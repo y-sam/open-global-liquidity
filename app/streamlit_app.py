@@ -14,7 +14,6 @@ from open_global_liquidity.dashboard import (
     DashboardDataError,
     latest_readings,
     load_dashboard_data,
-    resolve_dashboard_data_path,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
@@ -93,9 +92,19 @@ st.caption(
 )
 
 try:
-    data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
-except DashboardDataError as exc:
-    st.error(str(exc))
+    if PROCESSED_DATA_PATH.is_file():
+        data_path = PROCESSED_DATA_PATH
+        data_origin = "Local processed data"
+    elif SNAPSHOT_DATA_PATH.is_file():
+        data_path = SNAPSHOT_DATA_PATH
+        data_origin = "Bundled public snapshot"
+    else:
+        raise DashboardDataError(
+            "No dashboard data is available. Run the pipeline locally or publish a dashboard "
+            "snapshot."
+        )
+except DashboardDataError as data_path_error:
+    st.error(str(data_path_error))
     st.code(
         "uv run python -m open_global_liquidity.pipeline --start 2020-01-01 "
         "--publish-dashboard-snapshot",
