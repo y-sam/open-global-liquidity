@@ -1,5 +1,7 @@
 # Open Global Liquidity
 
+**Live Streamlit dashboard:** [https://open-global-liquidity.streamlit.app/](https://open-global-liquidity.streamlit.app/)
+
 > Open Global Liquidity is an independent research project using public data. It is inspired by publicly discussed concepts in global liquidity research, including work by Michael Howell and CrossBorder Capital, but it does not reproduce or claim access to CrossBorder Capital's proprietary methodology, data, or models.
 
 There is no endorsement by or affiliation with Michael Howell or CrossBorder Capital. The future
