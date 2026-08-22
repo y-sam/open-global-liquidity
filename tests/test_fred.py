@@ -1,3 +1,4 @@
+import logging
 from datetime import timedelta
 from pathlib import Path
 
@@ -91,6 +92,17 @@ def test_missing_api_key_fails_clearly(monkeypatch: pytest.MonkeyPatch, tmp_path
 
     with pytest.raises(MissingFredApiKeyError, match="FRED_API_KEY is missing"):
         FredProvider(cache_dir=tmp_path)
+
+
+def test_provider_suppresses_request_url_logging(tmp_path: Path) -> None:
+    httpx_logger = logging.getLogger("httpx")
+    previous_level = httpx_logger.level
+    httpx_logger.setLevel(logging.INFO)
+    try:
+        FredProvider(api_key="test-key", cache_dir=tmp_path)
+        assert httpx_logger.level == logging.WARNING
+    finally:
+        httpx_logger.setLevel(previous_level)
 
 
 def test_invalid_response_schema_fails_clearly(tmp_path: Path) -> None:

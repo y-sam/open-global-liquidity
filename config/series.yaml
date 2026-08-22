@@ -15,3 +15,53 @@ US:
       start: "2002-12-18"
       source: "Board of Governors of the Federal Reserve System (US), H.4.1"
       source_url: "https://fred.stlouisfed.org/series/WALCL"
+
+    treasury_general_account:
+      classification: measured_data
+      provider: fred
+      series_id: WDTGAL
+      component: treasury_general_account
+      title: "U.S. Treasury General Account: Wednesday Level"
+      description: >-
+        U.S. Treasury General Account deposits at Federal Reserve Banks at Wednesday level.
+        This measured cash balance is not itself a liquidity model or an OGLI component weight.
+      unit: "Millions of U.S. Dollars"
+      frequency: "Weekly, As of Wednesday"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2002-12-18"
+      source: "Board of Governors of the Federal Reserve System (US), H.4.1"
+      source_url: "https://fred.stlouisfed.org/series/WDTGAL"
+
+    overnight_reverse_repo:
+      classification: measured_data
+      provider: fred
+      series_id: RRPONTSYD
+      component: overnight_reverse_repo
+      title: "Overnight Reverse Repurchase Agreements: Treasury Securities Sold by the Federal Reserve"
+      description: >-
+        Aggregate daily amount of overnight reverse-repurchase transactions reported by the
+        Federal Reserve Bank of New York. This source series is daily and is not silently
+        interpolated or converted to a weekly economic model in this milestone.
+      unit: "Billions of U.S. Dollars"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2014-01-01"
+      source: "Federal Reserve Bank of New York, Temporary Open Market Operations"
+      source_url: "https://fred.stlouisfed.org/series/RRPONTSYD"
+
+    reserve_balances:
+      classification: measured_data
+      provider: fred
+      series_id: WRBWFRBL
+      component: reserve_balances
+      title: "Reserve Balances with Federal Reserve Banks: Wednesday Level"
+      description: >-
+        Reserve balances held with Federal Reserve Banks at Wednesday level. The Wednesday-level
+        series is selected for consistency with the balance-sheet stock observations; it is not
+        the weekly-average WRESBAL series.
+      unit: "Millions of U.S. Dollars"
+      frequency: "Weekly, As of Wednesday"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2002-12-18"
+      source: "Board of Governors of the Federal Reserve System (US), H.4.1"
+      source_url: "https://fred.stlouisfed.org/series/WRBWFRBL"

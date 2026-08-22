@@ -48,6 +48,10 @@ class FredProvider:
         cache_ttl: timedelta = timedelta(hours=24),
         client: httpx.Client | None = None,
     ) -> None:
+        # FRED v1 places credentials in the query string, which httpx includes in INFO request logs.
+        # Suppress transport request logging for every provider use, including notebooks.
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
         self.api_key = api_key or os.getenv("FRED_API_KEY")
         if not self.api_key:
             raise MissingFredApiKeyError(
@@ -130,10 +134,17 @@ class FredProvider:
     ) -> pd.DataFrame:
         cache_path = self.cache_dir / f"{series_id}.parquet"
         if not force_refresh and _cache_is_fresh(cache_path, self.cache_ttl):
-            LOGGER.info("Cache hit for %s: %s", series_id, cache_path)
             cached = pd.read_parquet(cache_path)
             _validate_raw_frame(cached, series_id)
-            return cached
+            observation_tolerance = timedelta(days=7)
+            cache_starts_early_enough = cached["date"].min().date() <= start + observation_tolerance
+            cache_ends_late_enough = (
+                end is None or cached["date"].max().date() >= end - observation_tolerance
+            )
+            if cache_starts_early_enough and cache_ends_late_enough:
+                LOGGER.info("Cache hit for %s: %s", series_id, cache_path)
+                return cached
+            LOGGER.info("Cache does not cover requested range for %s; refreshing", series_id)
 
         LOGGER.info("Cache miss for %s; downloading from FRED", series_id)
         raw = self._download(series_id=series_id, start=start, end=end)
