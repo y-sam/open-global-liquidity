@@ -1,0 +1,17 @@
+US:
+  liquidity:
+    fed_assets:
+      classification: measured_data
+      provider: fred
+      series_id: WALCL
+      component: fed_assets
+      title: "Assets: Total Assets: Total Assets (Less Eliminations from Consolidation): Wednesday Level"
+      description: >-
+        Total assets of the Federal Reserve Banks, less eliminations from consolidation.
+        This is measured source data and is not itself the OGLI or a Howell/CrossBorder model.
+      unit: "Millions of U.S. Dollars"
+      frequency: "Weekly, As of Wednesday"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2002-12-18"
+      source: "Board of Governors of the Federal Reserve System (US), H.4.1"
+      source_url: "https://fred.stlouisfed.org/series/WALCL"

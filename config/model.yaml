@@ -1,0 +1,4 @@
+# Model assumptions will be added in a later Phase 1 milestone.
+# Keeping this file separate makes future assumed and calibrated parameters auditable.
+assumptions: {}
+calibrated_parameters: {}
