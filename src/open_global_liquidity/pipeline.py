@@ -23,6 +23,7 @@ def run_pipeline(
     start: str | None = None,
     end: str | None = None,
     force_refresh: bool = False,
+    publish_dashboard_snapshot: bool = False,
 ) -> Path:
     """Fetch configured Phase 1 data and write one deterministic processed Parquet file."""
     load_dotenv(project_root / ".env")
@@ -48,6 +49,14 @@ def run_pipeline(
     output_path = output_dir / "us_fred_series.parquet"
     output.to_parquet(output_path, index=False)
     LOGGER.info("Wrote %d standardized observations to %s", len(output), output_path)
+
+    if publish_dashboard_snapshot:
+        snapshot_dir = project_root / "data" / "reference"
+        snapshot_dir.mkdir(parents=True, exist_ok=True)
+        snapshot_path = snapshot_dir / "us_fred_series_snapshot.parquet"
+        output.to_parquet(snapshot_path, index=False)
+        LOGGER.info("Published dashboard snapshot to %s", snapshot_path)
+
     print(
         f"Ingestion complete: {len(output):,} observations across "
         f"{output['series_id'].nunique()} series -> {output_path}"
@@ -65,6 +74,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Ignore the local raw-data cache and download again",
     )
+    parser.add_argument(
+        "--publish-dashboard-snapshot",
+        action="store_true",
+        help="Also write the versioned public snapshot used by hosted dashboards",
+    )
     return parser
 
 
@@ -73,7 +87,12 @@ def main() -> None:
     args = build_parser().parse_args()
     logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
     try:
-        run_pipeline(start=args.start, end=args.end, force_refresh=args.force_refresh)
+        run_pipeline(
+            start=args.start,
+            end=args.end,
+            force_refresh=args.force_refresh,
+            publish_dashboard_snapshot=args.publish_dashboard_snapshot,
+        )
     except (ConfigurationError, DataValidationError, FredError, OSError) as exc:
         raise SystemExit(f"Pipeline failed: {exc}") from exc
 

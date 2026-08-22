@@ -14,10 +14,12 @@ from open_global_liquidity.dashboard import (
     DashboardDataError,
     latest_readings,
     load_dashboard_data,
+    resolve_dashboard_data_path,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-DATA_PATH = PROJECT_ROOT / "data" / "processed" / "us_fred_series.parquet"
+PROCESSED_DATA_PATH = PROJECT_ROOT / "data" / "processed" / "us_fred_series.parquet"
+SNAPSHOT_DATA_PATH = PROJECT_ROOT / "data" / "reference" / "us_fred_series_snapshot.parquet"
 COMPONENT_ORDER = list(COMPONENT_LABELS)
 COLORS = {
     "Fed total assets": "#2563EB",
@@ -90,15 +92,19 @@ st.caption(
     "does not reproduce CrossBorder Capital's proprietary GLI."
 )
 
-if not DATA_PATH.is_file():
-    st.error(
-        "Processed data is missing. From the project root, run: "
-        "`uv run python -m open_global_liquidity.pipeline --start 2020-01-01`"
+try:
+    data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
+except DashboardDataError as exc:
+    st.error(str(exc))
+    st.code(
+        "uv run python -m open_global_liquidity.pipeline --start 2020-01-01 "
+        "--publish-dashboard-snapshot",
+        language="zsh",
     )
     st.stop()
 
 try:
-    data = _load_data(str(DATA_PATH), DATA_PATH.stat().st_mtime_ns)
+    data = _load_data(str(data_path), data_path.stat().st_mtime_ns)
 except DashboardDataError as exc:
     st.error(str(exc))
     st.stop()
@@ -114,6 +120,7 @@ with st.sidebar:
         [COMPONENT_LABELS[item] for item in COMPONENT_ORDER if item in set(data["component"])],
     )
     st.divider()
+    st.caption(f"Data mode: {data_origin}")
     st.caption(f"Data retrieved {last_retrieved:%Y-%m-%d %H:%M UTC}")
     st.caption("Source: FRED and the named originating Federal Reserve releases.")
 
@@ -177,7 +184,7 @@ with data_tab:
         .sort_values(["label", "date"], ascending=[True, False])
     )
     st.dataframe(table, width="stretch", hide_index=True)
-    st.caption(f"Processed file: `{DATA_PATH.relative_to(PROJECT_ROOT)}`")
+    st.caption(f"Displayed file: `{data_path.relative_to(PROJECT_ROOT)}`")
 
 with methodology_tab:
     st.subheader("What this version shows")
@@ -195,7 +202,8 @@ with methodology_tab:
 
         The charts use current-vintage FRED data and do not account for publication lags or preserve
         historical vintages. Daily RRP has not yet been resampled to a weekly research frequency.
-        No values are interpolated.
+        No values are interpolated. Hosted deployments use a versioned public-data snapshot when
+        locally processed data is unavailable; the sidebar identifies the active data mode.
         """
     )
     st.warning(

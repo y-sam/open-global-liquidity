@@ -49,9 +49,11 @@ US:
         lambda self, definition, **kwargs: expected,
     )
 
-    output_path = run_pipeline(project_root=tmp_path)
+    output_path = run_pipeline(project_root=tmp_path, publish_dashboard_snapshot=True)
     result = pd.read_parquet(output_path)
+    snapshot = pd.read_parquet(tmp_path / "data" / "reference" / "us_fred_series_snapshot.parquet")
 
     assert output_path == tmp_path / "data" / "processed" / "us_fred_series.parquet"
     assert result.columns.tolist() == STANDARD_COLUMNS
     pd.testing.assert_frame_equal(result, expected)
+    pd.testing.assert_frame_equal(snapshot, expected)

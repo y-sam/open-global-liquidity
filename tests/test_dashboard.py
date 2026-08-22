@@ -8,6 +8,7 @@ from open_global_liquidity.dashboard import (
     DashboardDataError,
     latest_readings,
     load_dashboard_data,
+    resolve_dashboard_data_path,
 )
 
 
@@ -63,3 +64,31 @@ def test_dashboard_rejects_unsupported_units(tmp_path: Path) -> None:
 
     with pytest.raises(DashboardDataError, match="cannot convert"):
         load_dashboard_data(path)
+
+
+def test_dashboard_prefers_processed_data_over_snapshot(tmp_path: Path) -> None:
+    processed = tmp_path / "processed.parquet"
+    snapshot = tmp_path / "snapshot.parquet"
+    processed.touch()
+    snapshot.touch()
+
+    path, origin = resolve_dashboard_data_path(processed, snapshot)
+
+    assert path == processed
+    assert origin == "Local processed data"
+
+
+def test_dashboard_falls_back_to_public_snapshot(tmp_path: Path) -> None:
+    processed = tmp_path / "processed.parquet"
+    snapshot = tmp_path / "snapshot.parquet"
+    snapshot.touch()
+
+    path, origin = resolve_dashboard_data_path(processed, snapshot)
+
+    assert path == snapshot
+    assert origin == "Bundled public snapshot"
+
+
+def test_dashboard_fails_clearly_without_any_data(tmp_path: Path) -> None:
+    with pytest.raises(DashboardDataError, match="No dashboard data"):
+        resolve_dashboard_data_path(tmp_path / "processed.parquet", tmp_path / "snapshot.parquet")

@@ -78,6 +78,7 @@ Useful options:
 ```zsh
 uv run python -m open_global_liquidity.pipeline --start 2020-01-01
 uv run python -m open_global_liquidity.pipeline --force-refresh
+uv run python -m open_global_liquidity.pipeline --start 2020-01-01 --publish-dashboard-snapshot
 ```
 
 The provider fails clearly when `FRED_API_KEY` is absent, FRED returns an error, the response schema
@@ -88,6 +89,12 @@ is invalid, or no observations are returned. A successful run writes:
 
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
+
+The explicit `--publish-dashboard-snapshot` option also writes
+`data/reference/us_fred_series_snapshot.parquet`. This small, versioned public-data artifact lets a
+hosted dashboard run without distributing a FRED key or downloading data on every visitor session.
+Updating the snapshot is a deliberate maintainer action and should be committed with its retrieval
+date visible in the dashboard.
 
 ## Launch the dashboard
 
@@ -102,6 +109,10 @@ Streamlit opens the dashboard at `http://localhost:8501`. The app shows latest b
 from each series' prior observation, multi-series history, a component explorer, recent source
 observations, and methodology notes. It reads the canonical processed Parquet output and contains
 no hidden economic calculations.
+
+The app prefers `data/processed/us_fred_series.parquet` during local research. If that ignored file
+is absent, as on Streamlit Community Cloud, it falls back to the tracked
+`data/reference/us_fred_series_snapshot.parquet` and labels the data mode in the sidebar.
 
 ## Internal data schema
 

@@ -25,6 +25,17 @@ class DashboardDataError(ValueError):
     """Raised when processed data cannot safely support the dashboard."""
 
 
+def resolve_dashboard_data_path(processed_path: Path, snapshot_path: Path) -> tuple[Path, str]:
+    """Prefer locally processed data and fall back to a versioned public snapshot."""
+    if processed_path.is_file():
+        return processed_path, "Local processed data"
+    if snapshot_path.is_file():
+        return snapshot_path, "Bundled public snapshot"
+    raise DashboardDataError(
+        "No dashboard data is available. Run the pipeline locally or publish a dashboard snapshot."
+    )
+
+
 def load_dashboard_data(path: Path) -> pd.DataFrame:
     """Load validated pipeline output and express dollar levels in common USD billions.
 
