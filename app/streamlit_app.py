@@ -791,6 +791,7 @@ def markets_page() -> None:
         & (comparisons["horizon_weeks"] == horizon)
     ].dropna(subset=["liquidity_signal", "market_return"])
     latest_pair = selected_pairs.iloc[-1]
+    bitcoin_price = latest_pair.get("value")
 
     with st.container(horizontal=True):
         st.metric(
@@ -800,7 +801,8 @@ def markets_page() -> None:
         )
         st.metric("Paired observations", f"{int(selected_summary['observations']):,}", border=True)
         st.metric("Latest paired OGLI", f"{latest_pair['ogli']:.1f}", border=True)
-        st.metric("BTC at signal date", f"${latest_pair['value']:,.0f}", border=True)
+        if pd.notna(bitcoin_price):
+            st.metric("BTC at signal date", f"${float(bitcoin_price):,.0f}", border=True)
         st.metric("Latest paired BTC return", f"{latest_pair['market_return']:.1%}", border=True)
 
     scatter_tab, rolling_tab, horizons_tab, data_tab = st.tabs(
