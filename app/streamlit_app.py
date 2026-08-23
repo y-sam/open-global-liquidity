@@ -8,7 +8,9 @@ from pathlib import Path
 
 import pandas as pd
 import plotly.express as px
+import plotly.graph_objects as go
 import streamlit as st
+from plotly.subplots import make_subplots
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 from dashboard_support import (  # noqa: E402
@@ -233,6 +235,52 @@ def _market_scatter_figure(frame: pd.DataFrame, title: str):
     return figure
 
 
+def _ogli_bitcoin_overlay_figure(frame: pd.DataFrame, title: str):
+    """Plot package-calculated OGLI beside Bitcoin prices without altering either series."""
+    figure = make_subplots(specs=[[{"secondary_y": True}]])
+    figure.add_trace(
+        go.Scatter(
+            x=frame["date"],
+            y=frame["value"],
+            name="Bitcoin price",
+            line={"color": "#D97706", "width": 2.25},
+            hovertemplate="$%{y:,.0f}<extra>Bitcoin</extra>",
+        ),
+        secondary_y=False,
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=frame["date"],
+            y=frame["ogli"],
+            name="OGLI",
+            line={"color": "#2563EB", "width": 2.25},
+            hovertemplate="%{y:.1f}<extra>OGLI</extra>",
+        ),
+        secondary_y=True,
+    )
+    figure.update_layout(
+        title=title,
+        hovermode="x unified",
+        legend={"orientation": "h", "y": 1.08, "x": 0},
+        margin={"l": 10, "r": 10, "t": 75, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    figure.update_yaxes(
+        title_text="Bitcoin price (USD, log scale)",
+        type="log",
+        tickprefix="$",
+        gridcolor="rgba(128,128,128,0.15)",
+        secondary_y=False,
+    )
+    figure.update_yaxes(
+        title_text="OGLI (0-100)",
+        range=[0, 100],
+        gridcolor="rgba(128,128,128,0.10)",
+        secondary_y=True,
+    )
+    return figure
+
+
 def _rolling_correlation_figure(frame: pd.DataFrame, title: str):
     figure = px.line(
         frame,
@@ -347,6 +395,61 @@ def landing_page() -> None:
         st.caption(
             f"Latest source date {latest_date:%Y-%m-%d} · {data_origin} · Nominal USD balances"
         )
+
+        try:
+            comparisons, correlations, market_origin = _market_data()
+            ogli_data, _ogli_origin = _ogli_data()
+        except DashboardDataError:
+            comparisons = None
+            correlations = pd.DataFrame()
+            ogli_data = pd.DataFrame()
+            market_origin = "Unavailable"
+
+        if comparisons is not None:
+            current_btc = comparisons.loc[
+                (comparisons["model_id"] == "model_b")
+                & (comparisons["market_id"] == "bitcoin")
+                & (comparisons["horizon_weeks"] == 0)
+            ].dropna(subset=["market_return"])
+            latest_ogli = ogli_data.loc[
+                (ogli_data["model_id"] == "model_b") & ogli_data["ogli"].notna()
+            ]
+            relationship = correlations.loc[
+                (correlations["model_id"] == "model_b")
+                & (correlations["market_id"] == "bitcoin")
+                & (correlations["horizon_weeks"] == 12)
+            ]
+            if not current_btc.empty and not latest_ogli.empty and not relationship.empty:
+                btc_row = current_btc.iloc[-1]
+                ogli_row = latest_ogli.iloc[-1]
+                relationship_row = relationship.iloc[0]
+                st.subheader("Bitcoin and liquidity momentum")
+                with st.container(horizontal=True):
+                    bitcoin_price = btc_row.get("value")
+                    if pd.notna(bitcoin_price):
+                        st.metric(
+                            "Bitcoin price",
+                            f"${float(bitcoin_price):,.0f}",
+                            f"{btc_row['market_return']:+.1%} weekly",
+                            border=True,
+                        )
+                    st.metric(
+                        "OGLI · Model B",
+                        f"{ogli_row['ogli']:.1f}",
+                        str(ogli_row["regime"]),
+                        border=True,
+                    )
+                    correlation = relationship_row["correlation"]
+                    st.metric(
+                        "BTC correlation · 12w forward",
+                        "Insufficient history" if pd.isna(correlation) else f"{correlation:+.2f}",
+                        f"{int(relationship_row['observations']):,} paired observations",
+                        border=True,
+                    )
+                st.caption(
+                    f"Bitcoin data through {btc_row['date']:%Y-%m-%d} · {market_origin} · "
+                    "Correlation is descriptive, not a forecast."
+                )
 
     st.subheader("A practical way to think about global liquidity")
     concept_columns = st.columns(3)
@@ -728,6 +831,12 @@ def markets_page() -> None:
             index=3,
             key="market_horizon",
         )
+        timeline_history = st.segmented_control(
+            "Timeline history",
+            ["3 years", "5 years", "All"],
+            default="5 years",
+            key="market_timeline_history",
+        )
         st.caption("Market: Bitcoin · Coin Metrics daily USD price")
         st.caption(f"Data mode: {data_origin}")
 
@@ -805,9 +914,39 @@ def markets_page() -> None:
             st.metric("BTC at signal date", f"${float(bitcoin_price):,.0f}", border=True)
         st.metric("Latest paired BTC return", f"{latest_pair['market_return']:.1%}", border=True)
 
-    scatter_tab, rolling_tab, horizons_tab, data_tab = st.tabs(
-        ["Relationship", "Rolling correlation", "Across horizons", "Paired data"]
+    timeline_tab, scatter_tab, rolling_tab, horizons_tab, data_tab = st.tabs(
+        ["Timeline", "Relationship", "Rolling correlation", "Across horizons", "Paired data"]
     )
+    with timeline_tab:
+        if "value" not in comparisons.columns:
+            st.info(
+                "Bitcoin price history will appear after the hosted data process finishes "
+                "reloading the latest snapshot.",
+                icon=":material/sync:",
+            )
+        else:
+            timeline = comparisons.loc[
+                (comparisons["model_id"] == model_id)
+                & (comparisons["market_id"] == "bitcoin")
+                & (comparisons["horizon_weeks"] == 0)
+            ].dropna(subset=["ogli", "value"])
+            if timeline_history != "All":
+                years = 3 if timeline_history == "3 years" else 5
+                timeline = timeline.loc[
+                    timeline["date"] >= timeline["date"].max() - timedelta(days=years * 365)
+                ]
+            st.plotly_chart(
+                _ogli_bitcoin_overlay_figure(
+                    timeline,
+                    f"{selected_model} and Bitcoin · {timeline_history}",
+                ),
+                width="stretch",
+                config={"displaylogo": False},
+            )
+            st.caption(
+                "Bitcoin uses a logarithmic USD axis; OGLI uses its 0-100 scale. The lines share "
+                "dates only—neither series is rescaled or fitted to the other."
+            )
     with scatter_tab:
         st.plotly_chart(
             _market_scatter_figure(

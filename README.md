@@ -164,8 +164,9 @@ uv run streamlit run app/streamlit_app.py
 ```
 
 Streamlit opens the dashboard at `http://localhost:8501`. The app shows latest measured balances,
-the three model levels, an OGLI page, a local Liquidity vs markets workspace, history, a component
-explorer, recent source observations, and methodology notes. Top navigation separates a
+the three model levels, an OGLI page, a Liquidity vs markets workspace, a log-scale Bitcoin/OGLI
+timeline, Bitcoin-focused landing metrics, history, a component explorer, recent source
+observations, and methodology notes. Top navigation separates a
 plain-language landing page, the OGLI index, market validation, the data dashboard, and a research
 guide with definitions, assumptions, limitations, and primary-source links. All
 model calculations come from the package and pipeline, not Streamlit.
@@ -229,15 +230,19 @@ CrossBorder Capital GLI.
 
 For each OGLI model, the pipeline compares the configured `momentum_score` at date `t` with Bitcoin
 USD price returns. Horizon zero is the one-week return ending at `t`; positive horizons are simple
-returns
-from `t` through 4, 8, 12, 26, or 52 weeks later. Pearson correlation summaries require 52 paired
-observations. Rolling correlations use a trailing 52-week window with a 26-observation minimum.
+returns from `t` through 4, 8, 12, 26, or 52 weeks later. Pearson correlation summaries require
+52 paired observations. Rolling correlations use a trailing 52-week window with a 26-observation
+minimum.
 
 Forward returns are retrospective outcome variables and never OGLI inputs. Longer forward-return
 windows overlap, observations are not independent, and correlation does not establish causation.
 The current alignment uses observation dates and does not yet adjust signals for source publication
 lags, so it is exploratory analysis rather than an investable historical backtest. The results do
 not currently calibrate weights or regimes.
+
+The dashboard timeline places Bitcoin's unmodified USD price on a logarithmic axis beside OGLI's
+unmodified 0-100 series. Sharing a chart and observation dates does not imply that either series
+causes, predicts, or has been fitted to the other.
 
 ## Roadmap
 
