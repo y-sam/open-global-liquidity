@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -11,29 +10,8 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-# Streamlit Community Cloud can retain an installed wheel when only application code changes.
-# Prefer this deployment's checked-out src package so UI imports and snapshot schemas stay in sync.
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-SOURCE_ROOT = PROJECT_ROOT / "src"
-while str(SOURCE_ROOT) in sys.path:
-    sys.path.remove(str(SOURCE_ROOT))
-sys.path.insert(0, str(SOURCE_ROOT))
-
-loaded_package = sys.modules.get("open_global_liquidity")
-loaded_package_path = getattr(loaded_package, "__file__", None)
-if loaded_package is not None and (
-    loaded_package_path is None
-    or not Path(loaded_package_path).resolve().is_relative_to(SOURCE_ROOT)
-):
-    stale_module_names = [
-        name
-        for name in sys.modules
-        if name == "open_global_liquidity" or name.startswith("open_global_liquidity.")
-    ]
-    for stale_module_name in stale_module_names:
-        del sys.modules[stale_module_name]
-
-from open_global_liquidity.dashboard import (  # noqa: E402
+from dashboard_support import (  # noqa: E402
     COMPONENT_LABELS,
     DashboardDataError,
     latest_model_readings,

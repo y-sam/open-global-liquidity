@@ -112,29 +112,25 @@ def test_streamlit_deployment_mode_needs_no_local_data_or_fred_secret(
     assert app.metric[0].label == "Net Fed liquidity proxy"
 
 
-def test_streamlit_prefers_checkout_over_stale_installed_package(tmp_path: Path) -> None:
+def test_streamlit_is_independent_of_broken_installed_package(tmp_path: Path) -> None:
     data_root = tmp_path / "data"
     _write_public_snapshots(data_root)
     stale_root = tmp_path / "stale_site_packages"
     stale_package = stale_root / "open_global_liquidity"
     stale_package.mkdir(parents=True)
     stale_package.joinpath("__init__.py").write_text("", encoding="utf-8")
-    stale_package.joinpath("dashboard.py").write_text("STALE_PACKAGE = True\n", encoding="utf-8")
+    stale_package.joinpath("dashboard.py").write_text(
+        'raise ImportError("simulated broken installed package")\n', encoding="utf-8"
+    )
 
     project_root = Path(__file__).resolve().parents[1]
     app_path = project_root / "app" / "streamlit_app.py"
-    checkout_dashboard = project_root / "src" / "open_global_liquidity" / "dashboard.py"
     script = f"""
-from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
-import open_global_liquidity.dashboard as stale_dashboard
-assert stale_dashboard.STALE_PACKAGE
 app = AppTest.from_file({str(app_path)!r}, default_timeout=20).run()
 assert not app.exception, app.exception
 assert not app.error, app.error
-import open_global_liquidity.dashboard as dashboard
-assert Path(dashboard.__file__).resolve() == Path({str(checkout_dashboard)!r}).resolve()
 """
     environment = os.environ.copy()
     environment["PYTHONPATH"] = str(stale_root)
