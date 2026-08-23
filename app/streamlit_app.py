@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import os
+import sys
 from datetime import timedelta
 from pathlib import Path
 
@@ -10,7 +11,15 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from open_global_liquidity.dashboard import (
+# Streamlit Community Cloud can retain an installed wheel when only application code changes.
+# Prefer this deployment's checked-out src package so UI imports and snapshot schemas stay in sync.
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+SOURCE_ROOT = PROJECT_ROOT / "src"
+while str(SOURCE_ROOT) in sys.path:
+    sys.path.remove(str(SOURCE_ROOT))
+sys.path.insert(0, str(SOURCE_ROOT))
+
+from open_global_liquidity.dashboard import (  # noqa: E402
     COMPONENT_LABELS,
     DashboardDataError,
     latest_model_readings,
@@ -20,7 +29,6 @@ from open_global_liquidity.dashboard import (
     resolve_dashboard_data_path,
 )
 
-PROJECT_ROOT = Path(__file__).resolve().parents[1]
 DATA_ROOT = Path(os.environ.get("OGLI_DATA_ROOT", PROJECT_ROOT / "data"))
 PROCESSED_DATA_PATH = DATA_ROOT / "processed" / "us_fred_series.parquet"
 SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_fred_series_snapshot.parquet"

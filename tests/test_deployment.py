@@ -1,3 +1,6 @@
+import os
+import subprocess
+import sys
 from datetime import UTC
 from pathlib import Path
 
@@ -107,3 +110,45 @@ def test_streamlit_deployment_mode_needs_no_local_data_or_fred_secret(
     ]
     assert len(app.metric) == 4
     assert app.metric[0].label == "Net Fed liquidity proxy"
+
+
+def test_streamlit_prefers_checkout_over_stale_installed_package(tmp_path: Path) -> None:
+    data_root = tmp_path / "data"
+    _write_public_snapshots(data_root)
+    stale_root = tmp_path / "stale_site_packages"
+    stale_package = stale_root / "open_global_liquidity"
+    stale_package.mkdir(parents=True)
+    stale_package.joinpath("__init__.py").write_text("", encoding="utf-8")
+    stale_package.joinpath("dashboard.py").write_text(
+        'raise ImportError("simulated stale dashboard package")\n', encoding="utf-8"
+    )
+
+    project_root = Path(__file__).resolve().parents[1]
+    app_path = project_root / "app" / "streamlit_app.py"
+    checkout_dashboard = project_root / "src" / "open_global_liquidity" / "dashboard.py"
+    script = f"""
+from pathlib import Path
+from streamlit.testing.v1 import AppTest
+
+app = AppTest.from_file({str(app_path)!r}, default_timeout=20).run()
+assert not app.exception, app.exception
+assert not app.error, app.error
+import open_global_liquidity.dashboard as dashboard
+assert Path(dashboard.__file__).resolve() == Path({str(checkout_dashboard)!r}).resolve()
+"""
+    environment = os.environ.copy()
+    environment["PYTHONPATH"] = str(stale_root)
+    environment["OGLI_DATA_ROOT"] = str(data_root)
+    environment.pop("FRED_API_KEY", None)
+
+    result = subprocess.run(
+        [sys.executable, "-c", script],
+        cwd=project_root,
+        env=environment,
+        capture_output=True,
+        text=True,
+        check=False,
+        timeout=30,
+    )
+
+    assert result.returncode == 0, result.stdout + result.stderr
