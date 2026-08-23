@@ -16,6 +16,7 @@ from open_global_liquidity.config import (
 )
 from open_global_liquidity.data.base import DataValidationError
 from open_global_liquidity.data.fred import FredError, FredProvider
+from open_global_liquidity.models.ogli import OGLICalculationError, calculate_ogli
 from open_global_liquidity.models.us_liquidity import (
     LiquidityModelError,
     calculate_us_liquidity_models,
@@ -23,6 +24,10 @@ from open_global_liquidity.models.us_liquidity import (
 from open_global_liquidity.transforms.frequency import (
     FrequencyAlignmentError,
     align_to_weekly_wednesday,
+)
+from open_global_liquidity.transforms.growth import (
+    GrowthCalculationError,
+    calculate_liquidity_momentum,
 )
 from open_global_liquidity.transforms.units import UnitConversionError, convert_to_usd_millions
 
@@ -78,6 +83,16 @@ def run_pipeline(
     models.to_parquet(models_path, index=False)
     LOGGER.info("Wrote %d model observations to %s", len(models), models_path)
 
+    ogli = calculate_ogli(calculate_liquidity_momentum(models), model_config.ogli)
+    ogli_path = output_dir / "us_ogli.parquet"
+    ogli.to_parquet(ogli_path, index=False)
+    LOGGER.info(
+        "Wrote %d OGLI observations (%d available) to %s",
+        len(ogli),
+        ogli["ogli"].notna().sum(),
+        ogli_path,
+    )
+
     if publish_dashboard_snapshot:
         snapshot_dir = project_root / "data" / "reference"
         snapshot_dir.mkdir(parents=True, exist_ok=True)
@@ -85,6 +100,7 @@ def run_pipeline(
             "us_fred_series_snapshot.parquet": output,
             "us_liquidity_weekly_snapshot.parquet": weekly,
             "us_liquidity_models_snapshot.parquet": models,
+            "us_ogli_snapshot.parquet": ogli,
         }
         for filename, snapshot_frame in snapshots.items():
             snapshot_path = snapshot_dir / filename
@@ -97,7 +113,8 @@ def run_pipeline(
 
     print(
         f"Pipeline complete: {len(output):,} source observations, "
-        f"{len(weekly):,} weekly aligned observations, and {len(models):,} model observations "
+        f"{len(weekly):,} weekly aligned observations, {len(models):,} model observations, "
+        f"and {ogli['ogli'].notna().sum():,} available OGLI readings "
         f"-> {output_dir}"
     )
     return output_path
@@ -137,7 +154,9 @@ def main() -> None:
         DataValidationError,
         FredError,
         FrequencyAlignmentError,
+        GrowthCalculationError,
         LiquidityModelError,
+        OGLICalculationError,
         UnitConversionError,
         OSError,
     ) as exc:

@@ -43,4 +43,29 @@ liquidity_models:
     terms:
       reserve_balances: 1.0
 
+ogli:
+  classification: statistical_transformation
+  description: >-
+    Experimental Open Global Liquidity Index normalization. OGLI measures how statistically
+    unusual current liquidity momentum is relative to its historical distribution. It is an
+    independent Open Global Liquidity methodology, not CrossBorder Capital's proprietary GLI.
+  normalization:
+    classification: statistical_transformation
+    default_mode: expanding
+    min_periods: 104
+  momentum_weights:
+    classification: model_assumption
+    growth_3m_annualized: 0.60
+    growth_12m_yoy: 0.40
+  regimes:
+    classification: model_assumption
+    thresholds:
+      - {label: "Strong contraction", max: 10}
+      - {label: "Contraction", max: 30}
+      - {label: "Below normal", max: 45}
+      - {label: "Neutral", max: 55}
+      - {label: "Above normal", max: 70}
+      - {label: "Expansion", max: 90}
+      - {label: "Strong expansion", max: 100}
+
 calibrated_parameters: {}

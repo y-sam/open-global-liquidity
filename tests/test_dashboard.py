@@ -1,3 +1,4 @@
+import importlib.util
 from datetime import UTC
 from pathlib import Path
 
@@ -119,3 +120,43 @@ def test_loads_liquidity_models_and_calculates_latest_change(tmp_path: Path) -> 
     assert result["value_usd_billions"].tolist() == [8_000.0, 8_100.0]
     assert latest["value_usd_billions"] == 8_100.0
     assert latest["change_usd_billions"] == 100.0
+
+
+def test_loads_calculated_ogli_and_selects_latest_available_reading(tmp_path: Path) -> None:
+    support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
+    spec = importlib.util.spec_from_file_location("dashboard_support_under_test", support_path)
+    assert spec is not None and spec.loader is not None
+    support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(support)
+    path = tmp_path / "ogli.parquet"
+    frame = pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-01-03", "2024-01-10"]),
+            "model_id": ["model_a", "model_a"],
+            "model_name": ["Model A", "Model A"],
+            "value": [8_000_000.0, 8_100_000.0],
+            "change_1m": [pd.NA, 100_000.0],
+            "change_3m": [pd.NA, 200_000.0],
+            "change_6m": [pd.NA, 300_000.0],
+            "change_12m": [pd.NA, 400_000.0],
+            "growth_3m_annualized": [pd.NA, 0.12],
+            "growth_12m_yoy": [pd.NA, 0.08],
+            "z_growth_3m_annualized": [pd.NA, 0.5],
+            "z_growth_12m_yoy": [pd.NA, 0.25],
+            "momentum_score": [pd.NA, 0.4],
+            "ogli": [pd.NA, 65.54],
+            "regime": [None, "Above normal"],
+            "zscore_mode": ["expanding", "expanding"],
+            "zscore_min_periods": [104, 104],
+            "ogli_classification": ["statistical_transformation"] * 2,
+            "weight_classification": ["model_assumption"] * 2,
+        }
+    )
+    frame.to_parquet(path, index=False)
+
+    loaded = support.load_ogli_data(path)
+    latest = support.latest_ogli_readings(loaded).iloc[0]
+
+    assert latest["ogli"] == 65.54
+    assert latest["regime"] == "Above normal"
+    assert latest["date"] == pd.Timestamp("2024-01-10")

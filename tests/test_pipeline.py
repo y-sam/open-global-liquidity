@@ -73,6 +73,27 @@ liquidity_models:
     formula: reserve_balances
     description: Test model C
     terms: {reserve_balances: 1.0}
+ogli:
+  classification: statistical_transformation
+  description: Test OGLI
+  normalization:
+    classification: statistical_transformation
+    default_mode: expanding
+    min_periods: 2
+  momentum_weights:
+    classification: model_assumption
+    growth_3m_annualized: 0.6
+    growth_12m_yoy: 0.4
+  regimes:
+    classification: model_assumption
+    thresholds:
+      - {label: Strong contraction, max: 10}
+      - {label: Contraction, max: 30}
+      - {label: Below normal, max: 45}
+      - {label: Neutral, max: 55}
+      - {label: Above normal, max: 70}
+      - {label: Expansion, max: 90}
+      - {label: Strong expansion, max: 100}
 """.strip(),
         encoding="utf-8",
     )
@@ -110,10 +131,12 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     source = pd.read_parquet(output_path)
     weekly = pd.read_parquet(tmp_path / "data" / "processed" / "us_liquidity_weekly.parquet")
     models = pd.read_parquet(tmp_path / "data" / "processed" / "us_liquidity_models.parquet")
+    ogli = pd.read_parquet(tmp_path / "data" / "processed" / "us_ogli.parquet")
     snapshot_dir = tmp_path / "data" / "reference"
     source_snapshot = pd.read_parquet(snapshot_dir / "us_fred_series_snapshot.parquet")
     weekly_snapshot = pd.read_parquet(snapshot_dir / "us_liquidity_weekly_snapshot.parquet")
     model_snapshot = pd.read_parquet(snapshot_dir / "us_liquidity_models_snapshot.parquet")
+    ogli_snapshot = pd.read_parquet(snapshot_dir / "us_ogli_snapshot.parquet")
 
     assert output_path == tmp_path / "data" / "processed" / "us_fred_series.parquet"
     assert source.columns.tolist() == STANDARD_COLUMNS
@@ -129,3 +152,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     pd.testing.assert_frame_equal(source_snapshot, source)
     pd.testing.assert_frame_equal(weekly_snapshot, weekly)
     pd.testing.assert_frame_equal(model_snapshot, models)
+    assert len(ogli) == 3
+    assert ogli["ogli"].isna().all()
+    assert set(ogli["zscore_mode"]) == {"expanding"}
+    pd.testing.assert_frame_equal(ogli_snapshot, ogli)

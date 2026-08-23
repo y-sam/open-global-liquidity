@@ -10,10 +10,13 @@ Capital GLI.
 
 ## Current scope: v0.1 US liquidity models
 
-The repository provides an auditable US data-ingestion path and a simple Streamlit dashboard. It
+The repository provides an auditable US data-ingestion path, experimental OGLI momentum index, and
+Streamlit dashboard. It
 downloads four liquidity-related Federal Reserve series from FRED, caches source observations,
 converts them to the project's long-format schema, aligns them to Wednesdays, and calculates three
-competing model levels. The dashboard keeps measured components separate from modeled results.
+competing model levels. It then calculates liquidity momentum and maps a configurable composite
+through the standard normal CDF onto the OGLI 0–100 scale. The dashboard keeps measured components,
+model assumptions, and statistical transformations separate.
 
 The configured measured series are:
 
@@ -31,7 +34,7 @@ The implemented models are transparent project assumptions:
 Model B is a common public-market proxy, not a Michael Howell or CrossBorder Capital formula.
 Model C uses reserve balances directly; TGA and RRP are not subtracted again because their effects
 are already reflected in reserves and another subtraction could double count those drains.
-Momentum and OGLI normalization remain deliberately unimplemented.
+The default OGLI uses expanding, non-look-ahead z-scores with a 104-observation minimum history.
 
 ## Research boundaries
 
@@ -100,6 +103,8 @@ is invalid, or no observations are returned. A successful run writes:
 - `data/processed/us_liquidity_weekly.parquet`: USD-million Wednesday inputs with source-date and
   staleness lineage;
 - `data/processed/us_liquidity_models.parquet`: the three weekly model levels and formulas.
+- `data/processed/us_ogli.parquet`: weekly changes, growth, z-scores, composite momentum, OGLI,
+  and regimes for all three models.
 
 Weekly source series require an exact Wednesday observation. Daily ON RRP uses the latest available
 observation on or before Wednesday, capped at seven calendar days. No balance-sheet values are
@@ -109,11 +114,12 @@ The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. 
 intentionally excluded from Git because it is reproducible from the public API.
 
 The explicit `--publish-dashboard-snapshot` option also writes
-three Git-versioned public-data artifacts:
+four Git-versioned public-data artifacts:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
 - `data/reference/us_liquidity_weekly_snapshot.parquet` — aligned weekly inputs and lineage;
 - `data/reference/us_liquidity_models_snapshot.parquet` — Models A/B/C.
+- `data/reference/us_ogli_snapshot.parquet` — momentum and expanding-normalized OGLI results.
 
 These small artifacts let the hosted dashboard run without local processed data, a `.env` file, a
 FRED key, or a download on every visitor session. Publishing snapshots is an explicit maintainer
@@ -130,9 +136,10 @@ uv run streamlit run app/streamlit_app.py
 ```
 
 Streamlit opens the dashboard at `http://localhost:8501`. The app shows latest measured balances,
-the three model levels, weekly changes, history, a component explorer, recent source observations,
-and methodology notes. Top navigation separates a plain-language landing page, the data dashboard,
-and a research guide with definitions, assumptions, limitations, and primary-source links. All
+the three model levels, an OGLI page, history, a component explorer, recent source observations,
+and methodology notes. Top navigation separates a plain-language landing page, the OGLI index,
+the data dashboard, and a research guide with definitions, assumptions, limitations, and
+primary-source links. All
 model calculations come from the package and pipeline, not Streamlit.
 
 The app prefers processed source and model files during local research. If those ignored files are
@@ -164,33 +171,37 @@ directory, and verifies that the public snapshots still render the landing-page 
 - `config/model.yaml` — classified weekly-alignment and model assumptions.
 - `src/open_global_liquidity/config.py` — validated configuration loading.
 - `src/open_global_liquidity/data/fred.py` — FRED network, error handling, cache, and standardization.
-- `src/open_global_liquidity/transforms/` — explicit unit conversion and weekly alignment.
+- `src/open_global_liquidity/transforms/` — unit conversion, alignment, growth, and z-scores.
 - `src/open_global_liquidity/models/us_liquidity.py` — configurable Model A/B/C calculations.
+- `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
 - `src/open_global_liquidity/dashboard.py` — tested dashboard data loading and unit conversion.
 - `src/open_global_liquidity/pipeline.py` — executable orchestration and Parquet output.
 - `app/streamlit_app.py` — presentation-only Streamlit application.
 - `tests/` — offline ingestion and configuration tests.
 
-## Locked next-milestone methodology
+## OGLI methodology
 
-The future OGLI normalization is specified as `100 × Φ(MomentumScore)`, where the momentum score is
+OGLI is specified as `100 × Φ(MomentumScore)`, where the momentum score is
 a configurable weighted composite of standardized 3-month annualized and 12-month year-over-year
-growth. The default historical mode will use expanding z-scores with a minimum history, so future
-observations cannot rewrite earlier values. Full-sample normalization will be labeled research-only
+growth. The current weights are 60% and 40%, respectively. The default historical mode uses
+expanding z-scores with a 104-observation minimum history, so future
+observations cannot rewrite earlier values. Full-sample normalization is research-only
 because it contains look-ahead. OGLI will **not** use min-max normalization or represent liquidity
-as a percentage of its historical maximum. This methodology is not implemented in the current
-deployment-readiness milestone.
+as a percentage of its historical maximum.
+
+The weights and regime thresholds are configurable research assumptions, not empirically calibrated
+parameters. OGLI is an independent Open Global Liquidity methodology and is not the proprietary
+CrossBorder Capital GLI.
 
 ## Roadmap
 
-The next v0.1 milestones are liquidity momentum, non-look-ahead OGLI normalization, and market
-validation. Later versions may add global
+The next v0.1 milestone is market comparison and lead-lag validation. Later versions may add global
 central banks, FX conversion, collateral and repo proxies, shadow monetary base concepts, BIS
 cross-border credit, and explicitly labeled public benchmark calibration.
 
 ## Limitations and disclaimer
 
-This early version is not yet a normalized liquidity index, trading model, or investment
+This early version is an experimental normalized momentum index, not a trading model or investment
 recommendation. It uses four nominal, non-seasonally-adjusted balance-sheet series standardized to
 a weekly research frequency. Public data can be revised, delayed, discontinued, or unavailable.
 Future statistical relationships will not by themselves establish causation. Users are responsible

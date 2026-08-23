@@ -15,9 +15,11 @@ from dashboard_support import (  # noqa: E402
     COMPONENT_LABELS,
     DashboardDataError,
     latest_model_readings,
+    latest_ogli_readings,
     latest_readings,
     load_dashboard_data,
     load_liquidity_model_data,
+    load_ogli_data,
     resolve_dashboard_data_path,
 )
 
@@ -26,6 +28,8 @@ PROCESSED_DATA_PATH = DATA_ROOT / "processed" / "us_fred_series.parquet"
 SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_fred_series_snapshot.parquet"
 MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
 MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
+OGLI_DATA_PATH = DATA_ROOT / "processed" / "us_ogli.parquet"
+OGLI_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_ogli_snapshot.parquet"
 COMPONENT_ORDER = list(COMPONENT_LABELS)
 WINDOW_DAYS = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
 COLORS = {
@@ -62,6 +66,13 @@ def _load_models(path: str, modified_ns: int) -> pd.DataFrame:
     return load_liquidity_model_data(Path(path))
 
 
+@st.cache_data(show_spinner=False)
+def _load_ogli(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache calculated OGLI data until its file timestamp changes."""
+    del modified_ns
+    return load_ogli_data(Path(path))
+
+
 def _source_data() -> tuple[pd.DataFrame, Path, str]:
     data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
     return _load_data(str(data_path), data_path.stat().st_mtime_ns), data_path, data_origin
@@ -76,6 +87,11 @@ def _model_data() -> tuple[pd.DataFrame, str] | None:
         return None
     models = _load_models(str(model_path), model_path.stat().st_mtime_ns)
     return models, model_origin
+
+
+def _ogli_data() -> tuple[pd.DataFrame, str]:
+    ogli_path, ogli_origin = resolve_dashboard_data_path(OGLI_DATA_PATH, OGLI_SNAPSHOT_DATA_PATH)
+    return _load_ogli(str(ogli_path), ogli_path.stat().st_mtime_ns), ogli_origin
 
 
 def _format_billions(value: float) -> str:
@@ -120,6 +136,32 @@ def _model_figure(frame: pd.DataFrame, title: str):
         margin={"l": 10, "r": 10, "t": 55, "b": 10},
         plot_bgcolor="rgba(0,0,0,0)",
         yaxis={"gridcolor": "rgba(128,128,128,0.18)", "tickprefix": "$", "ticksuffix": "bn"},
+    )
+    return figure
+
+
+def _ogli_figure(frame: pd.DataFrame, title: str):
+    figure = px.line(
+        frame,
+        x="date",
+        y="ogli",
+        labels={"date": "", "ogli": "OGLI (0-100)"},
+        title=title,
+    )
+    figure.update_traces(line={"width": 2.5, "color": "#2563EB"})
+    for threshold in [10, 30, 45, 55, 70, 90]:
+        figure.add_hline(
+            y=threshold,
+            line_width=1,
+            line_dash="dot",
+            line_color="rgba(128,128,128,0.3)",
+        )
+    figure.update_layout(
+        hovermode="x unified",
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+        yaxis={"range": [0, 100], "gridcolor": "rgba(128,128,128,0.12)"},
+        showlegend=False,
     )
     return figure
 
@@ -401,6 +443,130 @@ def data_dashboard_page() -> None:
         st.caption(f"Displayed file: `{displayed_path}`")
 
 
+def ogli_page() -> None:
+    st.title("OGLI momentum index")
+    st.caption(
+        "Experimental 0-100 normalization of US liquidity momentum. Independent Open Global "
+        "Liquidity methodology—not CrossBorder Capital's proprietary GLI."
+    )
+    try:
+        data, data_origin = _ogli_data()
+        latest_by_model = latest_ogli_readings(data)
+    except DashboardDataError as exc:
+        st.error(str(exc), icon=":material/error:")
+        st.code(
+            "uv run python -m open_global_liquidity.pipeline --start 2020-01-01",
+            language="zsh",
+        )
+        return
+
+    model_options = dict(
+        latest_by_model[["model_name", "model_id"]].itertuples(index=False, name=None)
+    )
+    with st.sidebar:
+        st.header("OGLI controls")
+        selected_name = st.selectbox(
+            "Liquidity definition",
+            list(model_options),
+            index=list(model_options).index("Model B — Net Fed liquidity proxy"),
+        )
+        history = st.segmented_control(
+            "History", ["1 year", "3 years", "All"], default="3 years", key="ogli_history"
+        )
+        st.caption(f"Data mode: {data_origin}")
+
+    model_id = model_options[selected_name]
+    model_data = data.loc[(data["model_id"] == model_id) & data["ogli"].notna()].copy()
+    latest = model_data.iloc[-1]
+    if history == "All":
+        visible = model_data
+    else:
+        visible = model_data.loc[
+            model_data["date"]
+            >= model_data["date"].max() - timedelta(days=WINDOW_DAYS[str(history)])
+        ]
+
+    with st.container(horizontal=True):
+        st.metric(
+            "Latest OGLI",
+            f"{latest['ogli']:.1f}",
+            border=True,
+            chart_data=model_data["ogli"].tail(26).tolist(),
+        )
+        st.metric("Liquidity regime", str(latest["regime"]), border=True)
+        st.metric(
+            "Momentum score", f"{latest['momentum_score']:+.2f} standard deviations", border=True
+        )
+        st.metric(
+            "3m annualized growth",
+            f"{latest['growth_3m_annualized']:.1%}",
+            border=True,
+        )
+        st.metric("12m YoY growth", f"{latest['growth_12m_yoy']:.1%}", border=True)
+
+    st.plotly_chart(
+        _ogli_figure(visible, f"{selected_name} · OGLI history"),
+        width="stretch",
+        config={"displaylogo": False},
+    )
+    st.caption(
+        f"Latest reading {latest['date']:%Y-%m-%d} · "
+        f"{latest['zscore_mode']} z-score · minimum {latest['zscore_min_periods']} observations"
+    )
+
+    with st.container(border=True):
+        st.subheader("How to read OGLI")
+        st.markdown(
+            """
+            OGLI measures how unusual current liquidity momentum is relative to historical
+            observations. It uses z-score normalization and the standard normal cumulative
+            distribution function. It is not normalized against the historical maximum, so new
+            liquidity highs do not mechanically rescale the entire historical index.
+
+            **Around 50 is statistically neutral.** Higher readings indicate momentum above its
+            historical norm; lower readings indicate momentum below its historical norm. This is
+            a relative momentum measure, not the dollar level of liquidity and not a forecast.
+            """
+        )
+
+    with st.expander("Formula, weights, and regimes"):
+        st.code(
+            "Momentum = 0.60 * z(3m annualized growth) + 0.40 * z(12m YoY growth)\n"
+            "OGLI = 100 * Phi(Momentum)",
+            language=None,
+        )
+        st.write(
+            "The 60/40 weights and regime thresholds are configurable Open Global Liquidity "
+            "research assumptions. They are not calibrated parameters and are not Howell or "
+            "CrossBorder Capital parameters."
+        )
+        st.dataframe(
+            pd.DataFrame(
+                {
+                    "OGLI range": [
+                        "0-10",
+                        ">10-30",
+                        ">30-45",
+                        ">45-55",
+                        ">55-70",
+                        ">70-90",
+                        ">90-100",
+                    ],
+                    "Regime": [
+                        "Strong contraction",
+                        "Contraction",
+                        "Below normal",
+                        "Neutral",
+                        "Above normal",
+                        "Expansion",
+                        "Strong expansion",
+                    ],
+                }
+            ),
+            hide_index=True,
+        )
+
+
 def research_guide_page() -> None:
     st.title("Research guide")
     st.markdown(
@@ -519,6 +685,25 @@ def research_guide_page() -> None:
         """
     )
 
+    st.subheader("OGLI statistical methodology")
+    st.markdown(
+        """
+        OGLI measures how unusual current liquidity momentum is relative to historical
+        observations. For each model, it combines **60% of the expanding z-score of 3-month
+        annualized growth** with **40% of the expanding z-score of 12-month year-over-year
+        growth**, then applies `100 * Phi(MomentumScore)`.
+
+        The default expanding z-score requires 104 valid observations and uses only information
+        available through each date. Full-sample normalization is available in package code for
+        exploratory research only because it contains look-ahead. OGLI is not normalized against
+        the historical maximum, so new liquidity highs do not mechanically rescale its history.
+
+        The weights, history requirement, and regime boundaries are declared in
+        `config/model.yaml`. They are Open Global Liquidity assumptions, not calibrated parameters.
+        OGLI is an independent methodology and is not the proprietary CrossBorder Capital GLI.
+        """
+    )
+
     st.subheader("Data sources and further reading")
     st.markdown(
         """
@@ -559,11 +744,17 @@ data_page = st.Page(
     icon=":material/monitoring:",
     url_path="dashboard",
 )
+ogli_index_page = st.Page(
+    ogli_page,
+    title="OGLI index",
+    icon=":material/speed:",
+    url_path="ogli",
+)
 guide_page = st.Page(
     research_guide_page,
     title="Research guide",
     icon=":material/menu_book:",
     url_path="research-guide",
 )
-navigation = st.navigation([home_page, data_page, guide_page], position="top")
+navigation = st.navigation([home_page, ogli_index_page, data_page, guide_page], position="top")
 navigation.run()

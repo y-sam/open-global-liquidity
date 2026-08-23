@@ -35,6 +35,28 @@ MODEL_COLUMNS = [
     "is_complete",
 ]
 
+OGLI_COLUMNS = [
+    "date",
+    "model_id",
+    "model_name",
+    "value",
+    "change_1m",
+    "change_3m",
+    "change_6m",
+    "change_12m",
+    "growth_3m_annualized",
+    "growth_12m_yoy",
+    "z_growth_3m_annualized",
+    "z_growth_12m_yoy",
+    "momentum_score",
+    "ogli",
+    "regime",
+    "zscore_mode",
+    "zscore_min_periods",
+    "ogli_classification",
+    "weight_classification",
+]
+
 COMPONENT_LABELS = {
     "fed_assets": "Fed total assets",
     "treasury_general_account": "Treasury General Account",
@@ -177,3 +199,37 @@ def latest_model_readings(frame: pd.DataFrame) -> pd.DataFrame:
     if not rows:
         raise DashboardDataError("Liquidity model data contains no complete observations")
     return pd.DataFrame(rows)
+
+
+def load_ogli_data(path: Path) -> pd.DataFrame:
+    """Load package-calculated OGLI observations without recalculating them in Streamlit."""
+    frame = _read_parquet(path, "OGLI data")
+    missing = sorted(set(OGLI_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("OGLI data is missing columns: " + ", ".join(missing))
+    if frame.empty:
+        raise DashboardDataError("OGLI data contains no observations")
+
+    result = frame[OGLI_COLUMNS].copy()
+    result["date"] = pd.to_datetime(result["date"])
+    invalid = result["ogli"].dropna().loc[lambda values: (values < 0) | (values > 100)]
+    if not invalid.empty:
+        raise DashboardDataError("OGLI data contains values outside 0-100")
+    return result.sort_values(["model_id", "date"]).reset_index(drop=True)
+
+
+def latest_ogli_readings(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return the latest available OGLI row for each model."""
+    required = {"model_id", "model_name", "date", "ogli", "regime"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError(f"OGLI data is missing columns: {', '.join(missing)}")
+    available = frame.dropna(subset=["ogli"])
+    if available.empty:
+        raise DashboardDataError("OGLI data contains no available normalized readings")
+    return (
+        available.sort_values("date")
+        .groupby("model_id", as_index=False, sort=False)
+        .tail(1)
+        .reset_index(drop=True)
+    )

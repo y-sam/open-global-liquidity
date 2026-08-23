@@ -61,11 +61,41 @@ class LiquidityModelDefinition:
 
 
 @dataclass(frozen=True, slots=True)
+class OGLINormalizationConfig:
+    """Historical standardization policy for the experimental OGLI."""
+
+    classification: str
+    default_mode: str
+    min_periods: int
+
+
+@dataclass(frozen=True, slots=True)
+class RegimeThreshold:
+    """Inclusive upper boundary and display label for one OGLI regime."""
+
+    label: str
+    max_value: float
+
+
+@dataclass(frozen=True, slots=True)
+class OGLIConfig:
+    """Assumptions and statistical transformations used by OGLI."""
+
+    classification: str
+    description: str
+    normalization: OGLINormalizationConfig
+    momentum_weights: dict[str, float]
+    regime_classification: str
+    regimes: tuple[RegimeThreshold, ...]
+
+
+@dataclass(frozen=True, slots=True)
 class ModelConfig:
     """Weekly alignment policy and competing liquidity definitions."""
 
     alignment: WeeklyAlignmentConfig
     models: tuple[LiquidityModelDefinition, ...]
+    ogli: OGLIConfig
 
 
 _REQUIRED_FIELDS = {
@@ -202,7 +232,84 @@ def load_model_config(path: Path) -> ModelConfig:
                 terms=terms,
             )
         )
-    return ModelConfig(alignment=alignment, models=tuple(models))
+    ogli = _parse_ogli_config(payload.get("ogli"))
+    return ModelConfig(alignment=alignment, models=tuple(models), ogli=ogli)
+
+
+def _parse_ogli_config(raw: Any) -> OGLIConfig:
+    if not isinstance(raw, dict):
+        raise ConfigurationError("ogli must be a mapping")
+    if raw.get("classification") != "statistical_transformation":
+        raise ConfigurationError("ogli must be classified as statistical_transformation")
+
+    normalization = raw.get("normalization")
+    if not isinstance(normalization, dict):
+        raise ConfigurationError("ogli.normalization must be a mapping")
+    if normalization.get("classification") != "statistical_transformation":
+        raise ConfigurationError(
+            "ogli.normalization must be classified as statistical_transformation"
+        )
+    mode = str(normalization.get("default_mode"))
+    if mode not in {"expanding", "full_sample"}:
+        raise ConfigurationError("ogli.normalization.default_mode must be expanding or full_sample")
+    try:
+        min_periods = int(normalization["min_periods"])
+    except (KeyError, TypeError, ValueError) as exc:
+        raise ConfigurationError("ogli.normalization.min_periods must be an integer") from exc
+    if min_periods < 2:
+        raise ConfigurationError("ogli.normalization.min_periods must be at least 2")
+
+    raw_weights = raw.get("momentum_weights")
+    if not isinstance(raw_weights, dict):
+        raise ConfigurationError("ogli.momentum_weights must be a mapping")
+    if raw_weights.get("classification") != "model_assumption":
+        raise ConfigurationError("ogli.momentum_weights must be classified as model_assumption")
+    expected_weights = {"growth_3m_annualized", "growth_12m_yoy"}
+    weight_keys = set(raw_weights) - {"classification"}
+    if weight_keys != expected_weights:
+        raise ConfigurationError(
+            "ogli.momentum_weights must define growth_3m_annualized and growth_12m_yoy"
+        )
+    try:
+        weights = {key: float(raw_weights[key]) for key in sorted(expected_weights)}
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError("ogli momentum weights must be numeric") from exc
+    if any(weight < 0 for weight in weights.values()):
+        raise ConfigurationError("ogli momentum weights cannot be negative")
+    if abs(sum(weights.values()) - 1.0) > 1e-12:
+        raise ConfigurationError("ogli momentum weights must sum to 1.0")
+
+    raw_regimes = raw.get("regimes")
+    if not isinstance(raw_regimes, dict):
+        raise ConfigurationError("ogli.regimes must be a mapping")
+    if raw_regimes.get("classification") != "model_assumption":
+        raise ConfigurationError("ogli.regimes must be classified as model_assumption")
+    raw_thresholds = raw_regimes.get("thresholds")
+    if not isinstance(raw_thresholds, list) or not raw_thresholds:
+        raise ConfigurationError("ogli.regimes.thresholds must be a non-empty list")
+    regimes: list[RegimeThreshold] = []
+    for item in raw_thresholds:
+        if not isinstance(item, dict) or set(item) != {"label", "max"}:
+            raise ConfigurationError("each OGLI regime must define label and max")
+        regimes.append(RegimeThreshold(label=str(item["label"]), max_value=float(item["max"])))
+    boundaries = [regime.max_value for regime in regimes]
+    if boundaries != sorted(boundaries) or len(set(boundaries)) != len(boundaries):
+        raise ConfigurationError("OGLI regime maxima must be strictly increasing")
+    if boundaries[-1] != 100.0:
+        raise ConfigurationError("the final OGLI regime maximum must be 100")
+
+    return OGLIConfig(
+        classification=str(raw["classification"]),
+        description=str(raw.get("description", "")),
+        normalization=OGLINormalizationConfig(
+            classification=str(normalization["classification"]),
+            default_mode=mode,
+            min_periods=min_periods,
+        ),
+        momentum_weights=weights,
+        regime_classification=str(raw_regimes["classification"]),
+        regimes=tuple(regimes),
+    )
 
 
 def _parse_definition(country: str, group: str, name: str, raw: Any) -> SeriesDefinition:

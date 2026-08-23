@@ -40,3 +40,19 @@ def test_load_model_config() -> None:
         "treasury_general_account": -1.0,
         "overnight_reverse_repo": -1.0,
     }
+    assert config.ogli.normalization.default_mode == "expanding"
+    assert config.ogli.normalization.min_periods == 104
+    assert config.ogli.momentum_weights == {
+        "growth_12m_yoy": 0.4,
+        "growth_3m_annualized": 0.6,
+    }
+    assert config.ogli.regimes[-1].max_value == 100
+
+
+def test_model_config_rejects_ogli_weights_that_do_not_sum_to_one(tmp_path: Path) -> None:
+    source = Path("config/model.yaml").read_text(encoding="utf-8")
+    path = tmp_path / "model.yaml"
+    path.write_text(source.replace("growth_12m_yoy: 0.40", "growth_12m_yoy: 0.50"))
+
+    with pytest.raises(ConfigurationError, match=r"must sum to 1\.0"):
+        load_model_config(path)
