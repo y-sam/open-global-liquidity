@@ -19,6 +19,20 @@ while str(SOURCE_ROOT) in sys.path:
     sys.path.remove(str(SOURCE_ROOT))
 sys.path.insert(0, str(SOURCE_ROOT))
 
+loaded_package = sys.modules.get("open_global_liquidity")
+loaded_package_path = getattr(loaded_package, "__file__", None)
+if loaded_package is not None and (
+    loaded_package_path is None
+    or not Path(loaded_package_path).resolve().is_relative_to(SOURCE_ROOT)
+):
+    stale_module_names = [
+        name
+        for name in sys.modules
+        if name == "open_global_liquidity" or name.startswith("open_global_liquidity.")
+    ]
+    for stale_module_name in stale_module_names:
+        del sys.modules[stale_module_name]
+
 from open_global_liquidity.dashboard import (  # noqa: E402
     COMPONENT_LABELS,
     DashboardDataError,

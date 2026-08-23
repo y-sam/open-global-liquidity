@@ -119,9 +119,7 @@ def test_streamlit_prefers_checkout_over_stale_installed_package(tmp_path: Path)
     stale_package = stale_root / "open_global_liquidity"
     stale_package.mkdir(parents=True)
     stale_package.joinpath("__init__.py").write_text("", encoding="utf-8")
-    stale_package.joinpath("dashboard.py").write_text(
-        'raise ImportError("simulated stale dashboard package")\n', encoding="utf-8"
-    )
+    stale_package.joinpath("dashboard.py").write_text("STALE_PACKAGE = True\n", encoding="utf-8")
 
     project_root = Path(__file__).resolve().parents[1]
     app_path = project_root / "app" / "streamlit_app.py"
@@ -130,6 +128,8 @@ def test_streamlit_prefers_checkout_over_stale_installed_package(tmp_path: Path)
 from pathlib import Path
 from streamlit.testing.v1 import AppTest
 
+import open_global_liquidity.dashboard as stale_dashboard
+assert stale_dashboard.STALE_PACKAGE
 app = AppTest.from_file({str(app_path)!r}, default_timeout=20).run()
 assert not app.exception, app.exception
 assert not app.error, app.error
