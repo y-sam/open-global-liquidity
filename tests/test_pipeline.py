@@ -23,14 +23,14 @@ def _write_test_config(project_root: Path) -> None:
             "Millions of U.S. Dollars",
             "Weekly, As of Wednesday",
         ),
-        "sp500": ("SP500", "Index", "Daily, Close"),
+        "bitcoin": ("btc.PriceUSD", "U.S. Dollars per Bitcoin", "Daily"),
     }
     blocks = []
     for component, (series_id, unit, frequency) in series.items():
         blocks.append(
             f"""    {component}:
       classification: measured_data
-      provider: fred
+      provider: {"coinmetrics" if component == "bitcoin" else "fred"}
       series_id: {series_id}
       component: {component}
       title: Test {component}
@@ -39,11 +39,11 @@ def _write_test_config(project_root: Path) -> None:
       frequency: {frequency}
       seasonal_adjustment: Not Seasonally Adjusted
       start: '2024-01-01'
-      source: Federal Reserve
-      source_url: https://fred.stlouisfed.org/series/{series_id}"""
+      source: Test provider
+      source_url: https://example.com/{series_id}"""
         )
-    liquidity_blocks = [block for block in blocks if "    sp500:" not in block]
-    market_block = next(block for block in blocks if "    sp500:" in block)
+    liquidity_blocks = [block for block in blocks if "    bitcoin:" not in block]
+    market_block = next(block for block in blocks if "    bitcoin:" in block)
     config_dir.joinpath("series.yaml").write_text(
         "US:\n  liquidity:\n" + "\n".join(liquidity_blocks) + "\n  markets:\n" + market_block,
         encoding="utf-8",
@@ -102,7 +102,7 @@ market_alignment:
   classification: model_assumption
   canonical_frequency: W-WED
   observation_day: Wednesday
-  daily_asof_components: [sp500]
+  daily_asof_components: [bitcoin]
   daily_asof_max_staleness_days: 7
   missing_policy: latest_prior_close
 market_analysis:
@@ -126,7 +126,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
         "WDTGAL": (500_000.0, "Millions of U.S. Dollars"),
         "RRPONTSYD": (1_000.0, "Billions of U.S. Dollars"),
         "WRBWFRBL": (3_000_000.0, "Millions of U.S. Dollars"),
-        "SP500": (4_800.0, "Index"),
+        "btc.PriceUSD": (60_000.0, "U.S. Dollars per Bitcoin"),
     }
 
     def fake_fetch(_provider, definition, **_kwargs):
@@ -135,7 +135,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
             {
                 "date": pd.to_datetime(["2024-01-03"]),
                 "country": ["US"],
-                "provider": ["FRED"],
+                "provider": [definition.provider],
                 "series_id": [definition.series_id],
                 "component": [definition.component],
                 "value": [value],
@@ -147,6 +147,9 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
 
     monkeypatch.setenv("FRED_API_KEY", "test-key")
     monkeypatch.setattr("open_global_liquidity.pipeline.FredProvider.fetch_definition", fake_fetch)
+    monkeypatch.setattr(
+        "open_global_liquidity.pipeline.CoinMetricsProvider.fetch_definition", fake_fetch
+    )
 
     output_path = run_pipeline(project_root=tmp_path, publish_dashboard_snapshot=True)
     source = pd.read_parquet(output_path)
@@ -170,6 +173,9 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     correlation_snapshot = pd.read_parquet(
         snapshot_dir / "us_liquidity_market_correlations_snapshot.parquet"
     )
+    comparison_snapshot = pd.read_parquet(
+        snapshot_dir / "us_liquidity_market_comparisons_snapshot.parquet"
+    )
 
     assert output_path == tmp_path / "data" / "processed" / "us_fred_series.parquet"
     assert source.columns.tolist() == STANDARD_COLUMNS
@@ -189,11 +195,13 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     assert ogli["ogli"].isna().all()
     assert set(ogli["zscore_mode"]) == {"expanding"}
     pd.testing.assert_frame_equal(ogli_snapshot, ogli)
-    assert market_source["series_id"].unique().tolist() == ["SP500"]
-    assert market_weekly["value"].item() == 4_800.0
+    assert market_source["series_id"].unique().tolist() == ["btc.PriceUSD"]
+    assert market_weekly["value"].item() == 60_000.0
     assert len(market_returns) == 6
     assert len(comparisons) == 18
     assert len(correlations) == 18
     pd.testing.assert_frame_equal(correlation_snapshot, correlations)
-    assert not snapshot_dir.joinpath("us_market_series_snapshot.parquet").exists()
-    assert not snapshot_dir.joinpath("us_liquidity_market_comparisons_snapshot.parquet").exists()
+    pd.testing.assert_frame_equal(comparison_snapshot, comparisons)
+    assert snapshot_dir.joinpath("us_market_series_snapshot.parquet").is_file()
+    assert snapshot_dir.joinpath("us_market_weekly_snapshot.parquet").is_file()
+    assert snapshot_dir.joinpath("us_market_returns_snapshot.parquet").is_file()

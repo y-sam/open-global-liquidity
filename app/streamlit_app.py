@@ -33,6 +33,9 @@ MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapsh
 OGLI_DATA_PATH = DATA_ROOT / "processed" / "us_ogli.parquet"
 OGLI_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_ogli_snapshot.parquet"
 MARKET_COMPARISONS_PATH = DATA_ROOT / "processed" / "us_liquidity_market_comparisons.parquet"
+MARKET_COMPARISONS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_liquidity_market_comparisons_snapshot.parquet"
+)
 MARKET_CORRELATIONS_PATH = DATA_ROOT / "processed" / "us_liquidity_market_correlations.parquet"
 MARKET_CORRELATIONS_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_liquidity_market_correlations_snapshot.parquet"
@@ -122,12 +125,14 @@ def _market_data() -> tuple[pd.DataFrame | None, pd.DataFrame, str]:
     correlations = _load_market_correlations(
         str(correlation_path), correlation_path.stat().st_mtime_ns
     )
-    if not MARKET_COMPARISONS_PATH.is_file():
+    try:
+        comparison_path, comparison_origin = resolve_dashboard_data_path(
+            MARKET_COMPARISONS_PATH, MARKET_COMPARISONS_SNAPSHOT_PATH
+        )
+    except DashboardDataError:
         return None, correlations, correlation_origin
-    comparisons = _load_market_comparisons(
-        str(MARKET_COMPARISONS_PATH), MARKET_COMPARISONS_PATH.stat().st_mtime_ns
-    )
-    return comparisons, correlations, "Local research data"
+    comparisons = _load_market_comparisons(str(comparison_path), comparison_path.stat().st_mtime_ns)
+    return comparisons, correlations, comparison_origin
 
 
 def _format_billions(value: float) -> str:
@@ -210,7 +215,7 @@ def _market_scatter_figure(frame: pd.DataFrame, title: str):
         hover_data={"date": "|%Y-%m-%d", "ogli": ":.1f"},
         labels={
             "liquidity_signal": "OGLI momentum score",
-            "market_return": "S&P 500 return",
+            "market_return": "Bitcoin return",
         },
         title=title,
     )
@@ -674,7 +679,7 @@ def ogli_page() -> None:
 def markets_page() -> None:
     st.title("Liquidity vs markets")
     st.caption(
-        "Retrospective comparison of OGLI momentum with S&P 500 returns. Correlation is not "
+        "Retrospective comparison of OGLI momentum with Bitcoin returns. Correlation is not "
         "causation, a forecast, or parameter calibration."
     )
     try:
@@ -682,17 +687,16 @@ def markets_page() -> None:
     except DashboardDataError as exc:
         st.info(str(exc), icon=":material/info:")
         st.markdown(
-            "The official FRED `SP500` series is suitable for local research, but its source "
-            "notes restrict redistribution. Run the pipeline with your own FRED key to create "
-            "the market files locally:"
+            "Bitcoin comparison files are unavailable. Run the pipeline to refresh the public "
+            "Coin Metrics market snapshot:"
         )
         st.code(
             "uv run python -m open_global_liquidity.pipeline --start 2020-01-01",
             language="zsh",
         )
         st.link_button(
-            "Review official SP500 metadata",
-            "https://fred.stlouisfed.org/series/SP500",
+            "Review Coin Metrics community data",
+            "https://github.com/coinmetrics/data",
             icon=":material/open_in_new:",
         )
         return
@@ -724,18 +728,18 @@ def markets_page() -> None:
             index=3,
             key="market_horizon",
         )
-        st.caption("Market: S&P 500 price index")
+        st.caption("Market: Bitcoin · Coin Metrics daily USD price")
         st.caption(f"Data mode: {data_origin}")
 
     model_id = model_options[selected_model]
     horizon = horizon_options[selected_horizon_label]
     selected_summary = correlations.loc[
         (correlations["model_id"] == model_id)
-        & (correlations["market_id"] == "sp500")
+        & (correlations["market_id"] == "bitcoin")
         & (correlations["horizon_weeks"] == horizon)
     ].iloc[0]
     model_correlations = correlations.loc[
-        (correlations["model_id"] == model_id) & (correlations["market_id"] == "sp500")
+        (correlations["model_id"] == model_id) & (correlations["market_id"] == "bitcoin")
     ]
     correlation = selected_summary["correlation"]
 
@@ -770,10 +774,9 @@ def markets_page() -> None:
             },
         )
         st.info(
-            "This hosted view contains only aggregate research statistics. Raw S&P 500 levels, "
-            "individual return observations, scatter points, and rolling correlations remain "
-            "local-only because the source series has redistribution restrictions.",
-            icon=":material/privacy_tip:",
+            "Only aggregate statistics are available in this data snapshot. Refresh the dashboard "
+            "snapshots to publish the complete non-commercial Bitcoin research view.",
+            icon=":material/info:",
         )
         st.warning(
             "These exploratory correlations use observation dates, do not model publication lags, "
@@ -784,7 +787,7 @@ def markets_page() -> None:
 
     selected_pairs = comparisons.loc[
         (comparisons["model_id"] == model_id)
-        & (comparisons["market_id"] == "sp500")
+        & (comparisons["market_id"] == "bitcoin")
         & (comparisons["horizon_weeks"] == horizon)
     ].dropna(subset=["liquidity_signal", "market_return"])
     latest_pair = selected_pairs.iloc[-1]
@@ -797,7 +800,8 @@ def markets_page() -> None:
         )
         st.metric("Paired observations", f"{int(selected_summary['observations']):,}", border=True)
         st.metric("Latest paired OGLI", f"{latest_pair['ogli']:.1f}", border=True)
-        st.metric("Latest paired S&P return", f"{latest_pair['market_return']:.1%}", border=True)
+        st.metric("BTC at signal date", f"${latest_pair['value']:,.0f}", border=True)
+        st.metric("Latest paired BTC return", f"{latest_pair['market_return']:.1%}", border=True)
 
     scatter_tab, rolling_tab, horizons_tab, data_tab = st.tabs(
         ["Relationship", "Rolling correlation", "Across horizons", "Paired data"]
@@ -806,7 +810,7 @@ def markets_page() -> None:
         st.plotly_chart(
             _market_scatter_figure(
                 selected_pairs,
-                f"{selected_model} vs S&P 500 · {selected_horizon_label}",
+                f"{selected_model} vs Bitcoin · {selected_horizon_label}",
             ),
             width="stretch",
             config={"displaylogo": False},
@@ -858,7 +862,7 @@ def markets_page() -> None:
                 "date": st.column_config.DateColumn("Signal date", format="YYYY-MM-DD"),
                 "ogli": st.column_config.NumberColumn("OGLI", format="%.1f"),
                 "liquidity_signal": st.column_config.NumberColumn("Momentum score", format="%+.2f"),
-                "market_return": st.column_config.NumberColumn("S&P return", format="percent"),
+                "market_return": st.column_config.NumberColumn("Bitcoin return", format="percent"),
                 "return_start_date": st.column_config.DateColumn(
                     "Return start", format="YYYY-MM-DD"
                 ),
@@ -875,10 +879,7 @@ def markets_page() -> None:
         "read as an investable signal.",
         icon=":material/warning:",
     )
-    st.caption(
-        "Source: S&P Dow Jones Indices LLC via FRED (`SP500`). Price index only; dividends are "
-        "excluded. Raw market observations are not included in the public repository snapshot."
-    )
+    st.caption("Source: Coin Metrics Community Data (`btc.PriceUSD`), licensed CC BY-NC 4.0.")
 
 
 def research_guide_page() -> None:
@@ -1021,8 +1022,9 @@ def research_guide_page() -> None:
     st.subheader("Market validation methodology")
     st.markdown(
         """
-        The initial validation slice compares each model's OGLI momentum score with the S&P 500
-        price index. Horizon zero is the contemporaneous one-week return ending at the signal date.
+        The initial validation slice compares each model's OGLI momentum score with the Coin
+        Metrics Bitcoin USD price. Horizon zero is the contemporaneous one-week return
+        ending at the signal date.
         Positive horizons are forward simple returns from the signal date through 4, 8, 12, 26,
         or 52 weeks later. Pearson correlations use at least 52 paired observations; rolling
         correlations use a 52-week window with a 26-observation minimum.
@@ -1034,10 +1036,9 @@ def research_guide_page() -> None:
         adjust for when each underlying release became publicly available, so it is exploratory
         analysis rather than a realistic backtest. Correlation does not establish causation.
 
-        FRED's `SP500` is a daily-close price index, excludes dividends, and provides a rolling ten
-        years of history. Its source notes restrict redistribution, so this project supports it for
-        local research but does not bundle its raw observations or market-analysis files in public
-        dashboard snapshots.
+        Coin Metrics publishes the daily `PriceUSD` metric in its community archive under CC BY-NC
+        4.0. This project uses it only for independent, non-commercial research and attributes the
+        source.
         """
     )
 
@@ -1050,11 +1051,13 @@ def research_guide_page() -> None:
         - [WDTGAL — Treasury General Account](https://fred.stlouisfed.org/series/WDTGAL)
         - [RRPONTSYD — Overnight reverse repo](https://fred.stlouisfed.org/series/RRPONTSYD)
         - [WRBWFRBL — Reserve balances](https://fred.stlouisfed.org/series/WRBWFRBL)
+        - [Bitcoin PriceUSD — Coin Metrics community data](https://github.com/coinmetrics/data)
 
         **Primary documentation and broader context**
 
         - [Federal Reserve H.4.1 balance-sheet release](https://www.federalreserve.gov/releases/h41/default.htm)
         - [New York Fed: repo and reverse repo agreements](https://www.newyorkfed.org/markets/domestic-market-operations/monetary-policy-implementation/repo-reverse-repo-agreements)
+        - [Coin Metrics metric documentation](https://docs.coinmetrics.io/)
         - [BIS: global liquidity indicators](https://www.bis.org/statistics/dataportal/gli.htm)
         - [BIS: global liquidity background and interpretation](https://www.bis.org/publ/qtrpdf/r_qt1503u.htm)
         """

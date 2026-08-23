@@ -73,7 +73,7 @@ market_alignment:
   canonical_frequency: "W-WED"
   observation_day: "Wednesday"
   daily_asof_components:
-    - sp500
+    - bitcoin
   daily_asof_max_staleness_days: 7
   missing_policy: "latest_prior_close"
 

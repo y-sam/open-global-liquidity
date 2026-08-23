@@ -67,19 +67,19 @@ US:
       source_url: "https://fred.stlouisfed.org/series/WRBWFRBL"
 
   markets:
-    sp500:
+    bitcoin:
       classification: measured_data
-      provider: fred
-      series_id: SP500
-      component: sp500
-      title: "S&P 500"
+      provider: coinmetrics
+      series_id: btc.PriceUSD
+      component: bitcoin
+      title: "Coin Metrics Bitcoin Price (USD)"
       description: >-
-        Daily S&P 500 price-index close. It excludes dividends and FRED provides a rolling ten
-        years of observations. S&P Dow Jones Indices copyright restrictions mean raw observations
-        are used for local research only and are not included in public dashboard snapshots.
-      unit: "Index"
-      frequency: "Daily, Close"
+        Daily Bitcoin price in U.S. dollars from Coin Metrics Community Data. This measured,
+        non-commercial community dataset is separate from OGLI and is used only as a retrospective
+        market outcome under the CC BY-NC 4.0 licence.
+      unit: "U.S. Dollars per Bitcoin"
+      frequency: "Daily"
       seasonal_adjustment: "Not Seasonally Adjusted"
-      start: "2016-01-01"
-      source: "S&P Dow Jones Indices LLC via FRED"
-      source_url: "https://fred.stlouisfed.org/series/SP500"
+      start: "2010-07-18"
+      source: "Coin Metrics Community Data"
+      source_url: "https://community-api.coinmetrics.io/v4/"

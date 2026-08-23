@@ -65,6 +65,8 @@ MARKET_COMPARISON_COLUMNS = [
     "momentum_score",
     "market_id",
     "series_id",
+    "value",
+    "unit",
     "horizon_weeks",
     "return_type",
     "market_return",

@@ -25,11 +25,11 @@ The configured measured liquidity series are:
 - [`RRPONTSYD`](https://fred.stlouisfed.org/series/RRPONTSYD): overnight reverse repos, daily;
 - [`WRBWFRBL`](https://fred.stlouisfed.org/series/WRBWFRBL): reserve balances, Wednesday level.
 
-The first local market-validation series is:
+The primary market-validation series is:
 
-- [`SP500`](https://fred.stlouisfed.org/series/SP500): S&P 500 daily-close price index. It excludes
-  dividends, has a rolling ten-year FRED history, and is not included in public snapshots because
-  its source notes restrict redistribution.
+- [`btc.PriceUSD`](https://community-api.coinmetrics.io/v4/): Coin Metrics' daily Bitcoin USD price,
+  published as Community Data under CC BY-NC 4.0. It is used for independent,
+  non-commercial research and can therefore support the complete hosted comparison workspace.
 
 The implemented models are transparent project assumptions:
 
@@ -86,7 +86,7 @@ cp .env.example .env
 ```
 
 Add your free FRED API key to `.env`. That file is ignored by Git and must never be committed.
-The S&P 500 local-research milestone uses the same FRED key; no additional account is required.
+Bitcoin market data comes from Coin Metrics Community Data and requires no account or API key.
 
 ## Run the pipeline
 
@@ -105,7 +105,8 @@ uv run python -m open_global_liquidity.pipeline --start 2020-01-01 --publish-das
 The provider fails clearly when `FRED_API_KEY` is absent, FRED returns an error, the response schema
 is invalid, or no observations are returned. A successful run writes:
 
-- `data/raw/fred/<SERIES_ID>.parquet`: provider observations plus retrieval metadata;
+- `data/raw/fred/<SERIES_ID>.parquet`: FRED observations plus retrieval metadata;
+- `data/raw/coinmetrics/btc_priceusd.parquet`: cached Bitcoin USD prices;
 - `data/processed/us_fred_series.parquet`: standardized long-format source observations;
 - `data/processed/us_liquidity_weekly.parquet`: USD-million Wednesday inputs with source-date and
   staleness lineage;
@@ -128,25 +129,30 @@ The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. 
 intentionally excluded from Git because it is reproducible from the public API.
 
 The explicit `--publish-dashboard-snapshot` option also writes
-five Git-versioned public-data artifacts:
+nine Git-versioned public-data artifacts:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
 - `data/reference/us_liquidity_weekly_snapshot.parquet` — aligned weekly inputs and lineage;
 - `data/reference/us_liquidity_models_snapshot.parquet` — Models A/B/C.
 - `data/reference/us_ogli_snapshot.parquet` — momentum and expanding-normalized OGLI results.
+- `data/reference/us_market_series_snapshot.parquet` — daily Bitcoin USD prices.
+- `data/reference/us_market_weekly_snapshot.parquet` — Wednesday-aligned Bitcoin prices.
+- `data/reference/us_market_returns_snapshot.parquet` — configured Bitcoin return outcomes.
+- `data/reference/us_liquidity_market_comparisons_snapshot.parquet` — individual OGLI/Bitcoin
+  pairs and trailing correlations.
 - `data/reference/us_liquidity_market_correlations_snapshot.parquet` — aggregate model/horizon
-  correlation estimates and sample sizes; no individual market observations or returns.
+  correlation estimates and sample sizes.
 
 These small artifacts let the hosted dashboard run without local processed data, a `.env` file, a
 FRED key, or a download on every visitor session. Publishing snapshots is an explicit maintainer
 action. Review the generated files before committing them; the dashboard displays the active data
 mode and source retrieval time.
 
-Market source data, individual returns, paired comparisons, scatter points, and rolling
-correlations are intentionally excluded from Git-versioned snapshots because FRED's official
-`SP500` notes impose S&P Dow Jones Indices redistribution restrictions. The hosted app displays
-only aggregate correlation estimates and sample sizes. A local pipeline run enables the complete
-market workspace using the researcher's own FRED access.
+Bitcoin market source data, individual returns, paired comparisons, scatter points, and rolling
+correlations are available in the hosted dashboard. Coin Metrics Community Data is licensed under
+[CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/); this project attributes Coin
+Metrics and uses the data only for independent, non-commercial research. S&P 500 analysis has been
+deferred until suitable public-display and derived-data rights are available.
 
 ## Launch the dashboard
 
@@ -193,6 +199,8 @@ directory, and verifies that the public snapshots still render the landing-page 
 - `config/model.yaml` — classified weekly-alignment and model assumptions.
 - `src/open_global_liquidity/config.py` — validated configuration loading.
 - `src/open_global_liquidity/data/fred.py` — FRED network, error handling, cache, and standardization.
+- `src/open_global_liquidity/data/coinmetrics.py` — no-key Coin Metrics community ingestion and
+  caching.
 - `src/open_global_liquidity/transforms/` — unit conversion, alignment, growth, and z-scores.
 - `src/open_global_liquidity/models/us_liquidity.py` — configurable Model A/B/C calculations.
 - `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
@@ -219,8 +227,9 @@ CrossBorder Capital GLI.
 
 ## Initial market-validation methodology
 
-For each OGLI model, the pipeline compares the configured `momentum_score` at date `t` with S&P 500
-returns. Horizon zero is the one-week return ending at `t`; positive horizons are simple returns
+For each OGLI model, the pipeline compares the configured `momentum_score` at date `t` with Bitcoin
+USD price returns. Horizon zero is the one-week return ending at `t`; positive horizons are simple
+returns
 from `t` through 4, 8, 12, 26, or 52 weeks later. Pearson correlation summaries require 52 paired
 observations. Rolling correlations use a trailing 52-week window with a 26-observation minimum.
 
@@ -232,8 +241,9 @@ not currently calibrate weights or regimes.
 
 ## Roadmap
 
-The next market additions may include Bitcoin, gold, Treasury yields, the yield curve, and a USD
-index after each source and its redistribution terms are verified. Later versions may add global
+The next market additions may include gold, Treasury yields, the yield curve, and a USD index after
+each source and its redistribution terms are verified. S&P 500 may return after appropriate public
+display rights are secured. Later versions may add global
 central banks, FX conversion, collateral and repo proxies, shadow monetary base concepts, BIS
 cross-border credit, and explicitly labeled public benchmark calibration.
 

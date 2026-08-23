@@ -24,6 +24,7 @@ from open_global_liquidity.config import (
     load_series_config,
 )
 from open_global_liquidity.data.base import DataValidationError
+from open_global_liquidity.data.coinmetrics import CoinMetricsError, CoinMetricsProvider
 from open_global_liquidity.data.fred import FredError, FredProvider
 from open_global_liquidity.models.ogli import OGLICalculationError, calculate_ogli
 from open_global_liquidity.models.us_liquidity import (
@@ -62,13 +63,11 @@ def run_pipeline(
         for item in definitions
         if item.provider.lower() == "fred" and item.group == "liquidity"
     ]
-    market_definitions = [
-        item for item in definitions if item.provider.lower() == "fred" and item.group == "markets"
-    ]
+    market_definitions = [item for item in definitions if item.group == "markets"]
     if not liquidity_definitions:
         raise RuntimeError("No FRED liquidity series are configured")
     if not market_definitions:
-        raise RuntimeError("No FRED market series are configured")
+        raise RuntimeError("No market series are configured")
 
     provider = FredProvider(cache_dir=project_root / "data" / "raw" / "fred")
     liquidity_frames = [
@@ -114,15 +113,23 @@ def run_pipeline(
         ogli_path,
     )
 
-    market_frames = [
-        provider.fetch_definition(
-            definition,
-            start=start,
-            end=end,
-            force_refresh=force_refresh,
+    coinmetrics_provider = CoinMetricsProvider(
+        cache_dir=project_root / "data" / "raw" / "coinmetrics"
+    )
+    market_providers = {"fred": provider, "coinmetrics": coinmetrics_provider}
+    market_frames = []
+    for definition in market_definitions:
+        market_provider = market_providers.get(definition.provider.lower())
+        if market_provider is None:
+            raise RuntimeError(f"Unsupported market provider: {definition.provider}")
+        market_frames.append(
+            market_provider.fetch_definition(
+                definition,
+                start=start,
+                end=end,
+                force_refresh=force_refresh,
+            )
         )
-        for definition in market_definitions
-    ]
     market_source = pd.concat(market_frames, ignore_index=True).sort_values(
         ["country", "series_id", "date"]
     )
@@ -181,6 +188,10 @@ def run_pipeline(
             "us_liquidity_weekly_snapshot.parquet": weekly,
             "us_liquidity_models_snapshot.parquet": models,
             "us_ogli_snapshot.parquet": ogli,
+            "us_market_series_snapshot.parquet": market_source,
+            "us_market_weekly_snapshot.parquet": market_weekly,
+            "us_market_returns_snapshot.parquet": market_returns,
+            "us_liquidity_market_comparisons_snapshot.parquet": comparisons,
             "us_liquidity_market_correlations_snapshot.parquet": correlations,
         }
         for filename, snapshot_frame in snapshots.items():
@@ -191,9 +202,8 @@ def run_pipeline(
                 len(snapshot_frame),
                 snapshot_path,
             )
-        LOGGER.warning(
-            "Raw market observations, returns, and paired comparisons were not published: "
-            "SP500 source metadata restricts redistribution"
+        LOGGER.info(
+            "Published Bitcoin market research under Coin Metrics Community Data CC BY-NC 4.0"
         )
 
     print(
@@ -237,6 +247,7 @@ def main() -> None:
         )
     except (
         ConfigurationError,
+        CoinMetricsError,
         DataValidationError,
         FredError,
         FrequencyAlignmentError,
