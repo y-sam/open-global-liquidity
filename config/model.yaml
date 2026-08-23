@@ -1,4 +1,46 @@
-# Model assumptions will be added in a later Phase 1 milestone.
-# Keeping this file separate makes future assumed and calibrated parameters auditable.
-assumptions: {}
+weekly_alignment:
+  classification: model_assumption
+  canonical_frequency: "W-WED"
+  observation_day: "Wednesday"
+  output_unit: "Millions of U.S. Dollars"
+  daily_asof_components:
+    - overnight_reverse_repo
+  daily_asof_max_staleness_days: 7
+  weekly_missing_policy: "exact_only"
+
+liquidity_models:
+  model_a:
+    name: "Model A — Fed assets"
+    classification: model_assumption
+    formula: "fed_assets"
+    description: >-
+      Federal Reserve total assets, used as the simplest central-bank balance-sheet liquidity
+      measure. It does not adjust for liability-side drains or describe all system liquidity.
+    terms:
+      fed_assets: 1.0
+
+  model_b:
+    name: "Model B — Net Fed liquidity proxy"
+    classification: model_assumption
+    formula: "fed_assets - treasury_general_account - overnight_reverse_repo"
+    description: >-
+      A common public-market proxy that adjusts Fed assets for the Treasury General Account and
+      overnight reverse-repo absorption. This is an Open Global Liquidity research assumption and
+      is not Michael Howell or CrossBorder Capital's proprietary formula.
+    terms:
+      fed_assets: 1.0
+      treasury_general_account: -1.0
+      overnight_reverse_repo: -1.0
+
+  model_c:
+    name: "Model C — Reserve-based liquidity"
+    classification: model_assumption
+    formula: "reserve_balances"
+    description: >-
+      Reserve balances held at Federal Reserve Banks are used as a direct settlement-liquidity
+      proxy. TGA and reverse repo are not subtracted again because their effects are already
+      reflected in reserve balances and doing so could double count drains.
+    terms:
+      reserve_balances: 1.0
+
 calibrated_parameters: {}

@@ -6,8 +6,10 @@ import pytest
 
 from open_global_liquidity.dashboard import (
     DashboardDataError,
+    latest_model_readings,
     latest_readings,
     load_dashboard_data,
+    load_liquidity_model_data,
     resolve_dashboard_data_path,
 )
 
@@ -92,3 +94,28 @@ def test_dashboard_falls_back_to_public_snapshot(tmp_path: Path) -> None:
 def test_dashboard_fails_clearly_without_any_data(tmp_path: Path) -> None:
     with pytest.raises(DashboardDataError, match="No dashboard data"):
         resolve_dashboard_data_path(tmp_path / "processed.parquet", tmp_path / "snapshot.parquet")
+
+
+def test_loads_liquidity_models_and_calculates_latest_change(tmp_path: Path) -> None:
+    path = tmp_path / "models.parquet"
+    pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-01-03", "2024-01-10"]),
+            "model_id": ["model_a", "model_a"],
+            "model_name": ["Model A", "Model A"],
+            "value": [8_000_000.0, 8_100_000.0],
+            "unit": ["Millions of U.S. Dollars"] * 2,
+            "frequency": ["Weekly, As of Wednesday"] * 2,
+            "classification": ["model_assumption"] * 2,
+            "formula": ["fed_assets"] * 2,
+            "description": ["Test"] * 2,
+            "is_complete": [True, True],
+        }
+    ).to_parquet(path, index=False)
+
+    result = load_liquidity_model_data(path)
+    latest = latest_model_readings(result).iloc[0]
+
+    assert result["value_usd_billions"].tolist() == [8_000.0, 8_100.0]
+    assert latest["value_usd_billions"] == 8_100.0
+    assert latest["change_usd_billions"] == 100.0

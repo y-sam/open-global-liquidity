@@ -20,6 +20,19 @@ _UNIT_TO_BILLIONS = {
     "Billions of U.S. Dollars": 1.0,
 }
 
+MODEL_COLUMNS = [
+    "date",
+    "model_id",
+    "model_name",
+    "value",
+    "unit",
+    "frequency",
+    "classification",
+    "formula",
+    "description",
+    "is_complete",
+]
+
 
 class DashboardDataError(ValueError):
     """Raised when processed data cannot safely support the dashboard."""
@@ -98,4 +111,61 @@ def latest_readings(frame: pd.DataFrame) -> pd.DataFrame:
         )
     if not rows:
         raise DashboardDataError("Dashboard data contains no numeric observations")
+    return pd.DataFrame(rows)
+
+
+def load_liquidity_model_data(path: Path) -> pd.DataFrame:
+    """Load package-calculated liquidity models for display in USD billions."""
+    if not path.is_file():
+        raise DashboardDataError(
+            f"Liquidity model data not found at {path}. Run the pipeline first."
+        )
+    try:
+        frame = pd.read_parquet(path)
+    except (OSError, ValueError) as exc:
+        raise DashboardDataError(f"Could not read liquidity model data at {path}: {exc}") from exc
+    missing = sorted(set(MODEL_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Liquidity model data is missing columns: " + ", ".join(missing))
+    if frame.empty:
+        raise DashboardDataError("Liquidity model data contains no observations")
+    if set(frame["unit"].dropna()) != {"Millions of U.S. Dollars"}:
+        raise DashboardDataError("Liquidity model data must use Millions of U.S. Dollars")
+
+    result = frame[MODEL_COLUMNS].copy()
+    result["date"] = pd.to_datetime(result["date"])
+    result["value_usd_billions"] = result["value"] * 0.001
+    return result.sort_values(["model_id", "date"]).reset_index(drop=True)
+
+
+def latest_model_readings(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return the latest complete model values and one-week changes."""
+    required = {"model_id", "model_name", "date", "value_usd_billions", "formula"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError(f"Liquidity model data is missing columns: {', '.join(missing)}")
+
+    rows: list[dict[str, object]] = []
+    for _model_id, group in frame.sort_values("date").groupby("model_id", sort=False):
+        valid = group.dropna(subset=["value_usd_billions"])
+        if valid.empty:
+            continue
+        latest = valid.iloc[-1]
+        previous = valid.iloc[-2] if len(valid) > 1 else None
+        rows.append(
+            {
+                "model_id": latest["model_id"],
+                "model_name": latest["model_name"],
+                "date": latest["date"],
+                "value_usd_billions": latest["value_usd_billions"],
+                "change_usd_billions": (
+                    latest["value_usd_billions"] - previous["value_usd_billions"]
+                    if previous is not None
+                    else pd.NA
+                ),
+                "formula": latest["formula"],
+            }
+        )
+    if not rows:
+        raise DashboardDataError("Liquidity model data contains no complete observations")
     return pd.DataFrame(rows)

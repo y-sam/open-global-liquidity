@@ -1,7 +1,8 @@
-"""Streamlit presentation layer for measured US liquidity data."""
+"""Streamlit presentation layer for Open Global Liquidity research."""
 
 from __future__ import annotations
 
+import os
 from datetime import timedelta
 from pathlib import Path
 
@@ -12,20 +13,39 @@ import streamlit as st
 from open_global_liquidity.dashboard import (
     COMPONENT_LABELS,
     DashboardDataError,
+    latest_model_readings,
     latest_readings,
     load_dashboard_data,
+    load_liquidity_model_data,
+    resolve_dashboard_data_path,
 )
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
-PROCESSED_DATA_PATH = PROJECT_ROOT / "data" / "processed" / "us_fred_series.parquet"
-SNAPSHOT_DATA_PATH = PROJECT_ROOT / "data" / "reference" / "us_fred_series_snapshot.parquet"
+DATA_ROOT = Path(os.environ.get("OGLI_DATA_ROOT", PROJECT_ROOT / "data"))
+PROCESSED_DATA_PATH = DATA_ROOT / "processed" / "us_fred_series.parquet"
+SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_fred_series_snapshot.parquet"
+MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
+MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
 COMPONENT_ORDER = list(COMPONENT_LABELS)
+WINDOW_DAYS = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
 COLORS = {
     "Fed total assets": "#2563EB",
     "Treasury General Account": "#D97706",
     "ON reverse repo": "#7C3AED",
     "Reserve balances": "#059669",
 }
+MODEL_COLORS = {
+    "Model A — Fed assets": "#2563EB",
+    "Model B — Net Fed liquidity proxy": "#D97706",
+    "Model C — Reserve-based liquidity": "#059669",
+}
+
+st.set_page_config(
+    page_title="Open Global Liquidity",
+    page_icon=":material/water_drop:",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
 
 @st.cache_data(show_spinner=False)
@@ -33,6 +53,29 @@ def _load_data(path: str, modified_ns: int) -> pd.DataFrame:
     """Cache processed data until its file modification timestamp changes."""
     del modified_ns
     return load_dashboard_data(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_models(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache model data until its file modification timestamp changes."""
+    del modified_ns
+    return load_liquidity_model_data(Path(path))
+
+
+def _source_data() -> tuple[pd.DataFrame, Path, str]:
+    data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
+    return _load_data(str(data_path), data_path.stat().st_mtime_ns), data_path, data_origin
+
+
+def _model_data() -> tuple[pd.DataFrame, str] | None:
+    try:
+        model_path, model_origin = resolve_dashboard_data_path(
+            MODEL_DATA_PATH, MODEL_SNAPSHOT_DATA_PATH
+        )
+    except DashboardDataError:
+        return None
+    models = _load_models(str(model_path), model_path.stat().st_mtime_ns)
+    return models, model_origin
 
 
 def _format_billions(value: float) -> str:
@@ -60,168 +103,467 @@ def _history_figure(frame: pd.DataFrame, title: str):
     return figure
 
 
-st.set_page_config(
-    page_title="Open Global Liquidity",
-    page_icon="◉",
-    layout="wide",
-    initial_sidebar_state="expanded",
-)
+def _model_figure(frame: pd.DataFrame, title: str):
+    figure = px.line(
+        frame,
+        x="date",
+        y="value_usd_billions",
+        color="model_name",
+        color_discrete_map=MODEL_COLORS,
+        labels={"date": "", "value_usd_billions": "USD billions", "model_name": "Model"},
+        title=title,
+    )
+    figure.update_traces(line={"width": 2})
+    figure.update_layout(
+        hovermode="x unified",
+        legend_title_text="",
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+        yaxis={"gridcolor": "rgba(128,128,128,0.18)", "tickprefix": "$", "ticksuffix": "bn"},
+    )
+    return figure
 
-st.markdown(
-    """
-    <style>
-    .block-container {padding-top: 3.5rem; padding-bottom: 3rem; max-width: 1500px;}
-    [data-testid="stMetric"] {
-        border: 1px solid rgba(128,128,128,.22); padding: 1rem; border-radius: .75rem;
-    }
-    [data-testid="stMetricValue"] {font-size: clamp(1.45rem, 2.2vw, 2rem);}
-    .ogli-kicker {
-        color: #64748b; font-size: .78rem; font-weight: 700; letter-spacing: .12em;
-        text-transform: uppercase;
-    }
-    </style>
-    """,
-    unsafe_allow_html=True,
-)
 
-st.markdown('<div class="ogli-kicker">Measured data monitor · v0.1</div>', unsafe_allow_html=True)
-st.title("Open Global Liquidity")
-st.caption(
-    "A transparent public-data research dashboard. This measured-data view is not yet OGLI and "
-    "does not reproduce CrossBorder Capital's proprietary GLI."
-)
-
-try:
-    if PROCESSED_DATA_PATH.is_file():
-        data_path = PROCESSED_DATA_PATH
-        data_origin = "Local processed data"
-    elif SNAPSHOT_DATA_PATH.is_file():
-        data_path = SNAPSHOT_DATA_PATH
-        data_origin = "Bundled public snapshot"
-    else:
-        raise DashboardDataError(
-            "No dashboard data is available. Run the pipeline locally or publish a dashboard "
-            "snapshot."
+def _load_or_explain() -> tuple[pd.DataFrame, Path, str] | None:
+    try:
+        return _source_data()
+    except DashboardDataError as exc:
+        st.error(str(exc), icon=":material/error:")
+        st.code(
+            "uv run python -m open_global_liquidity.pipeline --start 2020-01-01",
+            language="zsh",
         )
-except DashboardDataError as data_path_error:
-    st.error(str(data_path_error))
-    st.code(
-        "uv run python -m open_global_liquidity.pipeline --start 2020-01-01 "
-        "--publish-dashboard-snapshot",
-        language="zsh",
-    )
-    st.stop()
+        return None
 
-try:
-    data = _load_data(str(data_path), data_path.stat().st_mtime_ns)
-except DashboardDataError as exc:
-    st.error(str(exc))
-    st.stop()
 
-latest = latest_readings(data).set_index("component")
-last_retrieved = pd.to_datetime(data["retrieved_at"].max(), utc=True)
-
-with st.sidebar:
-    st.header("View controls")
-    window = st.radio("History", ["1 year", "3 years", "5 years", "All"], index=2)
-    selected_label = st.selectbox(
-        "Component explorer",
-        [COMPONENT_LABELS[item] for item in COMPONENT_ORDER if item in set(data["component"])],
-    )
-    st.divider()
-    st.caption(f"Data mode: {data_origin}")
-    st.caption(f"Data retrieved {last_retrieved:%Y-%m-%d %H:%M UTC}")
-    st.caption("Source: FRED and the named originating Federal Reserve releases.")
-
-max_date = data["date"].max()
-window_days = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
-if window == "All":
-    visible = data
-else:
-    visible = data.loc[data["date"] >= max_date - timedelta(days=window_days[window])]
-
-overview_tab, explorer_tab, data_tab, methodology_tab = st.tabs(
-    ["Overview", "Component explorer", "Latest data", "Methodology"]
-)
-
-with overview_tab:
-    st.subheader("Latest measured balances")
-    metric_columns = st.columns(4)
-    for column, component in zip(metric_columns, COMPONENT_ORDER, strict=True):
-        if component not in latest.index:
-            column.metric(COMPONENT_LABELS[component], "Unavailable")
-            continue
-        row = latest.loc[component]
-        change = row["change_usd_billions"]
-        delta = None if pd.isna(change) else f"{change:+,.1f}bn vs prior obs."
-        column.metric(row["label"], _format_billions(row["value_usd_billions"]), delta)
-        column.caption(f"{row['series_id']} · {row['date']:%Y-%m-%d}")
-
-    st.plotly_chart(
-        _history_figure(visible, f"US liquidity-related balance-sheet series · {window}"),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    st.info(
-        "Values are converted to USD billions only for display. No subtraction, weighting, "
-        "normalization, or OGLI calculation is applied in this dashboard version."
-    )
-
-with explorer_tab:
-    selected_component = next(
-        component for component, label in COMPONENT_LABELS.items() if label == selected_label
-    )
-    component_data = visible.loc[visible["component"] == selected_component]
-    st.plotly_chart(
-        _history_figure(component_data, selected_label),
-        width="stretch",
-        config={"displaylogo": False},
-    )
-    source_row = data.loc[data["component"] == selected_component].iloc[-1]
-    left, right = st.columns(2)
-    left.markdown(f"**FRED series:** `{source_row['series_id']}`")
-    left.markdown(f"**Source unit:** {source_row['unit']}")
-    right.markdown(f"**Frequency:** {source_row['frequency']}")
-    right.markdown(f"**Latest observation:** {source_row['date']:%Y-%m-%d}")
-
-with data_tab:
-    st.subheader("Most recent source observations")
-    table = (
-        data.sort_values("date")
-        .groupby("component", as_index=False)
-        .tail(10)[["date", "label", "series_id", "value", "unit", "frequency"]]
-        .sort_values(["label", "date"], ascending=[True, False])
-    )
-    st.dataframe(table, width="stretch", hide_index=True)
-    st.caption(f"Displayed file: `{data_path.relative_to(PROJECT_ROOT)}`")
-
-with methodology_tab:
-    st.subheader("What this version shows")
+def landing_page() -> None:
+    st.badge("Independent public-data research · v0.1", icon=":material/science:")
+    st.title("See the financial system through a liquidity lens")
     st.markdown(
         """
-        This dashboard displays four **measured public series**:
+        **Global liquidity is the ease with which financing can be created, obtained, and moved
+        through the financial system.** It reflects more than central-bank money: bank balance
+        sheets, credit creation, collateral, funding markets, and cross-border finance all matter.
 
-        - **WALCL:** Federal Reserve total assets, Wednesday level.
-        - **WDTGAL:** Treasury General Account, Wednesday level.
-        - **RRPONTSYD:** overnight reverse-repurchase operations, daily.
-        - **WRBWFRBL:** reserve balances with Federal Reserve Banks, Wednesday level.
-
-        Source observations in millions are divided by 1,000 for a common **USD billions** display
-        unit. RRP is already reported in billions. This unit conversion is not an economic model.
-
-        The charts use current-vintage FRED data and do not account for publication lags or preserve
-        historical vintages. Daily RRP has not yet been resampled to a weekly research frequency.
-        No values are interpolated. Hosted deployments use a versioned public-data snapshot when
-        locally processed data is unavailable; the sidebar identifies the active data mode.
+        Open Global Liquidity turns public data into transparent, reproducible indicators. The
+        current release is deliberately narrow—**United States only**—so the engineering and
+        research assumptions can be tested before building a global aggregate.
         """
     )
+
+    loaded = _load_or_explain()
+    if loaded is not None:
+        data, _data_path, data_origin = loaded
+        latest = latest_readings(data).set_index("component")
+        try:
+            model_bundle = _model_data()
+        except DashboardDataError:
+            model_bundle = None
+        models = model_bundle[0] if model_bundle is not None else None
+        latest_models = (
+            latest_model_readings(models).set_index("model_id") if models is not None else None
+        )
+
+        st.subheader("Latest US liquidity snapshot")
+        with st.container(horizontal=True):
+            if latest_models is not None and "model_b" in latest_models.index:
+                row = latest_models.loc["model_b"]
+                delta = row["change_usd_billions"]
+                st.metric(
+                    "Net Fed liquidity proxy",
+                    _format_billions(float(row["value_usd_billions"])),
+                    None if pd.isna(delta) else f"{delta:+,.1f}bn weekly",
+                    border=True,
+                    chart_data=models.loc[models["model_id"] == "model_b", "value_usd_billions"]
+                    .tail(26)
+                    .tolist(),
+                )
+            for component in ["fed_assets", "reserve_balances", "treasury_general_account"]:
+                if component not in latest.index:
+                    continue
+                row = latest.loc[component]
+                delta = row["change_usd_billions"]
+                st.metric(
+                    str(row["label"]),
+                    _format_billions(float(row["value_usd_billions"])),
+                    None if pd.isna(delta) else f"{delta:+,.1f}bn prior observation",
+                    border=True,
+                    chart_data=data.loc[data["component"] == component, "value_usd_billions"].tail(
+                        26
+                    ),
+                )
+        latest_date = data["date"].max()
+        st.caption(
+            f"Latest source date {latest_date:%Y-%m-%d} · {data_origin} · Nominal USD balances"
+        )
+
+    st.subheader("A practical way to think about global liquidity")
+    concept_columns = st.columns(3)
+    with concept_columns[0].container(border=True, height="stretch"):
+        st.markdown("#### :material/account_balance: Monetary base")
+        st.write(
+            "Central-bank assets and reserve balances establish the official-money foundation "
+            "on which financial institutions settle and expand balance sheets."
+        )
+    with concept_columns[1].container(border=True, height="stretch"):
+        st.markdown("#### :material/credit_score: Credit capacity")
+        st.write(
+            "Banks and market-based lenders multiply financing through loans, securities, repo, "
+            "and other forms of leverage."
+        )
+    with concept_columns[2].container(border=True, height="stretch"):
+        st.markdown("#### :material/hub: Market transmission")
+        st.write(
+            "Collateral quality, volatility, funding costs, and cross-border channels influence "
+            "how easily liquidity reaches markets and borrowers."
+        )
+
+    st.subheader("Why use a liquidity framework?")
+    benefit_columns = st.columns(3)
+    with benefit_columns[0]:
+        st.markdown("**Track the direction of financing conditions**")
+        st.caption(
+            "Levels and momentum can provide context for whether balance-sheet capacity is "
+            "expanding or contracting."
+        )
+    with benefit_columns[1]:
+        st.markdown("**Compare competing definitions**")
+        st.caption(
+            "No single series captures liquidity. Showing alternatives makes model uncertainty "
+            "visible instead of hiding it."
+        )
+    with benefit_columns[2]:
+        st.markdown("**Audit every transformation**")
+        st.caption(
+            "Series IDs, units, alignment rules, source dates, and model weights remain explicit "
+            "and reproducible."
+        )
+
     st.warning(
-        "No liquidity formula, momentum score, regime, or OGLI normalization is implemented yet. "
-        "Any such additions will be explicitly labeled as project assumptions."
+        "Liquidity is not directly observable, and correlation with asset prices does not imply "
+        "causation. This project is a research tool—not a market-timing signal or investment "
+        "advice.",
+        icon=":material/warning:",
     )
+    with st.container(horizontal=True):
+        st.page_link(data_page, label="Explore the data", icon=":material/monitoring:")
+        st.page_link(guide_page, label="Read the research guide", icon=":material/menu_book:")
+
+
+def data_dashboard_page() -> None:
+    st.title("US liquidity dashboard")
+    st.caption(
+        "Measured balance-sheet data and three transparent model assumptions. This is not OGLI "
+        "and does not reproduce CrossBorder Capital's proprietary GLI."
+    )
+    loaded = _load_or_explain()
+    if loaded is None:
+        return
+    data, data_path, data_origin = loaded
+    try:
+        model_bundle = _model_data()
+        model_error = None
+    except DashboardDataError as exc:
+        model_bundle = None
+        model_error = str(exc)
+    if model_bundle is None:
+        models = None
+        model_origin = None
+    else:
+        models, model_origin = model_bundle
+
+    latest = latest_readings(data).set_index("component")
+    last_retrieved = pd.to_datetime(data["retrieved_at"].max(), utc=True)
+    with st.sidebar:
+        st.header("View controls")
+        window = st.segmented_control(
+            "History", ["1 year", "3 years", "5 years", "All"], default="5 years"
+        )
+        selected_label = st.selectbox(
+            "Component explorer",
+            [COMPONENT_LABELS[item] for item in COMPONENT_ORDER if item in set(data["component"])],
+        )
+        st.caption(f"Data mode: {data_origin}")
+        st.caption(f"Retrieved {last_retrieved:%Y-%m-%d %H:%M UTC}")
+        st.caption("Source: FRED and the named originating Federal Reserve releases.")
+
+    max_date = data["date"].max()
+    if window == "All":
+        visible = data
+    else:
+        visible = data.loc[data["date"] >= max_date - timedelta(days=WINDOW_DAYS[str(window)])]
+
+    overview_tab, models_tab, explorer_tab, data_tab = st.tabs(
+        ["Measured data", "Liquidity models", "Component explorer", "Latest observations"]
+    )
+    with overview_tab:
+        st.subheader("Latest measured balances")
+        with st.container(horizontal=True):
+            for component in COMPONENT_ORDER:
+                if component not in latest.index:
+                    st.metric(COMPONENT_LABELS[component], "Unavailable", border=True)
+                    continue
+                row = latest.loc[component]
+                change = row["change_usd_billions"]
+                st.metric(
+                    str(row["label"]),
+                    _format_billions(float(row["value_usd_billions"])),
+                    None if pd.isna(change) else f"{change:+,.1f}bn vs prior observation",
+                    border=True,
+                )
+        st.plotly_chart(
+            _history_figure(visible, f"US liquidity-related balance-sheet series · {window}"),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+        st.caption(
+            "These charts show measured source series. USD-billions conversion is a display "
+            "transformation, not an economic weighting."
+        )
+
+    with models_tab:
+        st.subheader("Three competing US liquidity definitions")
+        if model_error:
+            st.error(model_error)
+        elif models is None:
+            st.info("Run the local pipeline to generate the liquidity-model dataset.")
+            st.code(
+                "uv run python -m open_global_liquidity.pipeline --start 2020-01-01",
+                language="zsh",
+            )
+        else:
+            latest_models = latest_model_readings(models).set_index("model_id")
+            with st.container(horizontal=True):
+                for model_id in ["model_a", "model_b", "model_c"]:
+                    if model_id not in latest_models.index:
+                        continue
+                    row = latest_models.loc[model_id]
+                    change = row["change_usd_billions"]
+                    st.metric(
+                        str(row["model_name"]),
+                        _format_billions(float(row["value_usd_billions"])),
+                        None if pd.isna(change) else f"{change:+,.1f}bn vs prior week",
+                        border=True,
+                    )
+            model_max_date = models["date"].max()
+            if window == "All":
+                visible_models = models
+            else:
+                visible_models = models.loc[
+                    models["date"] >= model_max_date - timedelta(days=WINDOW_DAYS[str(window)])
+                ]
+            st.plotly_chart(
+                _model_figure(visible_models, f"US liquidity model levels · {window}"),
+                width="stretch",
+                config={"displaylogo": False},
+            )
+            st.warning(
+                "These are configurable Open Global Liquidity assumptions. Model B is a common "
+                "public-market proxy; none is CrossBorder Capital's proprietary formula."
+            )
+            st.caption(f"Model data mode: {model_origin}")
+
+    with explorer_tab:
+        selected_component = next(
+            component for component, label in COMPONENT_LABELS.items() if label == selected_label
+        )
+        component_data = visible.loc[visible["component"] == selected_component]
+        st.plotly_chart(
+            _history_figure(component_data, selected_label),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+        source_row = data.loc[data["component"] == selected_component].iloc[-1]
+        source_columns = st.columns(2)
+        source_columns[0].markdown(f"**FRED series:** `{source_row['series_id']}`")
+        source_columns[0].markdown(f"**Source unit:** {source_row['unit']}")
+        source_columns[1].markdown(f"**Frequency:** {source_row['frequency']}")
+        source_columns[1].markdown(f"**Latest observation:** {source_row['date']:%Y-%m-%d}")
+
+    with data_tab:
+        st.subheader("Most recent source observations")
+        table = (
+            data.sort_values("date")
+            .groupby("component", as_index=False)
+            .tail(10)[["date", "label", "series_id", "value", "unit", "frequency"]]
+            .sort_values(["label", "date"], ascending=[True, False])
+        )
+        st.dataframe(
+            table,
+            width="stretch",
+            hide_index=True,
+            column_config={"date": st.column_config.DateColumn("Date", format="YYYY-MM-DD")},
+        )
+        try:
+            displayed_path = data_path.relative_to(PROJECT_ROOT)
+        except ValueError:
+            displayed_path = data_path
+        st.caption(f"Displayed file: `{displayed_path}`")
+
+
+def research_guide_page() -> None:
+    st.title("Research guide")
     st.markdown(
-        "[WALCL](https://fred.stlouisfed.org/series/WALCL) · "
-        "[WDTGAL](https://fred.stlouisfed.org/series/WDTGAL) · "
-        "[RRPONTSYD](https://fred.stlouisfed.org/series/RRPONTSYD) · "
-        "[WRBWFRBL](https://fred.stlouisfed.org/series/WRBWFRBL)"
+        """
+        This page defines the concepts, data, and assumptions behind the current prototype. The
+        guiding principle is simple: **measured data, model assumptions, and calibrated parameters
+        must never be presented as the same thing.**
+        """
     )
+
+    st.subheader("What does global liquidity mean?")
+    st.markdown(
+        """
+        Global liquidity describes the ease of financing in the international financial system.
+        It has both a **funding** dimension—the ability to obtain cash or credit—and a **market**
+        dimension—the ability to transact in assets without large price disruption. It is shaped
+        jointly by central banks, commercial banks, non-bank intermediaries, collateral markets,
+        investors, and cross-border currency funding.
+
+        Liquidity is not a single observable quantity. A serious framework therefore compares
+        several price and quantity indicators rather than treating one balance-sheet series as a
+        complete answer. The BIS likewise describes global liquidity as an unobservable system
+        property that must be assessed through multiple indicators.
+        """
+    )
+
+    with st.container(horizontal=True):
+        with st.container(border=True):
+            st.markdown("#### Measured data")
+            st.write(
+                "Public observations with provider, series ID, units, dates, and retrieval time."
+            )
+            st.badge("Implemented", color="green")
+        with st.container(border=True):
+            st.markdown("#### Model assumptions")
+            st.write(
+                "Declared transformations, frequency rules, formulas, and weights chosen here."
+            )
+            st.badge("Implemented", color="blue")
+        with st.container(border=True):
+            st.markdown("#### Calibrated parameters")
+            st.write("Values fitted against a named public target using a documented procedure.")
+            st.badge("Not used in v0.1", color="gray")
+
+    st.subheader("Current US model definitions")
+    with st.container(border=True):
+        st.markdown("#### Model A — Fed assets")
+        st.code("L_A(t) = FedAssets(t)", language=None)
+        st.write(
+            "The simplest central-bank balance-sheet measure. It ignores liability-side drains "
+            "and does not represent all system-wide liquidity."
+        )
+    with st.container(border=True):
+        st.markdown("#### Model B — Net Fed liquidity proxy")
+        st.code("L_B(t) = FedAssets(t) - TGA(t) - ON_RRP(t)", language=None)
+        st.write(
+            "A common public-market proxy. It adjusts total assets for Treasury cash held at the "
+            "Fed and balances absorbed through overnight reverse repo. It is not presented as a "
+            "Michael Howell or CrossBorder Capital formula."
+        )
+    with st.container(border=True):
+        st.markdown("#### Model C — Reserve-based liquidity")
+        st.code("L_C(t) = ReserveBalances(t)", language=None)
+        st.write(
+            "A direct settlement-liquidity proxy. TGA and ON RRP are not subtracted again because "
+            "their effects are already reflected in reserve balances, so another adjustment could "
+            "double count those drains."
+        )
+
+    st.subheader("Glossary")
+    glossary = {
+        "Central-bank liquidity": (
+            "Official balance-sheet capacity supplied by a central bank, including assets and "
+            "reserve liabilities. It is important but narrower than global liquidity."
+        ),
+        "Bank reserves": (
+            "Balances that eligible institutions hold at the Federal Reserve. They support "
+            "settlement and monetary-policy implementation but are not directly spendable by "
+            "the public."
+        ),
+        "Treasury General Account (TGA)": (
+            "The US Treasury's operating cash account at the Federal Reserve. Changes can shift "
+            "balances between the Treasury and the banking system."
+        ),
+        "Overnight reverse repo (ON RRP)": (
+            "A Federal Reserve facility through which eligible counterparties place cash overnight "
+            "against Treasury collateral. In the current proxy, the balance is treated as "
+            "absorption."
+        ),
+        "Collateral and haircuts": (
+            "Secured funding depends on acceptable collateral and the discount applied to it. "
+            "Higher haircuts reduce the amount of financing obtainable from a given asset pool. "
+            "Future scope."
+        ),
+        "Offshore dollar liquidity": (
+            "US-dollar credit and funding activity outside the United States, including banking, "
+            "bond, and FX-swap channels. It is outside the current US-only release."
+        ),
+    }
+    for term, definition in glossary.items():
+        with st.expander(term):
+            st.write(definition)
+
+    st.subheader("Frequency and data policy")
+    st.markdown(
+        """
+        - Canonical research frequency: **weekly, Wednesday**.
+        - Weekly H.4.1 series require an exact Wednesday observation.
+        - Daily ON RRP uses the latest observation on or before Wednesday, with a maximum age of
+          seven calendar days.
+        - No balance-sheet values are interpolated.
+        - Monetary inputs are standardized to **millions of US dollars** before model calculation.
+        - Source date, source unit, alignment method, and staleness are retained in processed data.
+        - Current-vintage FRED data can be revised; this project does not yet maintain real-time
+          vintages.
+        """
+    )
+
+    st.subheader("Data sources and further reading")
+    st.markdown(
+        """
+        **Series used by v0.1**
+
+        - [WALCL — Federal Reserve total assets](https://fred.stlouisfed.org/series/WALCL)
+        - [WDTGAL — Treasury General Account](https://fred.stlouisfed.org/series/WDTGAL)
+        - [RRPONTSYD — Overnight reverse repo](https://fred.stlouisfed.org/series/RRPONTSYD)
+        - [WRBWFRBL — Reserve balances](https://fred.stlouisfed.org/series/WRBWFRBL)
+
+        **Primary documentation and broader context**
+
+        - [Federal Reserve H.4.1 balance-sheet release](https://www.federalreserve.gov/releases/h41/default.htm)
+        - [New York Fed: repo and reverse repo agreements](https://www.newyorkfed.org/markets/domestic-market-operations/monetary-policy-implementation/repo-reverse-repo-agreements)
+        - [BIS: global liquidity indicators](https://www.bis.org/statistics/dataportal/gli.htm)
+        - [BIS: global liquidity background and interpretation](https://www.bis.org/publ/qtrpdf/r_qt1503u.htm)
+        """
+    )
+
+    st.warning(
+        "Open Global Liquidity is independent and unaffiliated. It is inspired by publicly "
+        "discussed global-liquidity concepts, including work by Michael Howell and CrossBorder "
+        "Capital, but does not reproduce or claim access to their proprietary data, methodology, "
+        "or models.",
+        icon=":material/info:",
+    )
+
+
+home_page = st.Page(
+    landing_page,
+    title="Overview",
+    icon=":material/home:",
+    default=True,
+)
+data_page = st.Page(
+    data_dashboard_page,
+    title="Data dashboard",
+    icon=":material/monitoring:",
+    url_path="dashboard",
+)
+guide_page = st.Page(
+    research_guide_page,
+    title="Research guide",
+    icon=":material/menu_book:",
+    url_path="research-guide",
+)
+navigation = st.navigation([home_page, data_page, guide_page], position="top")
+navigation.run()
