@@ -90,12 +90,40 @@ class OGLIConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class MarketAlignmentConfig:
+    """Explicit policy for aligning daily market closes to canonical Wednesdays."""
+
+    classification: str
+    canonical_frequency: str
+    observation_day: str
+    daily_asof_components: tuple[str, ...]
+    daily_asof_max_staleness_days: int
+    missing_policy: str
+
+
+@dataclass(frozen=True, slots=True)
+class MarketAnalysisConfig:
+    """Configured statistical choices for liquidity-versus-market research."""
+
+    classification: str
+    liquidity_signal: str
+    publication_lag_policy: str
+    forward_horizons_weeks: tuple[int, ...]
+    correlation_min_periods: int
+    rolling_window_weeks: int
+    rolling_min_periods: int
+    description: str
+
+
+@dataclass(frozen=True, slots=True)
 class ModelConfig:
     """Weekly alignment policy and competing liquidity definitions."""
 
     alignment: WeeklyAlignmentConfig
     models: tuple[LiquidityModelDefinition, ...]
     ogli: OGLIConfig
+    market_alignment: MarketAlignmentConfig
+    market_analysis: MarketAnalysisConfig
 
 
 _REQUIRED_FIELDS = {
@@ -233,7 +261,15 @@ def load_model_config(path: Path) -> ModelConfig:
             )
         )
     ogli = _parse_ogli_config(payload.get("ogli"))
-    return ModelConfig(alignment=alignment, models=tuple(models), ogli=ogli)
+    market_alignment = _parse_market_alignment(payload.get("market_alignment"))
+    market_analysis = _parse_market_analysis(payload.get("market_analysis"))
+    return ModelConfig(
+        alignment=alignment,
+        models=tuple(models),
+        ogli=ogli,
+        market_alignment=market_alignment,
+        market_analysis=market_analysis,
+    )
 
 
 def _parse_ogli_config(raw: Any) -> OGLIConfig:
@@ -309,6 +345,95 @@ def _parse_ogli_config(raw: Any) -> OGLIConfig:
         momentum_weights=weights,
         regime_classification=str(raw_regimes["classification"]),
         regimes=tuple(regimes),
+    )
+
+
+def _parse_market_alignment(raw: Any) -> MarketAlignmentConfig:
+    if not isinstance(raw, dict):
+        raise ConfigurationError("market_alignment must be a mapping")
+    required = {
+        "classification",
+        "canonical_frequency",
+        "observation_day",
+        "daily_asof_components",
+        "daily_asof_max_staleness_days",
+        "missing_policy",
+    }
+    missing = sorted(required - raw.keys())
+    if missing:
+        raise ConfigurationError(f"market_alignment is missing fields: {', '.join(missing)}")
+    if raw["classification"] != "model_assumption":
+        raise ConfigurationError("market_alignment must be classified as model_assumption")
+    if raw["canonical_frequency"] != "W-WED":
+        raise ConfigurationError("v0.1 market canonical_frequency must be W-WED")
+    if raw["missing_policy"] != "latest_prior_close":
+        raise ConfigurationError("v0.1 market missing_policy must be latest_prior_close")
+    components = raw["daily_asof_components"]
+    if not isinstance(components, list) or not all(isinstance(item, str) for item in components):
+        raise ConfigurationError("market daily_asof_components must be a list of component names")
+    try:
+        max_staleness = int(raw["daily_asof_max_staleness_days"])
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError("market daily_asof_max_staleness_days must be an integer") from exc
+    if max_staleness < 0:
+        raise ConfigurationError("market daily_asof_max_staleness_days cannot be negative")
+    return MarketAlignmentConfig(
+        classification=str(raw["classification"]),
+        canonical_frequency=str(raw["canonical_frequency"]),
+        observation_day=str(raw["observation_day"]),
+        daily_asof_components=tuple(components),
+        daily_asof_max_staleness_days=max_staleness,
+        missing_policy=str(raw["missing_policy"]),
+    )
+
+
+def _parse_market_analysis(raw: Any) -> MarketAnalysisConfig:
+    if not isinstance(raw, dict):
+        raise ConfigurationError("market_analysis must be a mapping")
+    required = {
+        "classification",
+        "liquidity_signal",
+        "publication_lag_policy",
+        "forward_horizons_weeks",
+        "correlation_min_periods",
+        "rolling_window_weeks",
+        "rolling_min_periods",
+        "description",
+    }
+    missing = sorted(required - raw.keys())
+    if missing:
+        raise ConfigurationError(f"market_analysis is missing fields: {', '.join(missing)}")
+    if raw["classification"] != "statistical_transformation":
+        raise ConfigurationError("market_analysis must be classified as statistical_transformation")
+    if raw["publication_lag_policy"] != "observation_date_unadjusted":
+        raise ConfigurationError(
+            "v0.1 market publication_lag_policy must be observation_date_unadjusted"
+        )
+    raw_horizons = raw["forward_horizons_weeks"]
+    if not isinstance(raw_horizons, list):
+        raise ConfigurationError("market forward_horizons_weeks must be a list")
+    try:
+        horizons = tuple(int(item) for item in raw_horizons)
+        correlation_min = int(raw["correlation_min_periods"])
+        rolling_window = int(raw["rolling_window_weeks"])
+        rolling_min = int(raw["rolling_min_periods"])
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError("market analysis periods must be integers") from exc
+    if not horizons or horizons[0] != 0 or any(item < 0 for item in horizons):
+        raise ConfigurationError("market horizons must start at zero and cannot be negative")
+    if tuple(sorted(set(horizons))) != horizons:
+        raise ConfigurationError("market horizons must be unique and increasing")
+    if correlation_min < 2 or rolling_min < 2 or rolling_window < rolling_min:
+        raise ConfigurationError("market correlation history settings are inconsistent")
+    return MarketAnalysisConfig(
+        classification=str(raw["classification"]),
+        liquidity_signal=str(raw["liquidity_signal"]),
+        publication_lag_policy=str(raw["publication_lag_policy"]),
+        forward_horizons_weeks=horizons,
+        correlation_min_periods=correlation_min,
+        rolling_window_weeks=rolling_window,
+        rolling_min_periods=rolling_min,
+        description=str(raw["description"]),
     )
 
 

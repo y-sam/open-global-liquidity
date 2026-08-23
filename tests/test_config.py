@@ -8,9 +8,9 @@ from open_global_liquidity.config import ConfigurationError, load_model_config, 
 def test_load_walcl_config() -> None:
     definitions = load_series_config(Path("config/series.yaml"))
 
-    assert len(definitions) == 4
+    assert len(definitions) == 5
     by_id = {definition.series_id: definition for definition in definitions}
-    assert set(by_id) == {"WALCL", "WDTGAL", "RRPONTSYD", "WRBWFRBL"}
+    assert set(by_id) == {"WALCL", "WDTGAL", "RRPONTSYD", "WRBWFRBL", "SP500"}
     walcl = by_id["WALCL"]
     assert walcl.series_id == "WALCL"
     assert walcl.classification == "measured_data"
@@ -18,6 +18,8 @@ def test_load_walcl_config() -> None:
     assert walcl.unit == "Millions of U.S. Dollars"
     assert by_id["RRPONTSYD"].unit == "Billions of U.S. Dollars"
     assert by_id["WRBWFRBL"].frequency == "Weekly, As of Wednesday"
+    assert by_id["SP500"].group == "markets"
+    assert by_id["SP500"].unit == "Index"
 
 
 def test_config_rejects_missing_fields(tmp_path: Path) -> None:
@@ -47,6 +49,10 @@ def test_load_model_config() -> None:
         "growth_3m_annualized": 0.6,
     }
     assert config.ogli.regimes[-1].max_value == 100
+    assert config.market_alignment.daily_asof_components == ("sp500",)
+    assert config.market_analysis.forward_horizons_weeks == (0, 4, 8, 12, 26, 52)
+    assert config.market_analysis.liquidity_signal == "momentum_score"
+    assert config.market_analysis.publication_lag_policy == "observation_date_unadjusted"
 
 
 def test_model_config_rejects_ogli_weights_that_do_not_sum_to_one(tmp_path: Path) -> None:

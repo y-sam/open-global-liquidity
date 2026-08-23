@@ -68,4 +68,27 @@ ogli:
       - {label: "Expansion", max: 90}
       - {label: "Strong expansion", max: 100}
 
+market_alignment:
+  classification: model_assumption
+  canonical_frequency: "W-WED"
+  observation_day: "Wednesday"
+  daily_asof_components:
+    - sp500
+  daily_asof_max_staleness_days: 7
+  missing_policy: "latest_prior_close"
+
+market_analysis:
+  classification: statistical_transformation
+  liquidity_signal: momentum_score
+  publication_lag_policy: "observation_date_unadjusted"
+  forward_horizons_weeks: [0, 4, 8, 12, 26, 52]
+  correlation_min_periods: 52
+  rolling_window_weeks: 52
+  rolling_min_periods: 26
+  description: >-
+    Horizon zero compares the liquidity signal with the contemporaneous one-week market return.
+    Positive horizons compare the signal at t with the market return from t through t+h. These
+    observation-date comparisons do not yet adjust for source publication lags. They are
+    descriptive associations and do not establish causation or calibrate OGLI parameters.
+
 calibrated_parameters: {}

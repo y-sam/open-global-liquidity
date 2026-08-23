@@ -23,6 +23,7 @@ def _write_test_config(project_root: Path) -> None:
             "Millions of U.S. Dollars",
             "Weekly, As of Wednesday",
         ),
+        "sp500": ("SP500", "Index", "Daily, Close"),
     }
     blocks = []
     for component, (series_id, unit, frequency) in series.items():
@@ -41,8 +42,11 @@ def _write_test_config(project_root: Path) -> None:
       source: Federal Reserve
       source_url: https://fred.stlouisfed.org/series/{series_id}"""
         )
+    liquidity_blocks = [block for block in blocks if "    sp500:" not in block]
+    market_block = next(block for block in blocks if "    sp500:" in block)
     config_dir.joinpath("series.yaml").write_text(
-        "US:\n  liquidity:\n" + "\n".join(blocks), encoding="utf-8"
+        "US:\n  liquidity:\n" + "\n".join(liquidity_blocks) + "\n  markets:\n" + market_block,
+        encoding="utf-8",
     )
     config_dir.joinpath("model.yaml").write_text(
         """
@@ -94,6 +98,22 @@ ogli:
       - {label: Above normal, max: 70}
       - {label: Expansion, max: 90}
       - {label: Strong expansion, max: 100}
+market_alignment:
+  classification: model_assumption
+  canonical_frequency: W-WED
+  observation_day: Wednesday
+  daily_asof_components: [sp500]
+  daily_asof_max_staleness_days: 7
+  missing_policy: latest_prior_close
+market_analysis:
+  classification: statistical_transformation
+  liquidity_signal: momentum_score
+  publication_lag_policy: observation_date_unadjusted
+  forward_horizons_weeks: [0, 4, 8, 12, 26, 52]
+  correlation_min_periods: 2
+  rolling_window_weeks: 2
+  rolling_min_periods: 2
+  description: Test market analysis
 """.strip(),
         encoding="utf-8",
     )
@@ -106,6 +126,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
         "WDTGAL": (500_000.0, "Millions of U.S. Dollars"),
         "RRPONTSYD": (1_000.0, "Billions of U.S. Dollars"),
         "WRBWFRBL": (3_000_000.0, "Millions of U.S. Dollars"),
+        "SP500": (4_800.0, "Index"),
     }
 
     def fake_fetch(_provider, definition, **_kwargs):
@@ -132,6 +153,15 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     weekly = pd.read_parquet(tmp_path / "data" / "processed" / "us_liquidity_weekly.parquet")
     models = pd.read_parquet(tmp_path / "data" / "processed" / "us_liquidity_models.parquet")
     ogli = pd.read_parquet(tmp_path / "data" / "processed" / "us_ogli.parquet")
+    market_source = pd.read_parquet(tmp_path / "data" / "processed" / "us_market_series.parquet")
+    market_weekly = pd.read_parquet(tmp_path / "data" / "processed" / "us_market_weekly.parquet")
+    market_returns = pd.read_parquet(tmp_path / "data" / "processed" / "us_market_returns.parquet")
+    comparisons = pd.read_parquet(
+        tmp_path / "data" / "processed" / "us_liquidity_market_comparisons.parquet"
+    )
+    correlations = pd.read_parquet(
+        tmp_path / "data" / "processed" / "us_liquidity_market_correlations.parquet"
+    )
     snapshot_dir = tmp_path / "data" / "reference"
     source_snapshot = pd.read_parquet(snapshot_dir / "us_fred_series_snapshot.parquet")
     weekly_snapshot = pd.read_parquet(snapshot_dir / "us_liquidity_weekly_snapshot.parquet")
@@ -156,3 +186,9 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     assert ogli["ogli"].isna().all()
     assert set(ogli["zscore_mode"]) == {"expanding"}
     pd.testing.assert_frame_equal(ogli_snapshot, ogli)
+    assert market_source["series_id"].unique().tolist() == ["SP500"]
+    assert market_weekly["value"].item() == 4_800.0
+    assert len(market_returns) == 6
+    assert len(comparisons) == 18
+    assert len(correlations) == 18
+    assert not snapshot_dir.joinpath("us_market_series_snapshot.parquet").exists()

@@ -57,6 +57,39 @@ OGLI_COLUMNS = [
     "weight_classification",
 ]
 
+MARKET_COMPARISON_COLUMNS = [
+    "date",
+    "model_id",
+    "model_name",
+    "ogli",
+    "momentum_score",
+    "market_id",
+    "series_id",
+    "horizon_weeks",
+    "return_type",
+    "market_return",
+    "return_start_date",
+    "return_end_date",
+    "liquidity_signal_name",
+    "liquidity_signal",
+    "rolling_correlation",
+    "rolling_window_weeks",
+    "rolling_min_periods",
+]
+
+MARKET_CORRELATION_COLUMNS = [
+    "model_id",
+    "model_name",
+    "market_id",
+    "series_id",
+    "horizon_weeks",
+    "return_type",
+    "liquidity_signal_name",
+    "correlation",
+    "observations",
+    "classification",
+]
+
 COMPONENT_LABELS = {
     "fed_assets": "Fed total assets",
     "treasury_general_account": "Treasury General Account",
@@ -231,5 +264,34 @@ def latest_ogli_readings(frame: pd.DataFrame) -> pd.DataFrame:
         available.sort_values("date")
         .groupby("model_id", as_index=False, sort=False)
         .tail(1)
+        .reset_index(drop=True)
+    )
+
+
+def load_market_comparisons(path: Path) -> pd.DataFrame:
+    """Load package-calculated liquidity-market pairs for local presentation."""
+    frame = _read_parquet(path, "Liquidity-market comparison data")
+    missing = sorted(set(MARKET_COMPARISON_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Market comparison data is missing columns: " + ", ".join(missing))
+    result = frame[MARKET_COMPARISON_COLUMNS].copy()
+    for column in ["date", "return_start_date", "return_end_date"]:
+        result[column] = pd.to_datetime(result[column])
+    return result.sort_values(["model_id", "market_id", "horizon_weeks", "date"]).reset_index(
+        drop=True
+    )
+
+
+def load_market_correlations(path: Path) -> pd.DataFrame:
+    """Load package-calculated lagged-correlation summaries for local presentation."""
+    frame = _read_parquet(path, "Liquidity-market correlation data")
+    missing = sorted(set(MARKET_CORRELATION_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError(
+            "Market correlation data is missing columns: " + ", ".join(missing)
+        )
+    return (
+        frame[MARKET_CORRELATION_COLUMNS]
+        .sort_values(["model_id", "market_id", "horizon_weeks"])
         .reset_index(drop=True)
     )

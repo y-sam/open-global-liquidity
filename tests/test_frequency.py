@@ -5,6 +5,7 @@ import pytest
 
 from open_global_liquidity.transforms.frequency import (
     FrequencyAlignmentError,
+    align_market_closes_to_weekly_wednesday,
     align_to_weekly_wednesday,
 )
 
@@ -75,3 +76,32 @@ def test_daily_series_requires_explicit_asof_policy() -> None:
 
     with pytest.raises(FrequencyAlignmentError, match="explicit as-of"):
         align_to_weekly_wednesday(source, daily_asof_components=[], daily_asof_max_staleness_days=7)
+
+
+def test_market_close_alignment_uses_prior_close_for_wednesday_holiday() -> None:
+    rows = [
+        {
+            **_row("2024-01-02", "sp500", 4_700.0, "Daily, Close"),
+            "unit": "Index",
+        },
+        {
+            **_row("2024-01-04", "sp500", 4_720.0, "Daily, Close"),
+            "unit": "Index",
+        },
+        {
+            **_row("2024-01-10", "sp500", 4_800.0, "Daily, Close"),
+            "unit": "Index",
+        },
+    ]
+
+    result = align_market_closes_to_weekly_wednesday(
+        pd.DataFrame(rows),
+        daily_asof_components=["sp500"],
+        daily_asof_max_staleness_days=7,
+    ).set_index("date")
+
+    assert result.loc[pd.Timestamp("2024-01-03"), "value"] == 4_700.0
+    assert result.loc[pd.Timestamp("2024-01-03"), "source_date"] == pd.Timestamp("2024-01-02")
+    assert result.loc[pd.Timestamp("2024-01-03"), "staleness_days"] == 1
+    assert result.loc[pd.Timestamp("2024-01-10"), "value"] == 4_800.0
+    assert set(result["unit"]) == {"Index"}

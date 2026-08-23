@@ -19,6 +19,8 @@ from dashboard_support import (  # noqa: E402
     latest_readings,
     load_dashboard_data,
     load_liquidity_model_data,
+    load_market_comparisons,
+    load_market_correlations,
     load_ogli_data,
     resolve_dashboard_data_path,
 )
@@ -30,6 +32,8 @@ MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
 MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
 OGLI_DATA_PATH = DATA_ROOT / "processed" / "us_ogli.parquet"
 OGLI_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_ogli_snapshot.parquet"
+MARKET_COMPARISONS_PATH = DATA_ROOT / "processed" / "us_liquidity_market_comparisons.parquet"
+MARKET_CORRELATIONS_PATH = DATA_ROOT / "processed" / "us_liquidity_market_correlations.parquet"
 COMPONENT_ORDER = list(COMPONENT_LABELS)
 WINDOW_DAYS = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
 COLORS = {
@@ -73,6 +77,20 @@ def _load_ogli(path: str, modified_ns: int) -> pd.DataFrame:
     return load_ogli_data(Path(path))
 
 
+@st.cache_data(show_spinner=False)
+def _load_market_comparisons(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated market comparison pairs."""
+    del modified_ns
+    return load_market_comparisons(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_market_correlations(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated market correlation summaries."""
+    del modified_ns
+    return load_market_correlations(Path(path))
+
+
 def _source_data() -> tuple[pd.DataFrame, Path, str]:
     data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
     return _load_data(str(data_path), data_path.stat().st_mtime_ns), data_path, data_origin
@@ -92,6 +110,21 @@ def _model_data() -> tuple[pd.DataFrame, str] | None:
 def _ogli_data() -> tuple[pd.DataFrame, str]:
     ogli_path, ogli_origin = resolve_dashboard_data_path(OGLI_DATA_PATH, OGLI_SNAPSHOT_DATA_PATH)
     return _load_ogli(str(ogli_path), ogli_path.stat().st_mtime_ns), ogli_origin
+
+
+def _market_data() -> tuple[pd.DataFrame, pd.DataFrame]:
+    if not MARKET_COMPARISONS_PATH.is_file() or not MARKET_CORRELATIONS_PATH.is_file():
+        raise DashboardDataError(
+            "Local market-analysis files are unavailable. Restricted S&P 500 observations are "
+            "not bundled with the public dashboard."
+        )
+    comparisons = _load_market_comparisons(
+        str(MARKET_COMPARISONS_PATH), MARKET_COMPARISONS_PATH.stat().st_mtime_ns
+    )
+    correlations = _load_market_correlations(
+        str(MARKET_CORRELATIONS_PATH), MARKET_CORRELATIONS_PATH.stat().st_mtime_ns
+    )
+    return comparisons, correlations
 
 
 def _format_billions(value: float) -> str:
@@ -162,6 +195,74 @@ def _ogli_figure(frame: pd.DataFrame, title: str):
         plot_bgcolor="rgba(0,0,0,0)",
         yaxis={"range": [0, 100], "gridcolor": "rgba(128,128,128,0.12)"},
         showlegend=False,
+    )
+    return figure
+
+
+def _market_scatter_figure(frame: pd.DataFrame, title: str):
+    figure = px.scatter(
+        frame,
+        x="liquidity_signal",
+        y="market_return",
+        hover_data={"date": "|%Y-%m-%d", "ogli": ":.1f"},
+        labels={
+            "liquidity_signal": "OGLI momentum score",
+            "market_return": "S&P 500 return",
+        },
+        title=title,
+    )
+    figure.update_traces(marker={"size": 7, "opacity": 0.65, "color": "#2563EB"})
+    figure.update_layout(
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+        xaxis={"zeroline": True, "gridcolor": "rgba(128,128,128,0.15)"},
+        yaxis={
+            "zeroline": True,
+            "gridcolor": "rgba(128,128,128,0.15)",
+            "tickformat": ".0%",
+        },
+    )
+    return figure
+
+
+def _rolling_correlation_figure(frame: pd.DataFrame, title: str):
+    figure = px.line(
+        frame,
+        x="date",
+        y="rolling_correlation",
+        labels={"date": "", "rolling_correlation": "Trailing correlation"},
+        title=title,
+    )
+    figure.update_traces(line={"width": 2.25, "color": "#7C3AED"})
+    figure.add_hline(y=0, line_width=1, line_color="rgba(128,128,128,0.5)")
+    figure.update_layout(
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+        yaxis={"range": [-1, 1], "gridcolor": "rgba(128,128,128,0.15)"},
+        showlegend=False,
+    )
+    return figure
+
+
+def _horizon_correlation_figure(frame: pd.DataFrame, title: str):
+    chart = frame.copy()
+    chart["horizon_label"] = chart["horizon_weeks"].map(
+        lambda value: "0 (1w current)" if value == 0 else f"{value}w forward"
+    )
+    figure = px.bar(
+        chart,
+        x="horizon_label",
+        y="correlation",
+        text_auto=".2f",
+        labels={"horizon_label": "Return horizon", "correlation": "Pearson correlation"},
+        title=title,
+    )
+    figure.update_traces(marker_color="#D97706")
+    figure.add_hline(y=0, line_width=1, line_color="rgba(128,128,128,0.5)")
+    figure.update_layout(
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+        yaxis={"range": [-1, 1], "gridcolor": "rgba(128,128,128,0.15)"},
     )
     return figure
 
@@ -567,6 +668,172 @@ def ogli_page() -> None:
         )
 
 
+def markets_page() -> None:
+    st.title("Liquidity vs markets")
+    st.caption(
+        "Retrospective comparison of OGLI momentum with S&P 500 returns. Correlation is not "
+        "causation, a forecast, or parameter calibration."
+    )
+    try:
+        comparisons, correlations = _market_data()
+    except DashboardDataError as exc:
+        st.info(str(exc), icon=":material/info:")
+        st.markdown(
+            "The official FRED `SP500` series is suitable for local research, but its source "
+            "notes restrict redistribution. Run the pipeline with your own FRED key to create "
+            "the market files locally:"
+        )
+        st.code(
+            "uv run python -m open_global_liquidity.pipeline --start 2020-01-01",
+            language="zsh",
+        )
+        st.link_button(
+            "Review official SP500 metadata",
+            "https://fred.stlouisfed.org/series/SP500",
+            icon=":material/open_in_new:",
+        )
+        return
+
+    model_options = dict(
+        correlations[["model_name", "model_id"]]
+        .drop_duplicates()
+        .itertuples(index=False, name=None)
+    )
+    horizon_options = {
+        "Current 1-week return": 0,
+        "4 weeks forward": 4,
+        "8 weeks forward": 8,
+        "12 weeks forward": 12,
+        "26 weeks forward": 26,
+        "52 weeks forward": 52,
+    }
+    with st.sidebar:
+        st.header("Market controls")
+        selected_model = st.selectbox(
+            "Liquidity definition",
+            list(model_options),
+            index=list(model_options).index("Model B — Net Fed liquidity proxy"),
+            key="market_model",
+        )
+        selected_horizon_label = st.selectbox(
+            "Return horizon",
+            list(horizon_options),
+            index=3,
+            key="market_horizon",
+        )
+        st.caption("Market: S&P 500 price index")
+        st.caption("Data mode: Local research data")
+
+    model_id = model_options[selected_model]
+    horizon = horizon_options[selected_horizon_label]
+    selected_pairs = comparisons.loc[
+        (comparisons["model_id"] == model_id)
+        & (comparisons["market_id"] == "sp500")
+        & (comparisons["horizon_weeks"] == horizon)
+    ].dropna(subset=["liquidity_signal", "market_return"])
+    selected_summary = correlations.loc[
+        (correlations["model_id"] == model_id)
+        & (correlations["market_id"] == "sp500")
+        & (correlations["horizon_weeks"] == horizon)
+    ].iloc[0]
+    model_correlations = correlations.loc[
+        (correlations["model_id"] == model_id) & (correlations["market_id"] == "sp500")
+    ]
+    latest_pair = selected_pairs.iloc[-1]
+    correlation = selected_summary["correlation"]
+
+    with st.container(horizontal=True):
+        st.metric(
+            "Pearson correlation",
+            "Insufficient history" if pd.isna(correlation) else f"{correlation:+.2f}",
+            border=True,
+        )
+        st.metric("Paired observations", f"{int(selected_summary['observations']):,}", border=True)
+        st.metric("Latest paired OGLI", f"{latest_pair['ogli']:.1f}", border=True)
+        st.metric("Latest paired S&P return", f"{latest_pair['market_return']:.1%}", border=True)
+
+    scatter_tab, rolling_tab, horizons_tab, data_tab = st.tabs(
+        ["Relationship", "Rolling correlation", "Across horizons", "Paired data"]
+    )
+    with scatter_tab:
+        st.plotly_chart(
+            _market_scatter_figure(
+                selected_pairs,
+                f"{selected_model} vs S&P 500 · {selected_horizon_label}",
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+        st.caption(
+            "Each point anchors the expanding OGLI momentum score at t to the named market-return "
+            "window. Forward outcomes are never inputs to OGLI."
+        )
+    with rolling_tab:
+        rolling = selected_pairs.dropna(subset=["rolling_correlation"])
+        st.plotly_chart(
+            _rolling_correlation_figure(
+                rolling,
+                f"52-week trailing correlation · {selected_horizon_label}",
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+        st.caption("The rolling estimate requires at least 26 paired weekly observations.")
+    with horizons_tab:
+        st.plotly_chart(
+            _horizon_correlation_figure(
+                model_correlations,
+                f"{selected_model} · correlation by return horizon",
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+        st.caption(
+            "All estimates use the same configured OGLI momentum signal. Horizon zero is the "
+            "one-week return ending at t; positive horizons start at t."
+        )
+    with data_tab:
+        table = selected_pairs[
+            [
+                "date",
+                "ogli",
+                "liquidity_signal",
+                "market_return",
+                "return_start_date",
+                "return_end_date",
+            ]
+        ].sort_values("date", ascending=False)
+        st.dataframe(
+            table,
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "date": st.column_config.DateColumn("Signal date", format="YYYY-MM-DD"),
+                "ogli": st.column_config.NumberColumn("OGLI", format="%.1f"),
+                "liquidity_signal": st.column_config.NumberColumn("Momentum score", format="%+.2f"),
+                "market_return": st.column_config.NumberColumn("S&P return", format="percent"),
+                "return_start_date": st.column_config.DateColumn(
+                    "Return start", format="YYYY-MM-DD"
+                ),
+                "return_end_date": st.column_config.DateColumn("Return end", format="YYYY-MM-DD"),
+            },
+        )
+
+    st.warning(
+        "These statistics are sensitive to sample selection, overlapping forward-return windows, "
+        "data revisions, publication lags, and common macroeconomic drivers. The current "
+        "exploratory alignment uses observation dates and does not model when each source became "
+        "publicly "
+        "available. It does not demonstrate that liquidity causes market returns and must not be "
+        "read as an investable signal.",
+        icon=":material/warning:",
+    )
+    st.caption(
+        "Source: S&P Dow Jones Indices LLC via FRED (`SP500`). Price index only; dividends are "
+        "excluded. Raw market observations are not included in the public repository snapshot."
+    )
+
+
 def research_guide_page() -> None:
     st.title("Research guide")
     st.markdown(
@@ -704,6 +971,29 @@ def research_guide_page() -> None:
         """
     )
 
+    st.subheader("Market validation methodology")
+    st.markdown(
+        """
+        The initial validation slice compares each model's OGLI momentum score with the S&P 500
+        price index. Horizon zero is the contemporaneous one-week return ending at the signal date.
+        Positive horizons are forward simple returns from the signal date through 4, 8, 12, 26,
+        or 52 weeks later. Pearson correlations use at least 52 paired observations; rolling
+        correlations use a 52-week window with a 26-observation minimum.
+
+        These choices are statistical transformations configured in `config/model.yaml`. The
+        results are not used to select OGLI weights and therefore are not calibrated parameters.
+        Forward-return windows overlap, especially at longer horizons, which reduces the effective
+        independence of observations. The current alignment uses observation dates and does not
+        adjust for when each underlying release became publicly available, so it is exploratory
+        analysis rather than a realistic backtest. Correlation does not establish causation.
+
+        FRED's `SP500` is a daily-close price index, excludes dividends, and provides a rolling ten
+        years of history. Its source notes restrict redistribution, so this project supports it for
+        local research but does not bundle its raw observations or market-analysis files in public
+        dashboard snapshots.
+        """
+    )
+
     st.subheader("Data sources and further reading")
     st.markdown(
         """
@@ -744,6 +1034,12 @@ data_page = st.Page(
     icon=":material/monitoring:",
     url_path="dashboard",
 )
+markets_index_page = st.Page(
+    markets_page,
+    title="Liquidity vs markets",
+    icon=":material/query_stats:",
+    url_path="markets",
+)
 ogli_index_page = st.Page(
     ogli_page,
     title="OGLI index",
@@ -756,5 +1052,7 @@ guide_page = st.Page(
     icon=":material/menu_book:",
     url_path="research-guide",
 )
-navigation = st.navigation([home_page, ogli_index_page, data_page, guide_page], position="top")
+navigation = st.navigation(
+    [home_page, ogli_index_page, markets_index_page, data_page, guide_page], position="top"
+)
 navigation.run()

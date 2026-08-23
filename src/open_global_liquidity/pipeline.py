@@ -9,6 +9,15 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
+from open_global_liquidity.analysis.correlations import (
+    add_rolling_correlations,
+    calculate_lagged_correlations,
+)
+from open_global_liquidity.analysis.lead_lag import (
+    MarketAnalysisError,
+    build_liquidity_market_comparison,
+    calculate_market_forward_returns,
+)
 from open_global_liquidity.config import (
     ConfigurationError,
     load_model_config,
@@ -23,6 +32,7 @@ from open_global_liquidity.models.us_liquidity import (
 )
 from open_global_liquidity.transforms.frequency import (
     FrequencyAlignmentError,
+    align_market_closes_to_weekly_wednesday,
     align_to_weekly_wednesday,
 )
 from open_global_liquidity.transforms.growth import (
@@ -47,21 +57,32 @@ def run_pipeline(
     load_dotenv(project_root / ".env")
     definitions = load_series_config(project_root / "config" / "series.yaml")
     model_config = load_model_config(project_root / "config" / "model.yaml")
-    fred_definitions = [item for item in definitions if item.provider.lower() == "fred"]
-    if not fred_definitions:
-        raise RuntimeError("No FRED series are configured")
+    liquidity_definitions = [
+        item
+        for item in definitions
+        if item.provider.lower() == "fred" and item.group == "liquidity"
+    ]
+    market_definitions = [
+        item for item in definitions if item.provider.lower() == "fred" and item.group == "markets"
+    ]
+    if not liquidity_definitions:
+        raise RuntimeError("No FRED liquidity series are configured")
+    if not market_definitions:
+        raise RuntimeError("No FRED market series are configured")
 
     provider = FredProvider(cache_dir=project_root / "data" / "raw" / "fred")
-    frames = [
+    liquidity_frames = [
         provider.fetch_definition(
             definition,
             start=start,
             end=end,
             force_refresh=force_refresh,
         )
-        for definition in fred_definitions
+        for definition in liquidity_definitions
     ]
-    output = pd.concat(frames, ignore_index=True).sort_values(["country", "series_id", "date"])
+    output = pd.concat(liquidity_frames, ignore_index=True).sort_values(
+        ["country", "series_id", "date"]
+    )
 
     output_dir = project_root / "data" / "processed"
     output_dir.mkdir(parents=True, exist_ok=True)
@@ -93,6 +114,65 @@ def run_pipeline(
         ogli_path,
     )
 
+    market_frames = [
+        provider.fetch_definition(
+            definition,
+            start=start,
+            end=end,
+            force_refresh=force_refresh,
+        )
+        for definition in market_definitions
+    ]
+    market_source = pd.concat(market_frames, ignore_index=True).sort_values(
+        ["country", "series_id", "date"]
+    )
+    market_source_path = output_dir / "us_market_series.parquet"
+    market_source.to_parquet(market_source_path, index=False)
+    LOGGER.info(
+        "Wrote %d standardized market observations to %s", len(market_source), market_source_path
+    )
+
+    market_weekly = align_market_closes_to_weekly_wednesday(
+        market_source,
+        daily_asof_components=model_config.market_alignment.daily_asof_components,
+        daily_asof_max_staleness_days=(model_config.market_alignment.daily_asof_max_staleness_days),
+    )
+    market_weekly_path = output_dir / "us_market_weekly.parquet"
+    market_weekly.to_parquet(market_weekly_path, index=False)
+    LOGGER.info(
+        "Wrote %d aligned market observations to %s", len(market_weekly), market_weekly_path
+    )
+
+    market_returns = calculate_market_forward_returns(
+        market_weekly,
+        horizons_weeks=model_config.market_analysis.forward_horizons_weeks,
+    )
+    market_returns_path = output_dir / "us_market_returns.parquet"
+    market_returns.to_parquet(market_returns_path, index=False)
+    LOGGER.info("Wrote %d market return outcomes to %s", len(market_returns), market_returns_path)
+
+    comparisons = build_liquidity_market_comparison(
+        ogli,
+        market_returns,
+        liquidity_signal=model_config.market_analysis.liquidity_signal,
+    )
+    comparisons = add_rolling_correlations(
+        comparisons,
+        window_weeks=model_config.market_analysis.rolling_window_weeks,
+        min_periods=model_config.market_analysis.rolling_min_periods,
+    )
+    comparisons_path = output_dir / "us_liquidity_market_comparisons.parquet"
+    comparisons.to_parquet(comparisons_path, index=False)
+    LOGGER.info("Wrote %d liquidity-market comparisons to %s", len(comparisons), comparisons_path)
+
+    correlations = calculate_lagged_correlations(
+        comparisons,
+        min_periods=model_config.market_analysis.correlation_min_periods,
+    )
+    correlations_path = output_dir / "us_liquidity_market_correlations.parquet"
+    correlations.to_parquet(correlations_path, index=False)
+    LOGGER.info("Wrote %d lagged-correlation estimates to %s", len(correlations), correlations_path)
+
     if publish_dashboard_snapshot:
         snapshot_dir = project_root / "data" / "reference"
         snapshot_dir.mkdir(parents=True, exist_ok=True)
@@ -110,11 +190,15 @@ def run_pipeline(
                 len(snapshot_frame),
                 snapshot_path,
             )
+        LOGGER.warning(
+            "Market datasets were not published: SP500 source metadata restricts redistribution"
+        )
 
     print(
         f"Pipeline complete: {len(output):,} source observations, "
         f"{len(weekly):,} weekly aligned observations, {len(models):,} model observations, "
-        f"and {ogli['ogli'].notna().sum():,} available OGLI readings "
+        f"{ogli['ogli'].notna().sum():,} available OGLI readings, and "
+        f"{len(correlations):,} market-correlation estimates "
         f"-> {output_dir}"
     )
     return output_path
@@ -156,6 +240,7 @@ def main() -> None:
         FrequencyAlignmentError,
         GrowthCalculationError,
         LiquidityModelError,
+        MarketAnalysisError,
         OGLICalculationError,
         UnitConversionError,
         OSError,

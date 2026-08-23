@@ -18,12 +18,18 @@ competing model levels. It then calculates liquidity momentum and maps a configu
 through the standard normal CDF onto the OGLI 0–100 scale. The dashboard keeps measured components,
 model assumptions, and statistical transformations separate.
 
-The configured measured series are:
+The configured measured liquidity series are:
 
 - [`WALCL`](https://fred.stlouisfed.org/series/WALCL): Federal Reserve total assets, Wednesday level;
 - [`WDTGAL`](https://fred.stlouisfed.org/series/WDTGAL): Treasury General Account, Wednesday level;
 - [`RRPONTSYD`](https://fred.stlouisfed.org/series/RRPONTSYD): overnight reverse repos, daily;
 - [`WRBWFRBL`](https://fred.stlouisfed.org/series/WRBWFRBL): reserve balances, Wednesday level.
+
+The first local market-validation series is:
+
+- [`SP500`](https://fred.stlouisfed.org/series/SP500): S&P 500 daily-close price index. It excludes
+  dividends, has a rolling ten-year FRED history, and is not included in public snapshots because
+  its source notes restrict redistribution.
 
 The implemented models are transparent project assumptions:
 
@@ -80,6 +86,7 @@ cp .env.example .env
 ```
 
 Add your free FRED API key to `.env`. That file is ignored by Git and must never be committed.
+The S&P 500 local-research milestone uses the same FRED key; no additional account is required.
 
 ## Run the pipeline
 
@@ -105,6 +112,13 @@ is invalid, or no observations are returned. A successful run writes:
 - `data/processed/us_liquidity_models.parquet`: the three weekly model levels and formulas.
 - `data/processed/us_ogli.parquet`: weekly changes, growth, z-scores, composite momentum, OGLI,
   and regimes for all three models.
+- `data/processed/us_market_series.parquet`: standardized local market observations;
+- `data/processed/us_market_weekly.parquet`: Wednesday-aligned market closes and lineage;
+- `data/processed/us_market_returns.parquet`: contemporaneous and forward market returns;
+- `data/processed/us_liquidity_market_comparisons.parquet`: signal/outcome pairs and rolling
+  correlations;
+- `data/processed/us_liquidity_market_correlations.parquet`: correlation summaries by model and
+  return horizon.
 
 Weekly source series require an exact Wednesday observation. Daily ON RRP uses the latest available
 observation on or before Wednesday, capped at seven calendar days. No balance-sheet values are
@@ -126,6 +140,11 @@ FRED key, or a download on every visitor session. Publishing snapshots is an exp
 action. Review the generated files before committing them; the dashboard displays the active data
 mode and source retrieval time.
 
+Market source data, returns, comparisons, and correlations are intentionally excluded from the
+Git-versioned snapshots because FRED's official `SP500` notes impose S&P Dow Jones Indices
+redistribution restrictions. The hosted app explains this limitation; a local pipeline run enables
+the market page using the researcher's own FRED access.
+
 ## Launch the dashboard
 
 Run the pipeline first, then launch Streamlit:
@@ -136,10 +155,10 @@ uv run streamlit run app/streamlit_app.py
 ```
 
 Streamlit opens the dashboard at `http://localhost:8501`. The app shows latest measured balances,
-the three model levels, an OGLI page, history, a component explorer, recent source observations,
-and methodology notes. Top navigation separates a plain-language landing page, the OGLI index,
-the data dashboard, and a research guide with definitions, assumptions, limitations, and
-primary-source links. All
+the three model levels, an OGLI page, a local Liquidity vs markets workspace, history, a component
+explorer, recent source observations, and methodology notes. Top navigation separates a
+plain-language landing page, the OGLI index, market validation, the data dashboard, and a research
+guide with definitions, assumptions, limitations, and primary-source links. All
 model calculations come from the package and pipeline, not Streamlit.
 
 The app prefers processed source and model files during local research. If those ignored files are
@@ -174,6 +193,8 @@ directory, and verifies that the public snapshots still render the landing-page 
 - `src/open_global_liquidity/transforms/` — unit conversion, alignment, growth, and z-scores.
 - `src/open_global_liquidity/models/us_liquidity.py` — configurable Model A/B/C calculations.
 - `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
+- `src/open_global_liquidity/analysis/lead_lag.py` — market returns and signal/outcome alignment.
+- `src/open_global_liquidity/analysis/correlations.py` — full-sample and rolling correlations.
 - `src/open_global_liquidity/dashboard.py` — tested dashboard data loading and unit conversion.
 - `src/open_global_liquidity/pipeline.py` — executable orchestration and Parquet output.
 - `app/streamlit_app.py` — presentation-only Streamlit application.
@@ -193,9 +214,23 @@ The weights and regime thresholds are configurable research assumptions, not emp
 parameters. OGLI is an independent Open Global Liquidity methodology and is not the proprietary
 CrossBorder Capital GLI.
 
+## Initial market-validation methodology
+
+For each OGLI model, the pipeline compares the configured `momentum_score` at date `t` with S&P 500
+returns. Horizon zero is the one-week return ending at `t`; positive horizons are simple returns
+from `t` through 4, 8, 12, 26, or 52 weeks later. Pearson correlation summaries require 52 paired
+observations. Rolling correlations use a trailing 52-week window with a 26-observation minimum.
+
+Forward returns are retrospective outcome variables and never OGLI inputs. Longer forward-return
+windows overlap, observations are not independent, and correlation does not establish causation.
+The current alignment uses observation dates and does not yet adjust signals for source publication
+lags, so it is exploratory analysis rather than an investable historical backtest. The results do
+not currently calibrate weights or regimes.
+
 ## Roadmap
 
-The next v0.1 milestone is market comparison and lead-lag validation. Later versions may add global
+The next market additions may include Bitcoin, gold, Treasury yields, the yield curve, and a USD
+index after each source and its redistribution terms are verified. Later versions may add global
 central banks, FX conversion, collateral and repo proxies, shadow monetary base concepts, BIS
 cross-border credit, and explicitly labeled public benchmark calibration.
 
