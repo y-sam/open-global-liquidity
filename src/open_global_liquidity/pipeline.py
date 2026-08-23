@@ -181,6 +181,7 @@ def run_pipeline(
             "us_liquidity_weekly_snapshot.parquet": weekly,
             "us_liquidity_models_snapshot.parquet": models,
             "us_ogli_snapshot.parquet": ogli,
+            "us_liquidity_market_correlations_snapshot.parquet": correlations,
         }
         for filename, snapshot_frame in snapshots.items():
             snapshot_path = snapshot_dir / filename
@@ -191,7 +192,8 @@ def run_pipeline(
                 snapshot_path,
             )
         LOGGER.warning(
-            "Market datasets were not published: SP500 source metadata restricts redistribution"
+            "Raw market observations, returns, and paired comparisons were not published: "
+            "SP500 source metadata restricts redistribution"
         )
 
     print(

@@ -167,6 +167,9 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     weekly_snapshot = pd.read_parquet(snapshot_dir / "us_liquidity_weekly_snapshot.parquet")
     model_snapshot = pd.read_parquet(snapshot_dir / "us_liquidity_models_snapshot.parquet")
     ogli_snapshot = pd.read_parquet(snapshot_dir / "us_ogli_snapshot.parquet")
+    correlation_snapshot = pd.read_parquet(
+        snapshot_dir / "us_liquidity_market_correlations_snapshot.parquet"
+    )
 
     assert output_path == tmp_path / "data" / "processed" / "us_fred_series.parquet"
     assert source.columns.tolist() == STANDARD_COLUMNS
@@ -191,4 +194,6 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     assert len(market_returns) == 6
     assert len(comparisons) == 18
     assert len(correlations) == 18
+    pd.testing.assert_frame_equal(correlation_snapshot, correlations)
     assert not snapshot_dir.joinpath("us_market_series_snapshot.parquet").exists()
+    assert not snapshot_dir.joinpath("us_liquidity_market_comparisons_snapshot.parquet").exists()

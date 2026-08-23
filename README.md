@@ -128,22 +128,25 @@ The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. 
 intentionally excluded from Git because it is reproducible from the public API.
 
 The explicit `--publish-dashboard-snapshot` option also writes
-four Git-versioned public-data artifacts:
+five Git-versioned public-data artifacts:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
 - `data/reference/us_liquidity_weekly_snapshot.parquet` — aligned weekly inputs and lineage;
 - `data/reference/us_liquidity_models_snapshot.parquet` — Models A/B/C.
 - `data/reference/us_ogli_snapshot.parquet` — momentum and expanding-normalized OGLI results.
+- `data/reference/us_liquidity_market_correlations_snapshot.parquet` — aggregate model/horizon
+  correlation estimates and sample sizes; no individual market observations or returns.
 
 These small artifacts let the hosted dashboard run without local processed data, a `.env` file, a
 FRED key, or a download on every visitor session. Publishing snapshots is an explicit maintainer
 action. Review the generated files before committing them; the dashboard displays the active data
 mode and source retrieval time.
 
-Market source data, returns, comparisons, and correlations are intentionally excluded from the
-Git-versioned snapshots because FRED's official `SP500` notes impose S&P Dow Jones Indices
-redistribution restrictions. The hosted app explains this limitation; a local pipeline run enables
-the market page using the researcher's own FRED access.
+Market source data, individual returns, paired comparisons, scatter points, and rolling
+correlations are intentionally excluded from Git-versioned snapshots because FRED's official
+`SP500` notes impose S&P Dow Jones Indices redistribution restrictions. The hosted app displays
+only aggregate correlation estimates and sample sizes. A local pipeline run enables the complete
+market workspace using the researcher's own FRED access.
 
 ## Launch the dashboard
 

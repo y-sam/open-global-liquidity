@@ -34,6 +34,9 @@ OGLI_DATA_PATH = DATA_ROOT / "processed" / "us_ogli.parquet"
 OGLI_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_ogli_snapshot.parquet"
 MARKET_COMPARISONS_PATH = DATA_ROOT / "processed" / "us_liquidity_market_comparisons.parquet"
 MARKET_CORRELATIONS_PATH = DATA_ROOT / "processed" / "us_liquidity_market_correlations.parquet"
+MARKET_CORRELATIONS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_liquidity_market_correlations_snapshot.parquet"
+)
 COMPONENT_ORDER = list(COMPONENT_LABELS)
 WINDOW_DAYS = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
 COLORS = {
@@ -112,19 +115,19 @@ def _ogli_data() -> tuple[pd.DataFrame, str]:
     return _load_ogli(str(ogli_path), ogli_path.stat().st_mtime_ns), ogli_origin
 
 
-def _market_data() -> tuple[pd.DataFrame, pd.DataFrame]:
-    if not MARKET_COMPARISONS_PATH.is_file() or not MARKET_CORRELATIONS_PATH.is_file():
-        raise DashboardDataError(
-            "Local market-analysis files are unavailable. Restricted S&P 500 observations are "
-            "not bundled with the public dashboard."
-        )
+def _market_data() -> tuple[pd.DataFrame | None, pd.DataFrame, str]:
+    correlation_path, correlation_origin = resolve_dashboard_data_path(
+        MARKET_CORRELATIONS_PATH, MARKET_CORRELATIONS_SNAPSHOT_PATH
+    )
+    correlations = _load_market_correlations(
+        str(correlation_path), correlation_path.stat().st_mtime_ns
+    )
+    if not MARKET_COMPARISONS_PATH.is_file():
+        return None, correlations, correlation_origin
     comparisons = _load_market_comparisons(
         str(MARKET_COMPARISONS_PATH), MARKET_COMPARISONS_PATH.stat().st_mtime_ns
     )
-    correlations = _load_market_correlations(
-        str(MARKET_CORRELATIONS_PATH), MARKET_CORRELATIONS_PATH.stat().st_mtime_ns
-    )
-    return comparisons, correlations
+    return comparisons, correlations, "Local research data"
 
 
 def _format_billions(value: float) -> str:
@@ -675,7 +678,7 @@ def markets_page() -> None:
         "causation, a forecast, or parameter calibration."
     )
     try:
-        comparisons, correlations = _market_data()
+        comparisons, correlations, data_origin = _market_data()
     except DashboardDataError as exc:
         st.info(str(exc), icon=":material/info:")
         st.markdown(
@@ -722,15 +725,10 @@ def markets_page() -> None:
             key="market_horizon",
         )
         st.caption("Market: S&P 500 price index")
-        st.caption("Data mode: Local research data")
+        st.caption(f"Data mode: {data_origin}")
 
     model_id = model_options[selected_model]
     horizon = horizon_options[selected_horizon_label]
-    selected_pairs = comparisons.loc[
-        (comparisons["model_id"] == model_id)
-        & (comparisons["market_id"] == "sp500")
-        & (comparisons["horizon_weeks"] == horizon)
-    ].dropna(subset=["liquidity_signal", "market_return"])
     selected_summary = correlations.loc[
         (correlations["model_id"] == model_id)
         & (correlations["market_id"] == "sp500")
@@ -739,8 +737,57 @@ def markets_page() -> None:
     model_correlations = correlations.loc[
         (correlations["model_id"] == model_id) & (correlations["market_id"] == "sp500")
     ]
-    latest_pair = selected_pairs.iloc[-1]
     correlation = selected_summary["correlation"]
+
+    if comparisons is None:
+        with st.container(horizontal=True):
+            st.metric(
+                "Pearson correlation",
+                "Insufficient history" if pd.isna(correlation) else f"{correlation:+.2f}",
+                border=True,
+            )
+            st.metric(
+                "Paired observations", f"{int(selected_summary['observations']):,}", border=True
+            )
+            st.metric("Selected horizon", selected_horizon_label, border=True)
+
+        st.plotly_chart(
+            _horizon_correlation_figure(
+                model_correlations,
+                f"{selected_model} · correlation by return horizon",
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+        st.dataframe(
+            model_correlations[["horizon_weeks", "correlation", "observations"]],
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "horizon_weeks": st.column_config.NumberColumn("Forward horizon (weeks)"),
+                "correlation": st.column_config.NumberColumn("Pearson correlation", format="%+.2f"),
+                "observations": st.column_config.NumberColumn("Paired observations", format="%d"),
+            },
+        )
+        st.info(
+            "This hosted view contains only aggregate research statistics. Raw S&P 500 levels, "
+            "individual return observations, scatter points, and rolling correlations remain "
+            "local-only because the source series has redistribution restrictions.",
+            icon=":material/privacy_tip:",
+        )
+        st.warning(
+            "These exploratory correlations use observation dates, do not model publication lags, "
+            "and do not establish causation or an investable signal.",
+            icon=":material/warning:",
+        )
+        return
+
+    selected_pairs = comparisons.loc[
+        (comparisons["model_id"] == model_id)
+        & (comparisons["market_id"] == "sp500")
+        & (comparisons["horizon_weeks"] == horizon)
+    ].dropna(subset=["liquidity_signal", "market_return"])
+    latest_pair = selected_pairs.iloc[-1]
 
     with st.container(horizontal=True):
         st.metric(
