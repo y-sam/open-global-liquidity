@@ -89,6 +89,21 @@ market_analysis:
   correlation_min_periods: 52
   non_overlapping_min_periods: 8
   confidence_level: 0.95
+  research_subperiods:
+    classification: model_assumption
+    periods:
+      - id: pre_2020
+        label: "Pre-2020"
+        start: "2010-07-18"
+        end: "2019-12-31"
+      - id: pandemic_cycle
+        label: "2020-2022"
+        start: "2020-01-01"
+        end: "2022-12-31"
+      - id: recent_cycle
+        label: "2023-present"
+        start: "2023-01-01"
+        end: null
   rolling_window_weeks: 52
   rolling_min_periods: 26
   description: >-
@@ -97,6 +112,7 @@ market_analysis:
     pipeline retains the observation-date view and adds a one-week available-information view,
     reflecting that Wednesday H.4.1 observations are normally published after that Wednesday's
     market close. Both remain descriptive associations and do not establish causation or calibrate
-    OGLI parameters.
+    OGLI parameters. The configured date partitions are descriptive research assumptions selected
+    before examining their results; they are not optimized breakpoints.
 
 calibrated_parameters: {}

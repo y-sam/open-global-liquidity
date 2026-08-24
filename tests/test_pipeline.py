@@ -1,3 +1,4 @@
+import json
 from datetime import UTC
 from pathlib import Path
 
@@ -114,6 +115,10 @@ market_analysis:
   correlation_min_periods: 2
   non_overlapping_min_periods: 2
   confidence_level: 0.95
+  research_subperiods:
+    classification: model_assumption
+    periods:
+      - {id: test_period, label: Test period, start: '2024-01-01', end: null}
   rolling_window_weeks: 2
   rolling_min_periods: 2
   description: Test market analysis
@@ -168,6 +173,9 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     correlations = pd.read_parquet(
         tmp_path / "data" / "processed" / "us_liquidity_market_correlations.parquet"
     )
+    subperiods = pd.read_parquet(
+        tmp_path / "data" / "processed" / "us_liquidity_market_subperiods.parquet"
+    )
     snapshot_dir = tmp_path / "data" / "reference"
     source_snapshot = pd.read_parquet(snapshot_dir / "us_fred_series_snapshot.parquet")
     weekly_snapshot = pd.read_parquet(snapshot_dir / "us_liquidity_weekly_snapshot.parquet")
@@ -178,6 +186,12 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     )
     comparison_snapshot = pd.read_parquet(
         snapshot_dir / "us_liquidity_market_comparisons_snapshot.parquet"
+    )
+    subperiod_snapshot = pd.read_parquet(
+        snapshot_dir / "us_liquidity_market_subperiods_snapshot.parquet"
+    )
+    manifest = json.loads(
+        snapshot_dir.joinpath("dashboard_snapshot_manifest.json").read_text(encoding="utf-8")
     )
 
     assert output_path == tmp_path / "data" / "processed" / "us_fred_series.parquet"
@@ -203,9 +217,14 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     assert len(market_returns) == 6
     assert len(comparisons) == 18
     assert len(correlations) == 18
+    assert len(subperiods) == 18
     assert set(comparisons["analysis_mode"]) == {"observation_date"}
     pd.testing.assert_frame_equal(correlation_snapshot, correlations)
     pd.testing.assert_frame_equal(comparison_snapshot, comparisons)
+    pd.testing.assert_frame_equal(subperiod_snapshot, subperiods)
+    assert manifest["snapshot_count"] == 11
+    assert set(manifest["files"]) == {path.name for path in snapshot_dir.glob("*.parquet")}
+    assert manifest["files"]["us_liquidity_market_subperiods_snapshot.parquet"]["rows"] == 18
     assert snapshot_dir.joinpath("us_market_series_snapshot.parquet").is_file()
     assert snapshot_dir.joinpath("us_market_weekly_snapshot.parquet").is_file()
     assert snapshot_dir.joinpath("us_market_returns_snapshot.parquet").is_file()

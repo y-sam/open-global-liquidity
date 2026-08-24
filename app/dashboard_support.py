@@ -6,6 +6,7 @@ only the presentation contract so Streamlit Cloud never depends on a cached inst
 
 from __future__ import annotations
 
+import json
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -122,6 +123,16 @@ MARKET_REGIME_COLUMNS = [
     "mean_ci_lower",
     "mean_ci_upper",
     "classification",
+]
+
+MARKET_SUBPERIOD_COLUMNS = [
+    *MARKET_CORRELATION_COLUMNS,
+    "period_id",
+    "period_label",
+    "period_start",
+    "period_end",
+    "period_order",
+    "period_classification",
 ]
 
 MACRO_CONTEXT_COLUMNS = [
@@ -441,6 +452,60 @@ def load_market_regime_statistics(path: Path) -> pd.DataFrame:
         .sort_values(["model_id", "analysis_mode", "sample_policy", "horizon_weeks", "regime"])
         .reset_index(drop=True)
     )
+
+
+def load_market_subperiod_statistics(path: Path) -> pd.DataFrame:
+    """Load package-calculated Bitcoin correlations in predeclared research periods."""
+    frame = _read_parquet(path, "Market subperiod statistics")
+    missing = sorted(set(MARKET_SUBPERIOD_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Market subperiod data is missing columns: " + ", ".join(missing))
+    result = frame[MARKET_SUBPERIOD_COLUMNS].copy()
+    result["period_start"] = pd.to_datetime(result["period_start"])
+    result["period_end"] = pd.to_datetime(result["period_end"])
+    return result.sort_values(
+        ["period_order", "model_id", "analysis_mode", "sample_policy", "horizon_weeks"]
+    ).reset_index(drop=True)
+
+
+def load_snapshot_manifest(path: Path) -> dict[str, object]:
+    """Load and validate the public snapshot's point-in-time provenance record."""
+    if not path.is_file():
+        raise DashboardDataError(f"Snapshot provenance manifest not found at {path}")
+    try:
+        manifest = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise DashboardDataError(f"Could not read snapshot provenance manifest: {exc}") from exc
+    if not isinstance(manifest, dict):
+        raise DashboardDataError("Snapshot provenance manifest must be a JSON object")
+    required = {
+        "schema_version",
+        "classification",
+        "generated_at",
+        "pipeline_version",
+        "source_commit",
+        "working_tree_dirty",
+        "snapshot_count",
+        "files",
+    }
+    missing = sorted(required - set(manifest))
+    if missing:
+        raise DashboardDataError("Snapshot provenance manifest is missing: " + ", ".join(missing))
+    if manifest["schema_version"] != 1 or manifest["classification"] != "snapshot_provenance":
+        raise DashboardDataError("Snapshot provenance manifest has an unsupported schema")
+    files = manifest["files"]
+    if not isinstance(files, dict) or manifest["snapshot_count"] != len(files):
+        raise DashboardDataError("Snapshot provenance manifest file count is inconsistent")
+    generated_at = pd.to_datetime(manifest["generated_at"], utc=True, errors="coerce")
+    if pd.isna(generated_at):
+        raise DashboardDataError("Snapshot provenance manifest has an invalid generation time")
+    for filename, metadata in files.items():
+        if not isinstance(filename, str) or not isinstance(metadata, dict):
+            raise DashboardDataError("Snapshot provenance manifest has an invalid file entry")
+        digest = metadata.get("sha256")
+        if not isinstance(digest, str) or len(digest) != 64:
+            raise DashboardDataError(f"Snapshot provenance hash is invalid for {filename}")
+    return manifest
 
 
 def load_macro_context(path: Path) -> pd.DataFrame:

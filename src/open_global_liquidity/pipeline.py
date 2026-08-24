@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+from importlib.metadata import version
 from pathlib import Path
 
 import pandas as pd
@@ -24,6 +25,7 @@ from open_global_liquidity.analysis.lead_lag import (
     build_liquidity_market_comparison,
     calculate_market_forward_returns,
 )
+from open_global_liquidity.analysis.subperiods import calculate_subperiod_correlations
 from open_global_liquidity.config import (
     ConfigurationError,
     load_model_config,
@@ -37,6 +39,7 @@ from open_global_liquidity.models.us_liquidity import (
     LiquidityModelError,
     calculate_us_liquidity_models,
 )
+from open_global_liquidity.provenance import ProvenanceError, write_snapshot_manifest
 from open_global_liquidity.transforms.frequency import (
     FrequencyAlignmentError,
     align_market_closes_to_weekly_wednesday,
@@ -231,6 +234,13 @@ def run_pipeline(
         ],
         ignore_index=True,
     )
+    subperiod_correlations = calculate_subperiod_correlations(
+        comparisons,
+        model_config.market_analysis.research_subperiods,
+        overlapping_min_periods=model_config.market_analysis.correlation_min_periods,
+        non_overlapping_min_periods=model_config.market_analysis.non_overlapping_min_periods,
+        confidence_level=model_config.market_analysis.confidence_level,
+    )
     correlations_path = output_dir / "us_liquidity_market_correlations.parquet"
     correlations.to_parquet(correlations_path, index=False)
     LOGGER.info("Wrote %d lagged-correlation estimates to %s", len(correlations), correlations_path)
@@ -240,6 +250,13 @@ def run_pipeline(
         "Wrote %d regime-return estimates to %s",
         len(regime_statistics),
         regime_statistics_path,
+    )
+    subperiod_path = output_dir / "us_liquidity_market_subperiods.parquet"
+    subperiod_correlations.to_parquet(subperiod_path, index=False)
+    LOGGER.info(
+        "Wrote %d predeclared subperiod estimates to %s",
+        len(subperiod_correlations),
+        subperiod_path,
     )
 
     context_outputs: dict[str, pd.DataFrame] = {}
@@ -290,6 +307,7 @@ def run_pipeline(
             "us_liquidity_market_comparisons_snapshot.parquet": comparisons,
             "us_liquidity_market_correlations_snapshot.parquet": correlations,
             "us_liquidity_market_regimes_snapshot.parquet": regime_statistics,
+            "us_liquidity_market_subperiods_snapshot.parquet": subperiod_correlations,
         }
         snapshots.update(
             {
@@ -305,6 +323,13 @@ def run_pipeline(
                 len(snapshot_frame),
                 snapshot_path,
             )
+        manifest_path = write_snapshot_manifest(
+            snapshot_dir,
+            snapshots,
+            project_root=project_root,
+            pipeline_version=version("open-global-liquidity"),
+        )
+        LOGGER.info("Published snapshot provenance manifest to %s", manifest_path)
         LOGGER.info(
             "Published Bitcoin market research under Coin Metrics Community Data CC BY-NC 4.0"
         )
@@ -359,6 +384,7 @@ def main() -> None:
         MarketAnalysisError,
         MacroContextError,
         OGLICalculationError,
+        ProvenanceError,
         UnitConversionError,
         OSError,
     ) as exc:

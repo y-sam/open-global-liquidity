@@ -30,7 +30,9 @@ from dashboard_support import (  # noqa: E402
     load_market_comparisons,
     load_market_correlations,
     load_market_regime_statistics,
+    load_market_subperiod_statistics,
     load_ogli_data,
+    load_snapshot_manifest,
     resolve_dashboard_data_path,
 )
 
@@ -53,6 +55,11 @@ MARKET_REGIMES_PATH = DATA_ROOT / "processed" / "us_liquidity_market_regimes.par
 MARKET_REGIMES_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_liquidity_market_regimes_snapshot.parquet"
 )
+MARKET_SUBPERIODS_PATH = DATA_ROOT / "processed" / "us_liquidity_market_subperiods.parquet"
+MARKET_SUBPERIODS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_liquidity_market_subperiods_snapshot.parquet"
+)
+SNAPSHOT_MANIFEST_PATH = DATA_ROOT / "reference" / "dashboard_snapshot_manifest.json"
 MACRO_CONTEXT_PATH = DATA_ROOT / "processed" / "us_macro_context_indicators.parquet"
 MACRO_CONTEXT_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_macro_context_indicators_snapshot.parquet"
@@ -122,6 +129,20 @@ def _load_market_regimes(path: str, modified_ns: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def _load_market_subperiods(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated market subperiod diagnostics."""
+    del modified_ns
+    return load_market_subperiod_statistics(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_snapshot_manifest(path: str, modified_ns: int) -> dict[str, object]:
+    """Cache snapshot provenance until the manifest changes."""
+    del modified_ns
+    return load_snapshot_manifest(Path(path))
+
+
+@st.cache_data(show_spinner=False)
 def _load_macro_context(path: str, modified_ns: int) -> pd.DataFrame:
     """Cache package-calculated measured macro context."""
     del modified_ns
@@ -174,6 +195,27 @@ def _market_regime_data() -> pd.DataFrame | None:
     except DashboardDataError:
         return None
     return _load_market_regimes(str(path), path.stat().st_mtime_ns)
+
+
+def _market_subperiod_data() -> pd.DataFrame | None:
+    try:
+        path, _origin = resolve_dashboard_data_path(
+            MARKET_SUBPERIODS_PATH, MARKET_SUBPERIODS_SNAPSHOT_PATH
+        )
+    except DashboardDataError:
+        return None
+    return _load_market_subperiods(str(path), path.stat().st_mtime_ns)
+
+
+def _snapshot_provenance() -> dict[str, object] | None:
+    if not SNAPSHOT_MANIFEST_PATH.is_file():
+        return None
+    try:
+        return _load_snapshot_manifest(
+            str(SNAPSHOT_MANIFEST_PATH), SNAPSHOT_MANIFEST_PATH.stat().st_mtime_ns
+        )
+    except DashboardDataError:
+        return None
 
 
 def _macro_context_data() -> pd.DataFrame | None:
@@ -385,6 +427,42 @@ def _horizon_correlation_figure(frame: pd.DataFrame, title: str):
     return figure
 
 
+def _subperiod_correlation_figure(frame: pd.DataFrame, title: str):
+    figure = go.Figure(
+        go.Bar(
+            x=frame["period_label"],
+            y=frame["correlation"],
+            marker_color="#059669",
+            text=frame["correlation"].map(lambda value: "—" if pd.isna(value) else f"{value:+.2f}"),
+            textposition="outside",
+            error_y={
+                "type": "data",
+                "symmetric": False,
+                "array": frame["correlation_ci_upper"] - frame["correlation"],
+                "arrayminus": frame["correlation"] - frame["correlation_ci_lower"],
+            },
+            customdata=frame[["observations", "period_start", "period_end"]],
+            hovertemplate=(
+                "%{x}<br>Correlation: %{y:+.2f}<br>Observations: %{customdata[0]:,}"
+                "<br>Period: %{customdata[1]|%Y-%m-%d} to %{customdata[2]|%Y-%m-%d}<extra></extra>"
+            ),
+        )
+    )
+    figure.add_hline(y=0, line_width=1, line_color="rgba(128,128,128,0.5)")
+    figure.update_layout(
+        title=title,
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+        yaxis={
+            "range": [-1, 1],
+            "title": "Pearson correlation",
+            "gridcolor": "rgba(128,128,128,0.15)",
+        },
+        xaxis={"title": "Predeclared research period"},
+    )
+    return figure
+
+
 def _regime_return_figure(frame: pd.DataFrame, title: str):
     figure = go.Figure()
     figure.add_trace(
@@ -539,6 +617,18 @@ def landing_page() -> None:
             f"Latest source date {latest_date:%Y-%m-%d} · {data_origin} · Nominal USD balances"
         )
         _show_freshness(data, "US liquidity data")
+        provenance = _snapshot_provenance()
+        if provenance is not None:
+            generated_at = pd.to_datetime(provenance["generated_at"], utc=True)
+            source_commit = str(provenance["source_commit"])
+            source_label = source_commit[:8]
+            if provenance["working_tree_dirty"] is True:
+                source_label += " + local changes"
+            st.caption(
+                f"Public snapshot generated {generated_at:%Y-%m-%d %H:%M UTC} · "
+                f"code source `{source_label}` · "
+                f"{int(provenance['snapshot_count'])} files recorded with SHA-256 hashes"
+            )
 
         try:
             comparisons, correlations, market_origin = _market_data()
@@ -1114,18 +1204,26 @@ def markets_page() -> None:
             st.metric("BTC at signal date", f"${float(bitcoin_price):,.0f}", border=True)
         st.metric("Latest paired BTC return", f"{latest_pair['market_return']:.1%}", border=True)
 
-    timeline_tab, scatter_tab, regimes_tab, rolling_tab, horizons_tab, macro_tab, data_tab = (
-        st.tabs(
-            [
-                "Timeline",
-                "Relationship",
-                "Returns by regime",
-                "Rolling correlation",
-                "Across horizons",
-                "Macro context",
-                "Paired data",
-            ]
-        )
+    (
+        timeline_tab,
+        scatter_tab,
+        regimes_tab,
+        rolling_tab,
+        horizons_tab,
+        subperiods_tab,
+        macro_tab,
+        data_tab,
+    ) = st.tabs(
+        [
+            "Timeline",
+            "Relationship",
+            "Returns by regime",
+            "Rolling correlation",
+            "Across horizons",
+            "Subperiod stability",
+            "Macro context",
+            "Paired data",
+        ]
     )
     with timeline_tab:
         if "value" not in comparisons.columns:
@@ -1252,6 +1350,63 @@ def markets_page() -> None:
             "All estimates use the same configured OGLI momentum signal. Horizon zero is the "
             "one-week return ending at t; positive horizons start at t."
         )
+    with subperiods_tab:
+        subperiod_statistics = _market_subperiod_data()
+        if subperiod_statistics is None:
+            st.info(
+                "Subperiod diagnostics will appear after the next full pipeline run.",
+                icon=":material/sync:",
+            )
+        else:
+            selected_subperiods = subperiod_statistics.loc[
+                (subperiod_statistics["model_id"] == model_id)
+                & (subperiod_statistics["market_id"] == "bitcoin")
+                & (subperiod_statistics["horizon_weeks"] == horizon)
+                & (subperiod_statistics["analysis_mode"] == analysis_mode)
+                & (subperiod_statistics["sample_policy"] == sample_policy)
+            ]
+            st.plotly_chart(
+                _subperiod_correlation_figure(
+                    selected_subperiods,
+                    f"Bitcoin correlation across predeclared periods · {selected_horizon_label}",
+                ),
+                width="stretch",
+                config={"displaylogo": False},
+            )
+            st.dataframe(
+                selected_subperiods[
+                    [
+                        "period_label",
+                        "period_start",
+                        "period_end",
+                        "correlation",
+                        "correlation_ci_lower",
+                        "correlation_ci_upper",
+                        "observations",
+                    ]
+                ],
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "period_label": "Research period",
+                    "period_start": st.column_config.DateColumn("Start", format="YYYY-MM-DD"),
+                    "period_end": st.column_config.DateColumn("End", format="YYYY-MM-DD"),
+                    "correlation": st.column_config.NumberColumn("Correlation", format="%+.2f"),
+                    "correlation_ci_lower": st.column_config.NumberColumn(
+                        "95% CI lower", format="%+.2f"
+                    ),
+                    "correlation_ci_upper": st.column_config.NumberColumn(
+                        "95% CI upper", format="%+.2f"
+                    ),
+                    "observations": st.column_config.NumberColumn("Observations", format="%d"),
+                },
+            )
+            st.caption(
+                "The periods—Pre-2020, 2020-2022, and 2023-present—were declared in configuration "
+                "before calculating these results. They are model assumptions, not breakpoints "
+                "optimized to improve Bitcoin correlation. Wide intervals and sign changes are "
+                "evidence of relationship instability, not something to hide."
+            )
     with macro_tab:
         macro_context = _macro_context_data()
         if macro_context is None:
@@ -1495,6 +1650,54 @@ def research_guide_page() -> None:
         source.
         """
     )
+
+    st.subheader("Point-in-time snapshot provenance")
+    st.markdown(
+        """
+        Every published Parquet snapshot has a companion manifest recording when the bundle was
+        generated, the project version, the exact source-code commit, row and date coverage, and a
+        SHA-256 content hash. The generation timestamp, source observation dates, and provider
+        retrieval timestamps are deliberately separate: they answer different audit questions.
+
+        Hashes establish byte-level integrity of the published files; they do not turn current-
+        vintage FRED observations into historical release vintages. A future vintage store is
+        still required for strict real-time backtesting.
+        """
+    )
+    provenance = _snapshot_provenance()
+    if provenance is None:
+        st.info(
+            "Run the pipeline with `--publish-dashboard-snapshot` to create the provenance "
+            "manifest.",
+            icon=":material/info:",
+        )
+    else:
+        generated_at = pd.to_datetime(provenance["generated_at"], utc=True)
+        source_commit = str(provenance["source_commit"])
+        source_label = source_commit[:8]
+        if provenance["working_tree_dirty"] is True:
+            source_label += " + local changes"
+        with st.container(horizontal=True):
+            st.metric("Snapshot generated", f"{generated_at:%Y-%m-%d %H:%M UTC}", border=True)
+            st.metric("Pipeline version", str(provenance["pipeline_version"]), border=True)
+            st.metric("Code source", source_label, border=True)
+            st.metric("Hashed files", str(provenance["snapshot_count"]), border=True)
+        files = provenance["files"]
+        if isinstance(files, dict):
+            manifest_table = pd.DataFrame(
+                [
+                    {
+                        "file": filename,
+                        "rows": metadata.get("rows"),
+                        "latest_observation": metadata.get("latest_observation"),
+                        "sha256": str(metadata.get("sha256", ""))[:12] + "…",
+                    }
+                    for filename, metadata in files.items()
+                    if isinstance(metadata, dict)
+                ]
+            )
+            with st.expander("Inspect the published file manifest"):
+                st.dataframe(manifest_table, width="stretch", hide_index=True)
 
     st.subheader("Data sources and further reading")
     st.markdown(

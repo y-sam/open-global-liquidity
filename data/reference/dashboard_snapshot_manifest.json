@@ -1,0 +1,474 @@
+{
+  "classification": "snapshot_provenance",
+  "files": {
+    "us_fred_series_snapshot.parquet": {
+      "bytes": 89535,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "retrieved_at"
+      ],
+      "components": [
+        "fed_assets",
+        "overnight_reverse_repo",
+        "reserve_balances",
+        "treasury_general_account"
+      ],
+      "earliest_observation": "2002-12-18",
+      "latest_observation": "2026-08-21",
+      "latest_retrieval": "2026-08-24T12:16:24.367309+00:00",
+      "providers": [
+        "FRED"
+      ],
+      "rows": 7006,
+      "series_ids": [
+        "RRPONTSYD",
+        "WALCL",
+        "WDTGAL",
+        "WRBWFRBL"
+      ],
+      "sha256": "6c4ca879add9f2652d0bd445b16a4c55c253399da602ac82d149883ecfd2c340"
+    },
+    "us_liquidity_market_comparisons_snapshot.parquet": {
+      "bytes": 599326,
+      "columns": [
+        "signal_observation_date",
+        "model_id",
+        "model_name",
+        "ogli",
+        "momentum_score",
+        "growth_3m_annualized",
+        "growth_12m_yoy",
+        "regime",
+        "date",
+        "signal_available_date",
+        "liquidity_signal_name",
+        "liquidity_signal",
+        "market_id",
+        "series_id",
+        "value",
+        "unit",
+        "horizon_weeks",
+        "return_type",
+        "market_return",
+        "return_start_date",
+        "return_end_date",
+        "analysis_mode",
+        "publication_lag_weeks",
+        "classification",
+        "rolling_correlation",
+        "rolling_window_weeks",
+        "rolling_min_periods",
+        "is_non_overlapping"
+      ],
+      "earliest_observation": "2014-01-08",
+      "latest_observation": "2026-08-19",
+      "market_ids": [
+        "bitcoin"
+      ],
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "rows": 23706,
+      "series_ids": [
+        "btc.PriceUSD"
+      ],
+      "sha256": "aaaead47fdf4446cf854ff50d27d5d90a17197ed06732ab4ded0173b26f2ebbd"
+    },
+    "us_liquidity_market_correlations_snapshot.parquet": {
+      "bytes": 11868,
+      "columns": [
+        "model_id",
+        "model_name",
+        "market_id",
+        "series_id",
+        "horizon_weeks",
+        "return_type",
+        "analysis_mode",
+        "liquidity_signal_name",
+        "correlation",
+        "observations",
+        "sample_policy",
+        "confidence_level",
+        "correlation_ci_lower",
+        "correlation_ci_upper",
+        "classification"
+      ],
+      "market_ids": [
+        "bitcoin"
+      ],
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "rows": 72,
+      "series_ids": [
+        "btc.PriceUSD"
+      ],
+      "sha256": "470e0f32e69caf272e1a467a76d2ad62c777710a2f8e439d4f76ef22039b0165"
+    },
+    "us_liquidity_market_regimes_snapshot.parquet": {
+      "bytes": 34876,
+      "columns": [
+        "model_id",
+        "model_name",
+        "market_id",
+        "series_id",
+        "horizon_weeks",
+        "return_type",
+        "analysis_mode",
+        "regime",
+        "sample_policy",
+        "observations",
+        "mean_return",
+        "median_return",
+        "positive_share",
+        "standard_error",
+        "confidence_level",
+        "mean_ci_lower",
+        "mean_ci_upper",
+        "classification"
+      ],
+      "market_ids": [
+        "bitcoin"
+      ],
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "rows": 562,
+      "series_ids": [
+        "btc.PriceUSD"
+      ],
+      "sha256": "2478619bc7a425a0211c42bc6caab1648a174d349e83c373ed31b60384d2f753"
+    },
+    "us_liquidity_market_subperiods_snapshot.parquet": {
+      "bytes": 18411,
+      "columns": [
+        "model_id",
+        "model_name",
+        "market_id",
+        "series_id",
+        "horizon_weeks",
+        "return_type",
+        "analysis_mode",
+        "liquidity_signal_name",
+        "correlation",
+        "observations",
+        "sample_policy",
+        "confidence_level",
+        "correlation_ci_lower",
+        "correlation_ci_upper",
+        "classification",
+        "period_id",
+        "period_label",
+        "period_start",
+        "period_end",
+        "period_order",
+        "period_classification"
+      ],
+      "market_ids": [
+        "bitcoin"
+      ],
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "rows": 216,
+      "series_ids": [
+        "btc.PriceUSD"
+      ],
+      "sha256": "65aeca30c55bc91af6de7c3882f21e7825fd9c28d8cae02ee2ea44e3675eb4b5"
+    },
+    "us_liquidity_models_snapshot.parquet": {
+      "bytes": 29298,
+      "columns": [
+        "date",
+        "model_id",
+        "model_name",
+        "value",
+        "unit",
+        "frequency",
+        "classification",
+        "formula",
+        "description",
+        "is_complete"
+      ],
+      "earliest_observation": "2014-01-08",
+      "latest_observation": "2026-08-19",
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "rows": 1977,
+      "sha256": "cc530609d5eaf58a29cd24b13aa3c38a49c5e302de7391029e9e7c89219cdb13"
+    },
+    "us_liquidity_weekly_snapshot.parquet": {
+      "bytes": 42565,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "source_date",
+        "source_unit",
+        "source_frequency",
+        "staleness_days",
+        "alignment_method",
+        "retrieved_at"
+      ],
+      "components": [
+        "fed_assets",
+        "overnight_reverse_repo",
+        "reserve_balances",
+        "treasury_general_account"
+      ],
+      "earliest_observation": "2014-01-08",
+      "latest_observation": "2026-08-19",
+      "latest_retrieval": "2026-08-24T12:16:24.367309+00:00",
+      "providers": [
+        "FRED"
+      ],
+      "rows": 2636,
+      "series_ids": [
+        "RRPONTSYD",
+        "WALCL",
+        "WDTGAL",
+        "WRBWFRBL"
+      ],
+      "sha256": "775114b615412cd3ddd7a9a90a200aeabb527af211f4ee8343fa9c4ab25cbb5e"
+    },
+    "us_macro_context_indicators_snapshot.parquet": {
+      "bytes": 32346,
+      "columns": [
+        "date",
+        "treasury_yield_10y",
+        "treasury_yield_2y",
+        "yield_curve_10y_2y",
+        "broad_usd_index",
+        "classification"
+      ],
+      "earliest_observation": "2006-01-04",
+      "latest_observation": "2026-08-19",
+      "rows": 1077,
+      "sha256": "2cc35773e0ee4b0fbcc9ca24559f10aaf14f06a2e622e4731eadba56da79d4fe"
+    },
+    "us_macro_context_series_snapshot.parquet": {
+      "bytes": 125698,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "retrieved_at"
+      ],
+      "components": [
+        "broad_usd_index",
+        "treasury_yield_10y",
+        "treasury_yield_2y"
+      ],
+      "earliest_observation": "2006-01-02",
+      "latest_observation": "2026-08-20",
+      "latest_retrieval": "2026-08-24T12:16:27.456408+00:00",
+      "providers": [
+        "FRED"
+      ],
+      "rows": 16148,
+      "series_ids": [
+        "DGS10",
+        "DGS2",
+        "DTWEXBGS"
+      ],
+      "sha256": "501b91fdd72fc86b213ab2f15b98f90711e8a0928f8e82832808002335ee29cb"
+    },
+    "us_macro_context_weekly_snapshot.parquet": {
+      "bytes": 47386,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "source_date",
+        "source_unit",
+        "source_frequency",
+        "staleness_days",
+        "alignment_method",
+        "retrieved_at"
+      ],
+      "components": [
+        "broad_usd_index",
+        "treasury_yield_10y",
+        "treasury_yield_2y"
+      ],
+      "earliest_observation": "2006-01-04",
+      "latest_observation": "2026-08-19",
+      "latest_retrieval": "2026-08-24T12:16:27.456408+00:00",
+      "providers": [
+        "FRED"
+      ],
+      "rows": 3230,
+      "series_ids": [
+        "DGS10",
+        "DGS2",
+        "DTWEXBGS"
+      ],
+      "sha256": "451aa2ba460aeaa6bf3f924c9d41a08458bd1741818cd0fa321b6cc0b0e074a3"
+    },
+    "us_market_returns_snapshot.parquet": {
+      "bytes": 92057,
+      "columns": [
+        "date",
+        "market_id",
+        "series_id",
+        "value",
+        "unit",
+        "horizon_weeks",
+        "return_type",
+        "market_return",
+        "return_start_date",
+        "return_end_date"
+      ],
+      "earliest_observation": "2010-07-21",
+      "latest_observation": "2026-08-19",
+      "market_ids": [
+        "bitcoin"
+      ],
+      "rows": 5040,
+      "series_ids": [
+        "btc.PriceUSD"
+      ],
+      "sha256": "66228af6cc029d8fa45e355ba71e44933a1ee0956a3e74eafb09c606113ff6ac"
+    },
+    "us_market_series_snapshot.parquet": {
+      "bytes": 114733,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "retrieved_at"
+      ],
+      "components": [
+        "bitcoin"
+      ],
+      "earliest_observation": "2010-07-18",
+      "latest_observation": "2026-08-23",
+      "latest_retrieval": "2026-08-24T12:16:25.560642+00:00",
+      "providers": [
+        "Coin Metrics"
+      ],
+      "rows": 5881,
+      "series_ids": [
+        "btc.PriceUSD"
+      ],
+      "sha256": "23bbed5ad62a40725f8d3a83b190891ae26325449da767477a79a7a541971cb6"
+    },
+    "us_market_weekly_snapshot.parquet": {
+      "bytes": 32261,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "source_date",
+        "source_unit",
+        "source_frequency",
+        "staleness_days",
+        "alignment_method",
+        "retrieved_at"
+      ],
+      "components": [
+        "bitcoin"
+      ],
+      "earliest_observation": "2010-07-21",
+      "latest_observation": "2026-08-19",
+      "latest_retrieval": "2026-08-24T12:16:25.560642+00:00",
+      "providers": [
+        "Coin Metrics"
+      ],
+      "rows": 840,
+      "series_ids": [
+        "btc.PriceUSD"
+      ],
+      "sha256": "f125152f4631a9c383d7044326b0e74d232d3229865be0176af9795ade6de69d"
+    },
+    "us_ogli_snapshot.parquet": {
+      "bytes": 183231,
+      "columns": [
+        "date",
+        "model_id",
+        "model_name",
+        "value",
+        "unit",
+        "frequency",
+        "classification",
+        "formula",
+        "description",
+        "is_complete",
+        "change_1m",
+        "change_3m",
+        "change_6m",
+        "change_12m",
+        "growth_3m_annualized",
+        "growth_12m_yoy",
+        "momentum_classification",
+        "z_growth_12m_yoy",
+        "z_growth_3m_annualized",
+        "momentum_score",
+        "ogli",
+        "regime",
+        "zscore_mode",
+        "zscore_min_periods",
+        "ogli_classification",
+        "weight_classification"
+      ],
+      "earliest_observation": "2014-01-08",
+      "latest_observation": "2026-08-19",
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "rows": 1977,
+      "sha256": "7c79169800df187c003adab1448302443094d0c1f0a9380551c437cf54265772"
+    }
+  },
+  "generated_at": "2026-08-24T13:40:03.041613+00:00",
+  "pipeline_version": "0.1.0",
+  "schema_version": 1,
+  "snapshot_count": 14,
+  "source_commit": "fca3ac8a9d21d88398c4c8da49919c4eb4f213ef",
+  "working_tree_dirty": true
+}

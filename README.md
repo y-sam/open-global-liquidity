@@ -128,6 +128,8 @@ is invalid, or no observations are returned. A successful run writes:
   return horizon.
 - `data/processed/us_liquidity_market_regimes.parquet`: Bitcoin return summaries by OGLI regime,
   timing policy, horizon, and sample policy.
+- `data/processed/us_liquidity_market_subperiods.parquet`: identical correlation diagnostics for
+  the predeclared Pre-2020, 2020-2022, and 2023-present research periods.
 - `data/processed/us_macro_context_*.parquet`: measured Treasury/dollar context and the transparent
   10-year-minus-2-year curve slope.
 
@@ -138,8 +140,8 @@ interpolated. These assumptions live in `config/model.yaml`.
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
 
-The explicit `--publish-dashboard-snapshot` option also writes
-thirteen Git-versioned public-data artifacts:
+The explicit `--publish-dashboard-snapshot` option also writes fourteen Git-versioned Parquet
+artifacts plus a JSON provenance manifest:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
 - `data/reference/us_liquidity_weekly_snapshot.parquet` — aligned weekly inputs and lineage;
@@ -154,10 +156,14 @@ thirteen Git-versioned public-data artifacts:
   correlation estimates and sample sizes.
 - `data/reference/us_liquidity_market_regimes_snapshot.parquet` — mean, median, positive share,
   and confidence intervals by OGLI regime.
+- `data/reference/us_liquidity_market_subperiods_snapshot.parquet` — correlation stability across
+  predeclared Bitcoin research periods.
 - `data/reference/us_macro_context_series_snapshot.parquet` — standardized measured macro sources.
 - `data/reference/us_macro_context_weekly_snapshot.parquet` — Wednesday-aligned context data.
 - `data/reference/us_macro_context_indicators_snapshot.parquet` — yields, curve slope, and broad
   dollar index for dashboard presentation.
+- `data/reference/dashboard_snapshot_manifest.json` — generation time, pipeline version, source
+  commit, row/date coverage, and SHA-256 digest for every published Parquet file.
 
 These small artifacts let the hosted dashboard run without local processed data, a `.env` file, a
 FRED key, or a download on every visitor session. Publishing snapshots is an explicit maintainer
@@ -168,8 +174,9 @@ mode and source retrieval time.
 
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
-environment, downloads fresh FRED and Coin Metrics observations, regenerates the thirteen public
-snapshots, and runs formatting, linting, and offline tests. Only successful runs can commit changed
+environment, downloads fresh FRED and Coin Metrics observations, regenerates the fourteen public
+Parquet snapshots and provenance manifest, and runs formatting, linting, and offline tests. Only
+successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 
 The workflow requires a repository Actions secret named `FRED_API_KEY` and **Read and write**
@@ -236,6 +243,8 @@ directory, and verifies that the public snapshots still render the landing-page 
 - `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
 - `src/open_global_liquidity/analysis/lead_lag.py` — market returns and signal/outcome alignment.
 - `src/open_global_liquidity/analysis/correlations.py` — full-sample and rolling correlations.
+- `src/open_global_liquidity/analysis/subperiods.py` — predeclared Bitcoin stability diagnostics.
+- `src/open_global_liquidity/provenance.py` — snapshot hashes and point-in-time manifest metadata.
 - `src/open_global_liquidity/dashboard.py` — tested dashboard data loading and unit conversion.
 - `src/open_global_liquidity/pipeline.py` — executable orchestration and Parquet output.
 - `app/streamlit_app.py` — presentation-only Streamlit application.
@@ -271,11 +280,24 @@ a classical Student-t 95% interval around the mean. These intervals assume the r
 independent and identically distributed enough for descriptive inference; they are not forecast
 intervals.
 
+The same calculation is repeated over three date partitions declared in `config/model.yaml`:
+Pre-2020, 2020-2022, and 2023-present. Membership is based on the liquidity observation date, and
+non-overlapping windows are reselected inside each partition. These boundaries are research
+assumptions chosen for interpretable cycle comparisons, not change points fitted to maximize
+Bitcoin correlation. Small samples, wide confidence intervals, and unstable signs are expected and
+must remain visible.
+
 Forward returns are retrospective outcome variables and never OGLI inputs. The overlapping view has
 dependent observations, while the non-overlapping view has materially smaller samples. Neither the
 one-week availability assumption nor current-vintage FRED observations fully reproduce what an
 investor knew historically. Correlation does not establish causation, and the results do not
 calibrate OGLI weights or regimes.
+
+Published snapshots are auditable at the bundle level through
+`data/reference/dashboard_snapshot_manifest.json`. Its generation timestamp is distinct from each
+series' observation and retrieval timestamps. The manifest's source commit identifies the code used
+for the run, while SHA-256 hashes detect any later byte-level change. This integrity record does not
+solve the separate current-vintage/revision limitation.
 
 The dashboard timeline places Bitcoin's unmodified USD price on a logarithmic axis beside OGLI's
 unmodified 0-100 series. Sharing a chart and observation dates does not imply that either series

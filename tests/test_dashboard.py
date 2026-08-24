@@ -1,4 +1,5 @@
 import importlib.util
+import json
 from datetime import UTC
 from pathlib import Path
 
@@ -179,3 +180,37 @@ def test_freshness_status_flags_old_observations() -> None:
     assert status.latest_date == pd.Timestamp("2024-01-10")
     assert status.age_days == 15
     assert status.is_stale
+
+
+def test_load_snapshot_manifest_validates_point_in_time_metadata(tmp_path: Path) -> None:
+    support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
+    spec = importlib.util.spec_from_file_location("dashboard_support_manifest_test", support_path)
+    assert spec is not None and spec.loader is not None
+    support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(support)
+    path = tmp_path / "manifest.json"
+    path.write_text(
+        json.dumps(
+            {
+                "schema_version": 1,
+                "classification": "snapshot_provenance",
+                "generated_at": "2024-01-11T12:00:00+00:00",
+                "pipeline_version": "0.1.0",
+                "source_commit": "abc123",
+                "working_tree_dirty": False,
+                "snapshot_count": 1,
+                "files": {
+                    "sample.parquet": {
+                        "sha256": "a" * 64,
+                        "rows": 2,
+                    }
+                },
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    manifest = support.load_snapshot_manifest(path)
+
+    assert manifest["source_commit"] == "abc123"
+    assert manifest["snapshot_count"] == 1

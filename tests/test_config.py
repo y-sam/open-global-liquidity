@@ -71,6 +71,12 @@ def test_load_model_config() -> None:
     assert config.market_analysis.signal_availability_lag_weeks == 1
     assert config.market_analysis.non_overlapping_min_periods == 8
     assert config.market_analysis.confidence_level == 0.95
+    assert [period.period_id for period in config.market_analysis.research_subperiods] == [
+        "pre_2020",
+        "pandemic_cycle",
+        "recent_cycle",
+    ]
+    assert config.market_analysis.research_subperiods[-1].end is None
 
 
 def test_model_config_rejects_ogli_weights_that_do_not_sum_to_one(tmp_path: Path) -> None:

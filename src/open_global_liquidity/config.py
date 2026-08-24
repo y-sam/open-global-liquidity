@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from itertools import pairwise
 from pathlib import Path
 from typing import Any
 
@@ -113,9 +114,21 @@ class MarketAnalysisConfig:
     correlation_min_periods: int
     non_overlapping_min_periods: int
     confidence_level: float
+    research_subperiod_classification: str
+    research_subperiods: tuple[MarketResearchSubperiod, ...]
     rolling_window_weeks: int
     rolling_min_periods: int
     description: str
+
+
+@dataclass(frozen=True, slots=True)
+class MarketResearchSubperiod:
+    """One predeclared date partition for market-stability diagnostics."""
+
+    period_id: str
+    label: str
+    start: date
+    end: date | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -402,6 +415,7 @@ def _parse_market_analysis(raw: Any) -> MarketAnalysisConfig:
         "correlation_min_periods",
         "non_overlapping_min_periods",
         "confidence_level",
+        "research_subperiods",
         "rolling_window_weeks",
         "rolling_min_periods",
         "description",
@@ -440,6 +454,44 @@ def _parse_market_analysis(raw: Any) -> MarketAnalysisConfig:
         raise ConfigurationError("market correlation history settings are inconsistent")
     if not 0 < confidence_level < 1:
         raise ConfigurationError("market confidence_level must be between 0 and 1")
+
+    raw_subperiods = raw["research_subperiods"]
+    if not isinstance(raw_subperiods, dict):
+        raise ConfigurationError("market research_subperiods must be a mapping")
+    if raw_subperiods.get("classification") != "model_assumption":
+        raise ConfigurationError("market research_subperiods must be a model_assumption")
+    raw_periods = raw_subperiods.get("periods")
+    if not isinstance(raw_periods, list) or not raw_periods:
+        raise ConfigurationError("market research_subperiods.periods must be a non-empty list")
+    subperiods: list[MarketResearchSubperiod] = []
+    for item in raw_periods:
+        if not isinstance(item, dict) or set(item) != {"id", "label", "start", "end"}:
+            raise ConfigurationError(
+                "each market research subperiod must define id, label, start, and end"
+            )
+        try:
+            period_start = date.fromisoformat(str(item["start"]))
+            period_end = None if item["end"] is None else date.fromisoformat(str(item["end"]))
+        except ValueError as exc:
+            raise ConfigurationError("market research subperiod dates must be ISO dates") from exc
+        if period_end is not None and period_end < period_start:
+            raise ConfigurationError("market research subperiod end cannot precede start")
+        subperiods.append(
+            MarketResearchSubperiod(
+                period_id=str(item["id"]),
+                label=str(item["label"]),
+                start=period_start,
+                end=period_end,
+            )
+        )
+    ids = [period.period_id for period in subperiods]
+    if len(set(ids)) != len(ids):
+        raise ConfigurationError("market research subperiod ids must be unique")
+    for previous, current in pairwise(subperiods):
+        if previous.end is None or current.start <= previous.end:
+            raise ConfigurationError(
+                "market research subperiods must be ordered and non-overlapping"
+            )
     return MarketAnalysisConfig(
         classification=str(raw["classification"]),
         liquidity_signal=str(raw["liquidity_signal"]),
@@ -449,6 +501,8 @@ def _parse_market_analysis(raw: Any) -> MarketAnalysisConfig:
         correlation_min_periods=correlation_min,
         non_overlapping_min_periods=non_overlapping_min,
         confidence_level=confidence_level,
+        research_subperiod_classification=str(raw_subperiods["classification"]),
+        research_subperiods=tuple(subperiods),
         rolling_window_weeks=rolling_window,
         rolling_min_periods=rolling_min,
         description=str(raw["description"]),

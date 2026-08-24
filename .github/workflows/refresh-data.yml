@@ -76,9 +76,11 @@ jobs:
             data/reference/us_liquidity_market_comparisons_snapshot.parquet \
             data/reference/us_liquidity_market_correlations_snapshot.parquet \
             data/reference/us_liquidity_market_regimes_snapshot.parquet \
+            data/reference/us_liquidity_market_subperiods_snapshot.parquet \
             data/reference/us_macro_context_series_snapshot.parquet \
             data/reference/us_macro_context_weekly_snapshot.parquet \
-            data/reference/us_macro_context_indicators_snapshot.parquet
+            data/reference/us_macro_context_indicators_snapshot.parquet \
+            data/reference/dashboard_snapshot_manifest.json
 
           if git diff --cached --quiet; then
             echo "Public dashboard snapshots are already current."
