@@ -93,6 +93,8 @@ cp .env.example .env
 
 Add your free FRED API key to `.env`. That file is ignored by Git and must never be committed.
 Bitcoin market data comes from Coin Metrics Community Data and requires no account or API key.
+The same `FRED_API_KEY` also authorizes ALFRED historical-vintage requests; no separate ALFRED
+account or key is required.
 
 ## Run the pipeline
 
@@ -136,6 +138,30 @@ is invalid, or no observations are returned. A successful run writes:
 Weekly source series require an exact Wednesday observation. Daily ON RRP uses the latest available
 observation on or before Wednesday, capped at seven calendar days. No balance-sheet values are
 interpolated. These assumptions live in `config/model.yaml`.
+
+### Capture an ALFRED as-of dataset
+
+The separate vintage command downloads the four configured liquidity inputs exactly as ALFRED
+reports them on a specified historical information date:
+
+```zsh
+uv run python -m open_global_liquidity.vintage_pipeline --as-of 2020-03-20
+uv run python -m open_global_liquidity.vintage_pipeline --as-of 2020-03-20 --compare-current
+```
+
+It writes
+`data/vintages/fred/as_of=2020-03-20/us_liquidity_vintage.parquet`. Each row keeps the observation
+date, requested vintage date, ALFRED real-time bounds, provider metadata, and retrieval timestamp.
+Different as-of dates use separate directories, and per-series vintage responses are cached under
+`data/raw/fred/vintages/`. Both locations are ignored by Git because a historical vintage archive
+can grow substantially.
+
+This command is research infrastructure only: it does **not** yet calculate a vintage OGLI or
+replace the published current-vintage pipeline. That separation prevents an as-of frame from being
+silently mixed with revised current data. The optional comparison writes
+`revision_comparison_to_current.parquet`, preserving both values and labeling each observation as
+revised, unchanged, or missing from the current vintage. A difference identifies a revision but
+does not infer its economic or methodological cause.
 
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
@@ -243,8 +269,12 @@ directory, and verifies that the public snapshots still render the landing-page 
 - `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
 - `src/open_global_liquidity/analysis/lead_lag.py` — market returns and signal/outcome alignment.
 - `src/open_global_liquidity/analysis/correlations.py` — full-sample and rolling correlations.
+- `src/open_global_liquidity/analysis/bootstrap.py` — deterministic moving-block correlation
+  intervals.
+- `src/open_global_liquidity/analysis/revisions.py` — ALFRED-versus-current revision comparisons.
 - `src/open_global_liquidity/analysis/subperiods.py` — predeclared Bitcoin stability diagnostics.
 - `src/open_global_liquidity/provenance.py` — snapshot hashes and point-in-time manifest metadata.
+- `src/open_global_liquidity/vintage_pipeline.py` — explicit local ALFRED as-of capture.
 - `src/open_global_liquidity/dashboard.py` — tested dashboard data loading and unit conversion.
 - `src/open_global_liquidity/pipeline.py` — executable orchestration and Parquet output.
 - `app/streamlit_app.py` — presentation-only Streamlit application.
@@ -275,10 +305,14 @@ Wednesday H.4.1 observations; it is not a real-time release-vintage database.
 
 The dashboard defaults to non-overlapping outcome windows for robustness and retains the full
 overlapping sample for comparison. Correlation tables include Fisher-transformed 95% confidence
-intervals. Regime summaries report arithmetic mean, median, positive-return share, sample size, and
-a classical Student-t 95% interval around the mean. These intervals assume the retained sample is
-independent and identically distributed enough for descriptive inference; they are not forecast
-intervals.
+intervals and deterministic circular moving-block bootstrap intervals. The dashboard uses the
+bootstrap interval for correlation error bars because contiguous block resampling preserves some
+local time dependence that an IID calculation would discard. The current 1,000 resamples,
+eight-observation block length, and seed are declared in `config/model.yaml`; they are research
+assumptions, not calibrated parameters. In a non-overlapping sample, eight retained observations
+can span far more than eight calendar weeks. Regime summaries report arithmetic mean, median,
+positive-return share, sample size, and a classical Student-t 95% interval around the mean. None of
+these intervals are forecast intervals.
 
 The same calculation is repeated over three date partitions declared in `config/model.yaml`:
 Pre-2020, 2020-2022, and 2023-present. Membership is based on the liquidity observation date, and
@@ -292,6 +326,11 @@ dependent observations, while the non-overlapping view has materially smaller sa
 one-week availability assumption nor current-vintage FRED observations fully reproduce what an
 investor knew historically. Correlation does not establish causation, and the results do not
 calibrate OGLI weights or regimes.
+
+The ALFRED capture CLI is the first vintage-aware building block. A genuine point-in-time OGLI
+backtest still requires a scheduled vintage grid, explicit release-availability rules for every
+input, and model calculation separately inside each information set. Until that work is complete,
+the published index remains clearly labeled current-vintage.
 
 Published snapshots are auditable at the bundle level through
 `data/reference/dashboard_snapshot_manifest.json`. Its generation timestamp is distinct from each

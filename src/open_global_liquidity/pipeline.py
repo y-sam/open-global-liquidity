@@ -208,6 +208,9 @@ def run_pipeline(
         min_periods=model_config.market_analysis.correlation_min_periods,
         sample_policy="overlapping",
         confidence_level=model_config.market_analysis.confidence_level,
+        bootstrap_resamples=model_config.market_analysis.bootstrap.resamples,
+        bootstrap_block_length=model_config.market_analysis.bootstrap.block_length_observations,
+        bootstrap_seed=model_config.market_analysis.bootstrap.seed,
     )
     non_overlapping_comparisons = comparisons.loc[comparisons["is_non_overlapping"]].copy()
     non_overlapping_correlations = calculate_lagged_correlations(
@@ -215,6 +218,9 @@ def run_pipeline(
         min_periods=model_config.market_analysis.non_overlapping_min_periods,
         sample_policy="non_overlapping",
         confidence_level=model_config.market_analysis.confidence_level,
+        bootstrap_resamples=model_config.market_analysis.bootstrap.resamples,
+        bootstrap_block_length=model_config.market_analysis.bootstrap.block_length_observations,
+        bootstrap_seed=model_config.market_analysis.bootstrap.seed,
     )
     correlations = pd.concat(
         [overlapping_correlations, non_overlapping_correlations], ignore_index=True
@@ -240,6 +246,9 @@ def run_pipeline(
         overlapping_min_periods=model_config.market_analysis.correlation_min_periods,
         non_overlapping_min_periods=model_config.market_analysis.non_overlapping_min_periods,
         confidence_level=model_config.market_analysis.confidence_level,
+        bootstrap_resamples=model_config.market_analysis.bootstrap.resamples,
+        bootstrap_block_length=model_config.market_analysis.bootstrap.block_length_observations,
+        bootstrap_seed=model_config.market_analysis.bootstrap.seed,
     )
     correlations_path = output_dir / "us_liquidity_market_correlations.parquet"
     correlations.to_parquet(correlations_path, index=False)

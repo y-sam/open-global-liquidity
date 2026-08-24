@@ -27,6 +27,7 @@ dev = [
 
 [project.scripts]
 ogli-pipeline = "open_global_liquidity.pipeline:main"
+ogli-vintage = "open_global_liquidity.vintage_pipeline:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]

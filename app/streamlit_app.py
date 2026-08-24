@@ -409,17 +409,25 @@ def _horizon_correlation_figure(frame: pd.DataFrame, title: str):
     chart["horizon_label"] = chart["horizon_weeks"].map(
         lambda value: "0 (1w current)" if value == 0 else f"{value}w forward"
     )
-    figure = px.bar(
-        chart,
-        x="horizon_label",
-        y="correlation",
-        text_auto=".2f",
-        labels={"horizon_label": "Return horizon", "correlation": "Pearson correlation"},
-        title=title,
+    figure = go.Figure(
+        go.Bar(
+            x=chart["horizon_label"],
+            y=chart["correlation"],
+            text=chart["correlation"].map(lambda value: "—" if pd.isna(value) else f"{value:+.2f}"),
+            textposition="outside",
+            marker_color="#D97706",
+            error_y={
+                "type": "data",
+                "symmetric": False,
+                "array": chart["bootstrap_ci_upper"] - chart["correlation"],
+                "arrayminus": chart["correlation"] - chart["bootstrap_ci_lower"],
+            },
+            hovertemplate="%{x}<br>Correlation: %{y:+.2f}<extra></extra>",
+        )
     )
-    figure.update_traces(marker_color="#D97706")
     figure.add_hline(y=0, line_width=1, line_color="rgba(128,128,128,0.5)")
     figure.update_layout(
+        title=title,
         margin={"l": 10, "r": 10, "t": 55, "b": 10},
         plot_bgcolor="rgba(0,0,0,0)",
         yaxis={"range": [-1, 1], "gridcolor": "rgba(128,128,128,0.15)"},
@@ -438,8 +446,8 @@ def _subperiod_correlation_figure(frame: pd.DataFrame, title: str):
             error_y={
                 "type": "data",
                 "symmetric": False,
-                "array": frame["correlation_ci_upper"] - frame["correlation"],
-                "arrayminus": frame["correlation"] - frame["correlation_ci_lower"],
+                "array": frame["bootstrap_ci_upper"] - frame["correlation"],
+                "arrayminus": frame["correlation"] - frame["bootstrap_ci_lower"],
             },
             customdata=frame[["observations", "period_start", "period_end"]],
             hovertemplate=(
@@ -1153,12 +1161,26 @@ def markets_page() -> None:
             config={"displaylogo": False},
         )
         st.dataframe(
-            model_correlations[["horizon_weeks", "correlation", "observations"]],
+            model_correlations[
+                [
+                    "horizon_weeks",
+                    "correlation",
+                    "bootstrap_ci_lower",
+                    "bootstrap_ci_upper",
+                    "observations",
+                ]
+            ],
             width="stretch",
             hide_index=True,
             column_config={
                 "horizon_weeks": st.column_config.NumberColumn("Forward horizon (weeks)"),
                 "correlation": st.column_config.NumberColumn("Pearson correlation", format="%+.2f"),
+                "bootstrap_ci_lower": st.column_config.NumberColumn(
+                    "Block bootstrap CI lower", format="%+.2f"
+                ),
+                "bootstrap_ci_upper": st.column_config.NumberColumn(
+                    "Block bootstrap CI upper", format="%+.2f"
+                ),
                 "observations": st.column_config.NumberColumn("Paired observations", format="%d"),
             },
         )
@@ -1203,6 +1225,14 @@ def markets_page() -> None:
         if pd.notna(bitcoin_price):
             st.metric("BTC at signal date", f"${float(bitcoin_price):,.0f}", border=True)
         st.metric("Latest paired BTC return", f"{latest_pair['market_return']:.1%}", border=True)
+    if pd.notna(selected_summary["bootstrap_ci_lower"]):
+        st.caption(
+            f"95% circular moving-block bootstrap interval: "
+            f"{selected_summary['bootstrap_ci_lower']:+.2f} to "
+            f"{selected_summary['bootstrap_ci_upper']:+.2f} · "
+            f"{int(selected_summary['bootstrap_valid_resamples']):,} valid resamples · "
+            f"{int(selected_summary['bootstrap_block_length'])}-observation blocks"
+        )
 
     (
         timeline_tab,
@@ -1380,8 +1410,8 @@ def markets_page() -> None:
                         "period_start",
                         "period_end",
                         "correlation",
-                        "correlation_ci_lower",
-                        "correlation_ci_upper",
+                        "bootstrap_ci_lower",
+                        "bootstrap_ci_upper",
                         "observations",
                     ]
                 ],
@@ -1392,16 +1422,17 @@ def markets_page() -> None:
                     "period_start": st.column_config.DateColumn("Start", format="YYYY-MM-DD"),
                     "period_end": st.column_config.DateColumn("End", format="YYYY-MM-DD"),
                     "correlation": st.column_config.NumberColumn("Correlation", format="%+.2f"),
-                    "correlation_ci_lower": st.column_config.NumberColumn(
-                        "95% CI lower", format="%+.2f"
+                    "bootstrap_ci_lower": st.column_config.NumberColumn(
+                        "Block bootstrap CI lower", format="%+.2f"
                     ),
-                    "correlation_ci_upper": st.column_config.NumberColumn(
-                        "95% CI upper", format="%+.2f"
+                    "bootstrap_ci_upper": st.column_config.NumberColumn(
+                        "Block bootstrap CI upper", format="%+.2f"
                     ),
                     "observations": st.column_config.NumberColumn("Observations", format="%d"),
                 },
             )
             st.caption(
+                "Error bars are deterministic 95% circular moving-block bootstrap intervals. "
                 "The periods—Pre-2020, 2020-2022, and 2023-present—were declared in configuration "
                 "before calculating these results. They are model assumptions, not breakpoints "
                 "optimized to improve Bitcoin correlation. Wide intervals and sign changes are "
@@ -1640,7 +1671,12 @@ def research_guide_page() -> None:
         These choices are statistical transformations configured in `config/model.yaml`. The
         results are not used to select OGLI weights and therefore are not calibrated parameters.
         The dashboard defaults to non-overlapping return windows and retains the overlapping view
-        for comparison. Correlations have Fisher-transformed confidence intervals; regime tables
+        for comparison. Correlations retain Fisher-transformed confidence intervals and add a
+        deterministic circular moving-block bootstrap. Dashboard error bars use the bootstrap,
+        whose 1,000 resamples, eight-observation blocks, and seed are declared in
+        `config/model.yaml`. A block can cover much more than eight calendar weeks in a
+        non-overlapping sample.
+        These are transparent statistical assumptions, not calibrated parameters. Regime tables
         report means, medians, positive-return shares, and Student-t confidence intervals around
         means. Smaller non-overlapping samples and current-vintage revisions remain important
         limitations. Correlation does not establish causation.
@@ -1664,6 +1700,22 @@ def research_guide_page() -> None:
         still required for strict real-time backtesting.
         """
     )
+    with st.container(border=True):
+        st.markdown("#### :material/history: ALFRED vintage foundation")
+        st.write(
+            "A separate local command can now capture every configured US liquidity input as "
+            "ALFRED reported it on one historical date. The capture preserves observation, "
+            "vintage, real-time, and retrieval fields and never enters published OGLI silently."
+        )
+        st.code(
+            "uv run python -m open_global_liquidity.vintage_pipeline "
+            "--as-of 2020-03-20 --compare-current",
+            language="zsh",
+        )
+        st.caption(
+            "The existing FRED_API_KEY is sufficient. A complete vintage OGLI backtest remains "
+            "future work and requires multiple declared information dates."
+        )
     provenance = _snapshot_provenance()
     if provenance is None:
         st.info(

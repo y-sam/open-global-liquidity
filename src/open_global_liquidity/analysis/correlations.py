@@ -6,6 +6,7 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+from open_global_liquidity.analysis.bootstrap import moving_block_bootstrap_correlation
 from open_global_liquidity.analysis.lead_lag import MarketAnalysisError
 
 GROUP_COLUMNS = [
@@ -25,6 +26,9 @@ def calculate_lagged_correlations(
     min_periods: int = 52,
     sample_policy: str = "overlapping",
     confidence_level: float = 0.95,
+    bootstrap_resamples: int = 1_000,
+    bootstrap_block_length: int = 8,
+    bootstrap_seed: int = 42,
 ) -> pd.DataFrame:
     """Calculate Pearson correlations between liquidity signals and market outcomes.
 
@@ -43,7 +47,9 @@ def calculate_lagged_correlations(
         raise MarketAnalysisError("Correlation confidence_level must be between 0 and 1")
 
     rows: list[dict[str, object]] = []
-    for keys, group in comparisons.groupby(GROUP_COLUMNS, sort=True, dropna=False):
+    for group_number, (keys, group) in enumerate(
+        comparisons.groupby(GROUP_COLUMNS, sort=True, dropna=False)
+    ):
         paired = group[["liquidity_signal", "market_return"]].dropna()
         correlation = (
             paired["liquidity_signal"].corr(paired["market_return"])
@@ -62,6 +68,21 @@ def calculate_lagged_correlations(
         else:
             correlation_ci_lower = float("nan")
             correlation_ci_upper = float("nan")
+        if pd.notna(correlation):
+            bootstrap_ci_lower, bootstrap_ci_upper, bootstrap_valid_resamples = (
+                moving_block_bootstrap_correlation(
+                    paired["liquidity_signal"],
+                    paired["market_return"],
+                    confidence_level=confidence_level,
+                    resamples=bootstrap_resamples,
+                    block_length=bootstrap_block_length,
+                    seed=bootstrap_seed + group_number,
+                )
+            )
+        else:
+            bootstrap_ci_lower = float("nan")
+            bootstrap_ci_upper = float("nan")
+            bootstrap_valid_resamples = 0
         row = dict(zip(GROUP_COLUMNS, keys, strict=True))
         row.update(
             {
@@ -72,6 +93,13 @@ def calculate_lagged_correlations(
                 "confidence_level": confidence_level,
                 "correlation_ci_lower": correlation_ci_lower,
                 "correlation_ci_upper": correlation_ci_upper,
+                "bootstrap_ci_lower": bootstrap_ci_lower,
+                "bootstrap_ci_upper": bootstrap_ci_upper,
+                "bootstrap_method": "circular_moving_block_percentile",
+                "bootstrap_resamples": bootstrap_resamples,
+                "bootstrap_valid_resamples": bootstrap_valid_resamples,
+                "bootstrap_block_length": bootstrap_block_length,
+                "bootstrap_seed": bootstrap_seed + group_number,
                 "classification": "statistical_transformation",
             }
         )
@@ -85,6 +113,13 @@ def calculate_lagged_correlations(
         "confidence_level",
         "correlation_ci_lower",
         "correlation_ci_upper",
+        "bootstrap_ci_lower",
+        "bootstrap_ci_upper",
+        "bootstrap_method",
+        "bootstrap_resamples",
+        "bootstrap_valid_resamples",
+        "bootstrap_block_length",
+        "bootstrap_seed",
         "classification",
     ]
     if not rows:

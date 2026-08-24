@@ -103,6 +103,17 @@ class MarketAlignmentConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class CorrelationBootstrapConfig:
+    """Configured resampling policy for descriptive correlation uncertainty."""
+
+    classification: str
+    method: str
+    resamples: int
+    block_length_observations: int
+    seed: int
+
+
+@dataclass(frozen=True, slots=True)
 class MarketAnalysisConfig:
     """Configured statistical choices for liquidity-versus-market research."""
 
@@ -114,6 +125,7 @@ class MarketAnalysisConfig:
     correlation_min_periods: int
     non_overlapping_min_periods: int
     confidence_level: float
+    bootstrap: CorrelationBootstrapConfig
     research_subperiod_classification: str
     research_subperiods: tuple[MarketResearchSubperiod, ...]
     rolling_window_weeks: int
@@ -415,6 +427,7 @@ def _parse_market_analysis(raw: Any) -> MarketAnalysisConfig:
         "correlation_min_periods",
         "non_overlapping_min_periods",
         "confidence_level",
+        "bootstrap",
         "research_subperiods",
         "rolling_window_weeks",
         "rolling_min_periods",
@@ -454,6 +467,36 @@ def _parse_market_analysis(raw: Any) -> MarketAnalysisConfig:
         raise ConfigurationError("market correlation history settings are inconsistent")
     if not 0 < confidence_level < 1:
         raise ConfigurationError("market confidence_level must be between 0 and 1")
+
+    raw_bootstrap = raw["bootstrap"]
+    if not isinstance(raw_bootstrap, dict):
+        raise ConfigurationError("market bootstrap must be a mapping")
+    expected_bootstrap_fields = {
+        "classification",
+        "method",
+        "resamples",
+        "block_length_observations",
+        "seed",
+    }
+    if set(raw_bootstrap) != expected_bootstrap_fields:
+        raise ConfigurationError(
+            "market bootstrap must define classification, method, resamples, "
+            "block_length_observations, and seed"
+        )
+    if raw_bootstrap["classification"] != "statistical_transformation":
+        raise ConfigurationError("market bootstrap must be a statistical_transformation")
+    if raw_bootstrap["method"] != "circular_moving_block_percentile":
+        raise ConfigurationError("market bootstrap method is unsupported")
+    try:
+        bootstrap_resamples = int(raw_bootstrap["resamples"])
+        bootstrap_block_length = int(raw_bootstrap["block_length_observations"])
+        bootstrap_seed = int(raw_bootstrap["seed"])
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError("market bootstrap parameters must be integers") from exc
+    if bootstrap_resamples < 100:
+        raise ConfigurationError("market bootstrap resamples must be at least 100")
+    if bootstrap_block_length < 1:
+        raise ConfigurationError("market bootstrap block_length_observations must be positive")
 
     raw_subperiods = raw["research_subperiods"]
     if not isinstance(raw_subperiods, dict):
@@ -501,6 +544,13 @@ def _parse_market_analysis(raw: Any) -> MarketAnalysisConfig:
         correlation_min_periods=correlation_min,
         non_overlapping_min_periods=non_overlapping_min,
         confidence_level=confidence_level,
+        bootstrap=CorrelationBootstrapConfig(
+            classification=str(raw_bootstrap["classification"]),
+            method=str(raw_bootstrap["method"]),
+            resamples=bootstrap_resamples,
+            block_length_observations=bootstrap_block_length,
+            seed=bootstrap_seed,
+        ),
         research_subperiod_classification=str(raw_subperiods["classification"]),
         research_subperiods=tuple(subperiods),
         rolling_window_weeks=rolling_window,

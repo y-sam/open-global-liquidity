@@ -41,6 +41,9 @@ def test_subperiod_correlations_keep_predeclared_periods_and_sample_policies() -
         overlapping_min_periods=2,
         non_overlapping_min_periods=2,
         confidence_level=0.95,
+        bootstrap_resamples=100,
+        bootstrap_block_length=2,
+        bootstrap_seed=42,
     )
 
     assert set(result["period_id"]) == {"before", "after"}

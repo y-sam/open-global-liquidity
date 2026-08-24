@@ -6,12 +6,34 @@ import httpx
 import pandas as pd
 import pytest
 
+from open_global_liquidity.config import SeriesDefinition
 from open_global_liquidity.data.base import STANDARD_COLUMNS
 from open_global_liquidity.data.fred import (
+    VINTAGE_COLUMNS,
     FredProvider,
     FredResponseError,
     MissingFredApiKeyError,
 )
+
+
+def _definition() -> SeriesDefinition:
+    return SeriesDefinition(
+        country="US",
+        group="liquidity",
+        name="fed_assets",
+        classification="measured_data",
+        provider="fred",
+        series_id="WALCL",
+        component="fed_assets",
+        title="Fed assets",
+        description="Test series",
+        unit="Millions of U.S. Dollars",
+        frequency="Weekly, As of Wednesday",
+        seasonal_adjustment="Not Seasonally Adjusted",
+        start=pd.Timestamp("2024-01-01").date(),
+        source="Federal Reserve",
+        source_url="https://fred.stlouisfed.org/series/WALCL",
+    )
 
 
 def _response(request: httpx.Request) -> httpx.Response:
@@ -113,3 +135,68 @@ def test_invalid_response_schema_fails_clearly(tmp_path: Path) -> None:
 
     with pytest.raises(FredResponseError, match="missing the observations collection"):
         provider.fetch("WALCL", "2024-01-01")
+
+
+def test_fetch_vintage_dates_uses_alfred_release_history(tmp_path: Path) -> None:
+    def response(request: httpx.Request) -> httpx.Response:
+        assert request.url.path.endswith("/fred/series/vintagedates")
+        assert request.url.params["realtime_start"] == "2024-01-01"
+        return httpx.Response(
+            200,
+            request=request,
+            json={"vintage_dates": ["2024-01-04", "2024-01-11"]},
+        )
+
+    provider = FredProvider(
+        api_key="test-key",
+        cache_dir=tmp_path,
+        client=httpx.Client(transport=httpx.MockTransport(response)),
+    )
+
+    result = provider.fetch_vintage_dates("WALCL", start="2024-01-01")
+
+    assert result["provider"].unique().tolist() == ["ALFRED"]
+    assert result["vintage_date"].tolist() == [
+        pd.Timestamp("2024-01-04"),
+        pd.Timestamp("2024-01-11"),
+    ]
+
+
+def test_fetch_vintage_definition_preserves_as_of_lineage_and_cache(tmp_path: Path) -> None:
+    requests = 0
+
+    def response(request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        assert request.url.params["vintage_dates"] == "2024-01-11"
+        assert request.url.params["output_type"] == "1"
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "observations": [
+                    {
+                        "realtime_start": "2024-01-11",
+                        "realtime_end": "9999-12-31",
+                        "date": "2024-01-03",
+                        "value": "6794581",
+                    }
+                ]
+            },
+        )
+
+    provider = FredProvider(
+        api_key="test-key",
+        cache_dir=tmp_path,
+        client=httpx.Client(transport=httpx.MockTransport(response)),
+    )
+    first = provider.fetch_vintage_definition(_definition(), vintage_date="2024-01-11")
+    second = provider.fetch_vintage_definition(_definition(), vintage_date="2024-01-11")
+
+    assert first.columns.tolist() == VINTAGE_COLUMNS
+    assert first["provider"].unique().tolist() == ["ALFRED"]
+    assert first["vintage_date"].item() == pd.Timestamp("2024-01-11")
+    assert first["observation_date"].item() == pd.Timestamp("2024-01-03")
+    assert first["value"].item() == 6_794_581
+    pd.testing.assert_frame_equal(first, second)
+    assert requests == 1

@@ -103,6 +103,13 @@ MARKET_CORRELATION_COLUMNS = [
     "confidence_level",
     "correlation_ci_lower",
     "correlation_ci_upper",
+    "bootstrap_ci_lower",
+    "bootstrap_ci_upper",
+    "bootstrap_method",
+    "bootstrap_resamples",
+    "bootstrap_valid_resamples",
+    "bootstrap_block_length",
+    "bootstrap_seed",
 ]
 
 MARKET_REGIME_COLUMNS = [
@@ -418,6 +425,13 @@ def load_market_correlations(path: Path) -> pd.DataFrame:
         "confidence_level",
         "correlation_ci_lower",
         "correlation_ci_upper",
+        "bootstrap_ci_lower",
+        "bootstrap_ci_upper",
+        "bootstrap_method",
+        "bootstrap_resamples",
+        "bootstrap_valid_resamples",
+        "bootstrap_block_length",
+        "bootstrap_seed",
     }
     missing = sorted(legacy_required - set(frame.columns))
     if missing:
@@ -430,6 +444,13 @@ def load_market_correlations(path: Path) -> pd.DataFrame:
         "confidence_level": 0.95,
         "correlation_ci_lower": pd.NA,
         "correlation_ci_upper": pd.NA,
+        "bootstrap_ci_lower": pd.NA,
+        "bootstrap_ci_upper": pd.NA,
+        "bootstrap_method": "unavailable_in_legacy_snapshot",
+        "bootstrap_resamples": 0,
+        "bootstrap_valid_resamples": 0,
+        "bootstrap_block_length": pd.NA,
+        "bootstrap_seed": pd.NA,
     }
     for column, value in defaults.items():
         if column not in frame.columns:
@@ -457,6 +478,18 @@ def load_market_regime_statistics(path: Path) -> pd.DataFrame:
 def load_market_subperiod_statistics(path: Path) -> pd.DataFrame:
     """Load package-calculated Bitcoin correlations in predeclared research periods."""
     frame = _read_parquet(path, "Market subperiod statistics")
+    bootstrap_defaults = {
+        "bootstrap_ci_lower": pd.NA,
+        "bootstrap_ci_upper": pd.NA,
+        "bootstrap_method": "unavailable_in_legacy_snapshot",
+        "bootstrap_resamples": 0,
+        "bootstrap_valid_resamples": 0,
+        "bootstrap_block_length": pd.NA,
+        "bootstrap_seed": pd.NA,
+    }
+    for column, value in bootstrap_defaults.items():
+        if column not in frame.columns:
+            frame[column] = value
     missing = sorted(set(MARKET_SUBPERIOD_COLUMNS) - set(frame.columns))
     if missing:
         raise DashboardDataError("Market subperiod data is missing columns: " + ", ".join(missing))

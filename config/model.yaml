@@ -89,6 +89,12 @@ market_analysis:
   correlation_min_periods: 52
   non_overlapping_min_periods: 8
   confidence_level: 0.95
+  bootstrap:
+    classification: statistical_transformation
+    method: circular_moving_block_percentile
+    resamples: 1000
+    block_length_observations: 8
+    seed: 42
   research_subperiods:
     classification: model_assumption
     periods:
@@ -113,6 +119,10 @@ market_analysis:
     reflecting that Wednesday H.4.1 observations are normally published after that Wednesday's
     market close. Both remain descriptive associations and do not establish causation or calibrate
     OGLI parameters. The configured date partitions are descriptive research assumptions selected
-    before examining their results; they are not optimized breakpoints.
+    before examining their results; they are not optimized breakpoints. Correlation uncertainty is
+    also estimated with a deterministic circular moving-block bootstrap. Its resample count,
+    eight-observation block length, and random seed are transparent statistical assumptions rather
+    than calibrated parameters. For non-overlapping outcome samples, eight retained observations
+    can span substantially more than eight calendar weeks.
 
 calibrated_parameters: {}

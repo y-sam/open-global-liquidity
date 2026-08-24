@@ -115,6 +115,12 @@ market_analysis:
   correlation_min_periods: 2
   non_overlapping_min_periods: 2
   confidence_level: 0.95
+  bootstrap:
+    classification: statistical_transformation
+    method: circular_moving_block_percentile
+    resamples: 100
+    block_length_observations: 2
+    seed: 42
   research_subperiods:
     classification: model_assumption
     periods:

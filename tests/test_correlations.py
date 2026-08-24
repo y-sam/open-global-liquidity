@@ -33,6 +33,9 @@ def test_lagged_correlation_reports_observation_count_and_perfect_relationship()
     assert result["observations"] == 8
     assert result["sample_policy"] == "overlapping"
     assert result["correlation_ci_lower"] == 1.0
+    assert np.isclose(result["bootstrap_ci_lower"], 1.0)
+    assert result["bootstrap_valid_resamples"] == 1_000
+    assert result["bootstrap_method"] == "circular_moving_block_percentile"
 
 
 def test_rolling_correlation_respects_minimum_history() -> None:

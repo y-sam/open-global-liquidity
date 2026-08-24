@@ -19,6 +19,9 @@ def calculate_subperiod_correlations(
     overlapping_min_periods: int,
     non_overlapping_min_periods: int,
     confidence_level: float,
+    bootstrap_resamples: int,
+    bootstrap_block_length: int,
+    bootstrap_seed: int,
 ) -> pd.DataFrame:
     """Calculate identical correlation diagnostics inside predeclared date partitions.
 
@@ -53,6 +56,9 @@ def calculate_subperiod_correlations(
                 min_periods=minimum,
                 sample_policy=sample_policy,
                 confidence_level=confidence_level,
+                bootstrap_resamples=bootstrap_resamples,
+                bootstrap_block_length=bootstrap_block_length,
+                bootstrap_seed=bootstrap_seed + period_order * 10_000,
             )
             if result.empty:
                 continue
