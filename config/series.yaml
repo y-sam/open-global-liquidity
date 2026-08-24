@@ -83,3 +83,52 @@ US:
       start: "2010-07-18"
       source: "Coin Metrics Community Data"
       source_url: "https://community-api.coinmetrics.io/v4/"
+
+  context:
+    treasury_yield_10y:
+      classification: measured_data
+      provider: fred
+      series_id: DGS10
+      component: treasury_yield_10y
+      title: "Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity"
+      description: >-
+        Daily 10-year constant-maturity Treasury yield. It is displayed as macro context and is
+        not an input to OGLI or a liquidity-model term.
+      unit: "Percent"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2006-01-02"
+      source: "Board of Governors of the Federal Reserve System (US), H.15"
+      source_url: "https://fred.stlouisfed.org/series/DGS10"
+
+    treasury_yield_2y:
+      classification: measured_data
+      provider: fred
+      series_id: DGS2
+      component: treasury_yield_2y
+      title: "Market Yield on U.S. Treasury Securities at 2-Year Constant Maturity"
+      description: >-
+        Daily 2-year constant-maturity Treasury yield. It is displayed as macro context and is
+        not an input to OGLI or a liquidity-model term.
+      unit: "Percent"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2006-01-02"
+      source: "Board of Governors of the Federal Reserve System (US), H.15"
+      source_url: "https://fred.stlouisfed.org/series/DGS2"
+
+    broad_usd_index:
+      classification: measured_data
+      provider: fred
+      series_id: DTWEXBGS
+      component: broad_usd_index
+      title: "Nominal Broad U.S. Dollar Index"
+      description: >-
+        Daily nominal broad trade-weighted U.S. dollar index. It is displayed as macro context and
+        is not an input to OGLI or a liquidity-model term.
+      unit: "Index Jan 2006=100"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2006-01-02"
+      source: "Board of Governors of the Federal Reserve System (US), H.10"
+      source_url: "https://fred.stlouisfed.org/series/DTWEXBGS"

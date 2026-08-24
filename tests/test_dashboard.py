@@ -160,3 +160,22 @@ def test_loads_calculated_ogli_and_selects_latest_available_reading(tmp_path: Pa
     assert latest["ogli"] == 65.54
     assert latest["regime"] == "Above normal"
     assert latest["date"] == pd.Timestamp("2024-01-10")
+
+
+def test_freshness_status_flags_old_observations() -> None:
+    support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
+    spec = importlib.util.spec_from_file_location("dashboard_support_freshness_test", support_path)
+    assert spec is not None and spec.loader is not None
+    support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(support)
+    frame = pd.DataFrame({"date": pd.to_datetime(["2024-01-03", "2024-01-10"])})
+
+    status = support.assess_freshness(
+        frame,
+        as_of=pd.Timestamp("2024-01-25", tz="UTC"),
+        max_age_days=14,
+    )
+
+    assert status.latest_date == pd.Timestamp("2024-01-10")
+    assert status.age_days == 15
+    assert status.is_stale

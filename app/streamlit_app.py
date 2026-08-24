@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 from datetime import timedelta
+from importlib import reload
 from pathlib import Path
 
 import pandas as pd
@@ -13,16 +14,22 @@ import streamlit as st
 from plotly.subplots import make_subplots
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
+import dashboard_support as dashboard_support_module  # noqa: E402
+
+reload(dashboard_support_module)
 from dashboard_support import (  # noqa: E402
     COMPONENT_LABELS,
     DashboardDataError,
+    assess_freshness,
     latest_model_readings,
     latest_ogli_readings,
     latest_readings,
     load_dashboard_data,
     load_liquidity_model_data,
+    load_macro_context,
     load_market_comparisons,
     load_market_correlations,
+    load_market_regime_statistics,
     load_ogli_data,
     resolve_dashboard_data_path,
 )
@@ -41,6 +48,14 @@ MARKET_COMPARISONS_SNAPSHOT_PATH = (
 MARKET_CORRELATIONS_PATH = DATA_ROOT / "processed" / "us_liquidity_market_correlations.parquet"
 MARKET_CORRELATIONS_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_liquidity_market_correlations_snapshot.parquet"
+)
+MARKET_REGIMES_PATH = DATA_ROOT / "processed" / "us_liquidity_market_regimes.parquet"
+MARKET_REGIMES_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_liquidity_market_regimes_snapshot.parquet"
+)
+MACRO_CONTEXT_PATH = DATA_ROOT / "processed" / "us_macro_context_indicators.parquet"
+MACRO_CONTEXT_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_macro_context_indicators_snapshot.parquet"
 )
 COMPONENT_ORDER = list(COMPONENT_LABELS)
 WINDOW_DAYS = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
@@ -99,6 +114,20 @@ def _load_market_correlations(path: str, modified_ns: int) -> pd.DataFrame:
     return load_market_correlations(Path(path))
 
 
+@st.cache_data(show_spinner=False)
+def _load_market_regimes(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated regime outcome summaries."""
+    del modified_ns
+    return load_market_regime_statistics(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_macro_context(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated measured macro context."""
+    del modified_ns
+    return load_macro_context(Path(path))
+
+
 def _source_data() -> tuple[pd.DataFrame, Path, str]:
     data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
     return _load_data(str(data_path), data_path.stat().st_mtime_ns), data_path, data_origin
@@ -135,6 +164,39 @@ def _market_data() -> tuple[pd.DataFrame | None, pd.DataFrame, str]:
         return None, correlations, correlation_origin
     comparisons = _load_market_comparisons(str(comparison_path), comparison_path.stat().st_mtime_ns)
     return comparisons, correlations, comparison_origin
+
+
+def _market_regime_data() -> pd.DataFrame | None:
+    try:
+        path, _origin = resolve_dashboard_data_path(
+            MARKET_REGIMES_PATH, MARKET_REGIMES_SNAPSHOT_PATH
+        )
+    except DashboardDataError:
+        return None
+    return _load_market_regimes(str(path), path.stat().st_mtime_ns)
+
+
+def _macro_context_data() -> pd.DataFrame | None:
+    try:
+        path, _origin = resolve_dashboard_data_path(MACRO_CONTEXT_PATH, MACRO_CONTEXT_SNAPSHOT_PATH)
+    except DashboardDataError:
+        return None
+    return _load_macro_context(str(path), path.stat().st_mtime_ns)
+
+
+def _show_freshness(frame: pd.DataFrame, label: str, *, max_age_days: int = 14) -> None:
+    status = assess_freshness(frame, max_age_days=max_age_days)
+    message = (
+        f"{label} latest observation: {status.latest_date:%Y-%m-%d} ({status.age_days} days old)."
+    )
+    if status.is_stale:
+        st.warning(
+            message
+            + f" Expected maximum age is {status.max_age_days} days; check the refresh workflow.",
+            icon=":material/update_disabled:",
+        )
+    else:
+        st.caption(message)
 
 
 def _format_billions(value: float) -> str:
@@ -323,6 +385,87 @@ def _horizon_correlation_figure(frame: pd.DataFrame, title: str):
     return figure
 
 
+def _regime_return_figure(frame: pd.DataFrame, title: str):
+    figure = go.Figure()
+    figure.add_trace(
+        go.Bar(
+            x=frame["regime"],
+            y=frame["median_return"],
+            name="Median return",
+            marker_color="#2563EB",
+            hovertemplate="%{x}<br>Median: %{y:.1%}<extra></extra>",
+        )
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=frame["regime"],
+            y=frame["mean_return"],
+            mode="markers",
+            name="Mean return",
+            marker={"color": "#D97706", "size": 10},
+            error_y={
+                "type": "data",
+                "symmetric": False,
+                "array": frame["mean_ci_upper"] - frame["mean_return"],
+                "arrayminus": frame["mean_return"] - frame["mean_ci_lower"],
+            },
+            hovertemplate="%{x}<br>Mean: %{y:.1%}<extra></extra>",
+        )
+    )
+    figure.add_hline(y=0, line_width=1, line_color="rgba(128,128,128,0.5)")
+    figure.update_layout(
+        title=title,
+        barmode="group",
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+        yaxis={"tickformat": ".0%", "title": "Bitcoin return"},
+        xaxis={"title": "OGLI regime at signal observation"},
+        legend={"orientation": "h", "y": 1.08, "x": 0},
+    )
+    return figure
+
+
+def _macro_context_figure(frame: pd.DataFrame, title: str):
+    figure = make_subplots(specs=[[{"secondary_y": True}]])
+    figure.add_trace(
+        go.Scatter(
+            x=frame["date"],
+            y=frame["treasury_yield_10y"],
+            name="10-year yield",
+            line={"color": "#2563EB", "width": 2},
+        ),
+        secondary_y=False,
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=frame["date"],
+            y=frame["treasury_yield_2y"],
+            name="2-year yield",
+            line={"color": "#7C3AED", "width": 2},
+        ),
+        secondary_y=False,
+    )
+    figure.add_trace(
+        go.Scatter(
+            x=frame["date"],
+            y=frame["broad_usd_index"],
+            name="Broad USD index",
+            line={"color": "#D97706", "width": 2},
+        ),
+        secondary_y=True,
+    )
+    figure.update_yaxes(title_text="Treasury yield (%)", secondary_y=False)
+    figure.update_yaxes(title_text="Broad USD index (Jan 2006=100)", secondary_y=True)
+    figure.update_layout(
+        title=title,
+        hovermode="x unified",
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+        legend={"orientation": "h", "y": 1.08, "x": 0},
+    )
+    return figure
+
+
 def _load_or_explain() -> tuple[pd.DataFrame, Path, str] | None:
     try:
         return _source_data()
@@ -395,6 +538,7 @@ def landing_page() -> None:
         st.caption(
             f"Latest source date {latest_date:%Y-%m-%d} · {data_origin} · Nominal USD balances"
         )
+        _show_freshness(data, "US liquidity data")
 
         try:
             comparisons, correlations, market_origin = _market_data()
@@ -418,7 +562,15 @@ def landing_page() -> None:
                 (correlations["model_id"] == "model_b")
                 & (correlations["market_id"] == "bitcoin")
                 & (correlations["horizon_weeks"] == 12)
+                & (correlations["analysis_mode"] == "available_information")
+                & (correlations["sample_policy"] == "non_overlapping")
             ]
+            if relationship.empty:
+                relationship = correlations.loc[
+                    (correlations["model_id"] == "model_b")
+                    & (correlations["market_id"] == "bitcoin")
+                    & (correlations["horizon_weeks"] == 12)
+                ]
             if not current_btc.empty and not latest_ogli.empty and not relationship.empty:
                 btc_row = current_btc.iloc[-1]
                 ogli_row = latest_ogli.iloc[-1]
@@ -514,6 +666,7 @@ def data_dashboard_page() -> None:
     if loaded is None:
         return
     data, data_path, data_origin = loaded
+    _show_freshness(data, "US liquidity data")
     try:
         model_bundle = _model_data()
         model_error = None
@@ -803,6 +956,8 @@ def markets_page() -> None:
             icon=":material/open_in_new:",
         )
         return
+    if comparisons is not None:
+        _show_freshness(comparisons, "Bitcoin/OGLI comparison")
 
     model_options = dict(
         correlations[["model_name", "model_id"]]
@@ -816,6 +971,24 @@ def markets_page() -> None:
         "12 weeks forward": 12,
         "26 weeks forward": 26,
         "52 weeks forward": 52,
+    }
+    analysis_labels = {
+        "Available-information (1-week release lag)": "available_information",
+        "Observation-date exploratory": "observation_date",
+    }
+    available_analysis_modes = set(correlations["analysis_mode"])
+    analysis_options = {
+        label: value
+        for label, value in analysis_labels.items()
+        if value in available_analysis_modes
+    }
+    sample_labels = {
+        "Non-overlapping windows": "non_overlapping",
+        "All overlapping observations": "overlapping",
+    }
+    available_sample_policies = set(correlations["sample_policy"])
+    sample_options = {
+        label: value for label, value in sample_labels.items() if value in available_sample_policies
     }
     with st.sidebar:
         st.header("Market controls")
@@ -831,6 +1004,16 @@ def markets_page() -> None:
             index=3,
             key="market_horizon",
         )
+        selected_analysis_label = st.selectbox(
+            "Signal timing",
+            list(analysis_options),
+            key="market_analysis_mode",
+        )
+        selected_sample_label = st.selectbox(
+            "Statistical sample",
+            list(sample_options),
+            key="market_sample_policy",
+        )
         timeline_history = st.segmented_control(
             "Timeline history",
             ["3 years", "5 years", "All"],
@@ -842,13 +1025,20 @@ def markets_page() -> None:
 
     model_id = model_options[selected_model]
     horizon = horizon_options[selected_horizon_label]
+    analysis_mode = analysis_options[selected_analysis_label]
+    sample_policy = sample_options[selected_sample_label]
     selected_summary = correlations.loc[
         (correlations["model_id"] == model_id)
         & (correlations["market_id"] == "bitcoin")
         & (correlations["horizon_weeks"] == horizon)
+        & (correlations["analysis_mode"] == analysis_mode)
+        & (correlations["sample_policy"] == sample_policy)
     ].iloc[0]
     model_correlations = correlations.loc[
-        (correlations["model_id"] == model_id) & (correlations["market_id"] == "bitcoin")
+        (correlations["model_id"] == model_id)
+        & (correlations["market_id"] == "bitcoin")
+        & (correlations["analysis_mode"] == analysis_mode)
+        & (correlations["sample_policy"] == sample_policy)
     ]
     correlation = selected_summary["correlation"]
 
@@ -888,8 +1078,9 @@ def markets_page() -> None:
             icon=":material/info:",
         )
         st.warning(
-            "These exploratory correlations use observation dates, do not model publication lags, "
-            "and do not establish causation or an investable signal.",
+            "These exploratory correlations do not establish causation or an investable signal. "
+            "Refresh the full snapshots to compare observation-date and available-information "
+            "timing policies.",
             icon=":material/warning:",
         )
         return
@@ -898,7 +1089,16 @@ def markets_page() -> None:
         (comparisons["model_id"] == model_id)
         & (comparisons["market_id"] == "bitcoin")
         & (comparisons["horizon_weeks"] == horizon)
+        & (comparisons["analysis_mode"] == analysis_mode)
     ].dropna(subset=["liquidity_signal", "market_return"])
+    if sample_policy == "non_overlapping":
+        selected_pairs = selected_pairs.loc[selected_pairs["is_non_overlapping"]]
+    if selected_pairs.empty:
+        st.info(
+            "No completed Bitcoin outcome windows are available for this combination yet.",
+            icon=":material/hourglass_empty:",
+        )
+        return
     latest_pair = selected_pairs.iloc[-1]
     bitcoin_price = latest_pair.get("value")
 
@@ -914,8 +1114,18 @@ def markets_page() -> None:
             st.metric("BTC at signal date", f"${float(bitcoin_price):,.0f}", border=True)
         st.metric("Latest paired BTC return", f"{latest_pair['market_return']:.1%}", border=True)
 
-    timeline_tab, scatter_tab, rolling_tab, horizons_tab, data_tab = st.tabs(
-        ["Timeline", "Relationship", "Rolling correlation", "Across horizons", "Paired data"]
+    timeline_tab, scatter_tab, regimes_tab, rolling_tab, horizons_tab, macro_tab, data_tab = (
+        st.tabs(
+            [
+                "Timeline",
+                "Relationship",
+                "Returns by regime",
+                "Rolling correlation",
+                "Across horizons",
+                "Macro context",
+                "Paired data",
+            ]
+        )
     )
     with timeline_tab:
         if "value" not in comparisons.columns:
@@ -929,6 +1139,7 @@ def markets_page() -> None:
                 (comparisons["model_id"] == model_id)
                 & (comparisons["market_id"] == "bitcoin")
                 & (comparisons["horizon_weeks"] == 0)
+                & (comparisons["analysis_mode"] == analysis_mode)
             ].dropna(subset=["ogli", "value"])
             if timeline_history != "All":
                 years = 3 if timeline_history == "3 years" else 5
@@ -960,6 +1171,63 @@ def markets_page() -> None:
             "Each point anchors the expanding OGLI momentum score at t to the named market-return "
             "window. Forward outcomes are never inputs to OGLI."
         )
+    with regimes_tab:
+        regime_statistics = _market_regime_data()
+        if regime_statistics is None:
+            st.info(
+                "Regime statistics will appear after the refreshed research snapshots are built.",
+                icon=":material/sync:",
+            )
+        else:
+            selected_regimes = regime_statistics.loc[
+                (regime_statistics["model_id"] == model_id)
+                & (regime_statistics["market_id"] == "bitcoin")
+                & (regime_statistics["horizon_weeks"] == horizon)
+                & (regime_statistics["analysis_mode"] == analysis_mode)
+                & (regime_statistics["sample_policy"] == sample_policy)
+            ]
+            st.plotly_chart(
+                _regime_return_figure(
+                    selected_regimes,
+                    f"Bitcoin outcomes by OGLI regime · {selected_horizon_label}",
+                ),
+                width="stretch",
+                config={"displaylogo": False},
+            )
+            st.dataframe(
+                selected_regimes[
+                    [
+                        "regime",
+                        "observations",
+                        "mean_return",
+                        "median_return",
+                        "positive_share",
+                        "mean_ci_lower",
+                        "mean_ci_upper",
+                    ]
+                ],
+                hide_index=True,
+                column_config={
+                    "regime": "OGLI regime",
+                    "observations": st.column_config.NumberColumn("Observations", format="%d"),
+                    "mean_return": st.column_config.NumberColumn("Mean", format="percent"),
+                    "median_return": st.column_config.NumberColumn("Median", format="percent"),
+                    "positive_share": st.column_config.NumberColumn(
+                        "Positive share", format="percent"
+                    ),
+                    "mean_ci_lower": st.column_config.NumberColumn(
+                        "Mean CI lower", format="percent"
+                    ),
+                    "mean_ci_upper": st.column_config.NumberColumn(
+                        "Mean CI upper", format="percent"
+                    ),
+                },
+            )
+            st.caption(
+                "Error bars are classical 95% Student-t confidence intervals around the mean, "
+                "not forecast intervals. Median and positive-share statistics are shown because "
+                "Bitcoin returns are strongly skewed."
+            )
     with rolling_tab:
         rolling = selected_pairs.dropna(subset=["rolling_correlation"])
         st.plotly_chart(
@@ -984,10 +1252,46 @@ def markets_page() -> None:
             "All estimates use the same configured OGLI momentum signal. Horizon zero is the "
             "one-week return ending at t; positive horizons start at t."
         )
+    with macro_tab:
+        macro_context = _macro_context_data()
+        if macro_context is None:
+            st.info(
+                "Treasury-yield and dollar context will appear after the next full pipeline run.",
+                icon=":material/sync:",
+            )
+        else:
+            visible_macro = macro_context.loc[
+                macro_context["date"] >= macro_context["date"].max() - timedelta(days=5 * 365)
+            ]
+            latest_macro = macro_context.dropna().iloc[-1]
+            with st.container(horizontal=True):
+                st.metric(
+                    "10-year Treasury", f"{latest_macro['treasury_yield_10y']:.2f}%", border=True
+                )
+                st.metric(
+                    "2-year Treasury", f"{latest_macro['treasury_yield_2y']:.2f}%", border=True
+                )
+                st.metric(
+                    "10y-2y slope", f"{latest_macro['yield_curve_10y_2y']:+.2f}pp", border=True
+                )
+                st.metric("Broad USD index", f"{latest_macro['broad_usd_index']:.1f}", border=True)
+            st.plotly_chart(
+                _macro_context_figure(
+                    visible_macro, "Treasury yields and broad U.S. dollar · 5 years"
+                ),
+                width="stretch",
+                config={"displaylogo": False},
+            )
+            st.caption(
+                "DGS10, DGS2, and DTWEXBGS are measured context series. The 10y-2y slope is a "
+                "transparent subtraction. None is currently an OGLI input."
+            )
     with data_tab:
         table = selected_pairs[
             [
                 "date",
+                "signal_observation_date",
+                "signal_available_date",
                 "ogli",
                 "liquidity_signal",
                 "market_return",
@@ -1001,6 +1305,12 @@ def markets_page() -> None:
             hide_index=True,
             column_config={
                 "date": st.column_config.DateColumn("Signal date", format="YYYY-MM-DD"),
+                "signal_observation_date": st.column_config.DateColumn(
+                    "Source observation", format="YYYY-MM-DD"
+                ),
+                "signal_available_date": st.column_config.DateColumn(
+                    "Assumed available", format="YYYY-MM-DD"
+                ),
                 "ogli": st.column_config.NumberColumn("OGLI", format="%.1f"),
                 "liquidity_signal": st.column_config.NumberColumn("Momentum score", format="%+.2f"),
                 "market_return": st.column_config.NumberColumn("Bitcoin return", format="percent"),
@@ -1013,10 +1323,10 @@ def markets_page() -> None:
 
     st.warning(
         "These statistics are sensitive to sample selection, overlapping forward-return windows, "
-        "data revisions, publication lags, and common macroeconomic drivers. The current "
-        "exploratory alignment uses observation dates and does not model when each source became "
-        "publicly "
-        "available. It does not demonstrate that liquidity causes market returns and must not be "
+        "data revisions, publication-lag assumptions, and common macroeconomic drivers. The "
+        "available-information view applies a configurable one-week weekly lag; it is a practical "
+        "approximation, not a historical release-vintage database. The results do not demonstrate "
+        "that liquidity causes market returns and must not be "
         "read as an investable signal.",
         icon=":material/warning:",
     )
@@ -1166,16 +1476,19 @@ def research_guide_page() -> None:
         The initial validation slice compares each model's OGLI momentum score with the Coin
         Metrics Bitcoin USD price. Horizon zero is the contemporaneous one-week return
         ending at the signal date.
-        Positive horizons are forward simple returns from the signal date through 4, 8, 12, 26,
-        or 52 weeks later. Pearson correlations use at least 52 paired observations; rolling
-        correlations use a 52-week window with a 26-observation minimum.
+        Positive horizons are forward simple returns through 4, 8, 12, 26, or 52 weeks. The
+        observation-date view is retained for exploratory comparison. The default
+        available-information view delays the weekly signal by one week because Wednesday H.4.1
+        observations are normally published after that Wednesday's market close. This is a
+        configurable availability assumption, not a real-time release-vintage archive.
 
         These choices are statistical transformations configured in `config/model.yaml`. The
         results are not used to select OGLI weights and therefore are not calibrated parameters.
-        Forward-return windows overlap, especially at longer horizons, which reduces the effective
-        independence of observations. The current alignment uses observation dates and does not
-        adjust for when each underlying release became publicly available, so it is exploratory
-        analysis rather than a realistic backtest. Correlation does not establish causation.
+        The dashboard defaults to non-overlapping return windows and retains the overlapping view
+        for comparison. Correlations have Fisher-transformed confidence intervals; regime tables
+        report means, medians, positive-return shares, and Student-t confidence intervals around
+        means. Smaller non-overlapping samples and current-vintage revisions remain important
+        limitations. Correlation does not establish causation.
 
         Coin Metrics publishes the daily `PriceUSD` metric in its community archive under CC BY-NC
         4.0. This project uses it only for independent, non-commercial research and attributes the
@@ -1193,6 +1506,9 @@ def research_guide_page() -> None:
         - [RRPONTSYD — Overnight reverse repo](https://fred.stlouisfed.org/series/RRPONTSYD)
         - [WRBWFRBL — Reserve balances](https://fred.stlouisfed.org/series/WRBWFRBL)
         - [Bitcoin PriceUSD — Coin Metrics community data](https://github.com/coinmetrics/data)
+        - [DGS10 — 10-year Treasury yield](https://fred.stlouisfed.org/series/DGS10)
+        - [DGS2 — 2-year Treasury yield](https://fred.stlouisfed.org/series/DGS2)
+        - [DTWEXBGS — Nominal broad U.S. dollar index](https://fred.stlouisfed.org/series/DTWEXBGS)
 
         **Primary documentation and broader context**
 

@@ -108,8 +108,11 @@ class MarketAnalysisConfig:
     classification: str
     liquidity_signal: str
     publication_lag_policy: str
+    signal_availability_lag_weeks: int
     forward_horizons_weeks: tuple[int, ...]
     correlation_min_periods: int
+    non_overlapping_min_periods: int
+    confidence_level: float
     rolling_window_weeks: int
     rolling_min_periods: int
     description: str
@@ -394,8 +397,11 @@ def _parse_market_analysis(raw: Any) -> MarketAnalysisConfig:
         "classification",
         "liquidity_signal",
         "publication_lag_policy",
+        "signal_availability_lag_weeks",
         "forward_horizons_weeks",
         "correlation_min_periods",
+        "non_overlapping_min_periods",
+        "confidence_level",
         "rolling_window_weeks",
         "rolling_min_periods",
         "description",
@@ -405,16 +411,19 @@ def _parse_market_analysis(raw: Any) -> MarketAnalysisConfig:
         raise ConfigurationError(f"market_analysis is missing fields: {', '.join(missing)}")
     if raw["classification"] != "statistical_transformation":
         raise ConfigurationError("market_analysis must be classified as statistical_transformation")
-    if raw["publication_lag_policy"] != "observation_date_unadjusted":
+    if raw["publication_lag_policy"] != "observation_and_available_information":
         raise ConfigurationError(
-            "v0.1 market publication_lag_policy must be observation_date_unadjusted"
+            "market publication_lag_policy must be observation_and_available_information"
         )
     raw_horizons = raw["forward_horizons_weeks"]
     if not isinstance(raw_horizons, list):
         raise ConfigurationError("market forward_horizons_weeks must be a list")
     try:
         horizons = tuple(int(item) for item in raw_horizons)
+        availability_lag = int(raw["signal_availability_lag_weeks"])
         correlation_min = int(raw["correlation_min_periods"])
+        non_overlapping_min = int(raw["non_overlapping_min_periods"])
+        confidence_level = float(raw["confidence_level"])
         rolling_window = int(raw["rolling_window_weeks"])
         rolling_min = int(raw["rolling_min_periods"])
     except (TypeError, ValueError) as exc:
@@ -423,14 +432,23 @@ def _parse_market_analysis(raw: Any) -> MarketAnalysisConfig:
         raise ConfigurationError("market horizons must start at zero and cannot be negative")
     if tuple(sorted(set(horizons))) != horizons:
         raise ConfigurationError("market horizons must be unique and increasing")
-    if correlation_min < 2 or rolling_min < 2 or rolling_window < rolling_min:
+    if availability_lag < 0:
+        raise ConfigurationError("signal_availability_lag_weeks cannot be negative")
+    if correlation_min < 2 or non_overlapping_min < 2:
+        raise ConfigurationError("market correlation minimum periods must be at least 2")
+    if rolling_min < 2 or rolling_window < rolling_min:
         raise ConfigurationError("market correlation history settings are inconsistent")
+    if not 0 < confidence_level < 1:
+        raise ConfigurationError("market confidence_level must be between 0 and 1")
     return MarketAnalysisConfig(
         classification=str(raw["classification"]),
         liquidity_signal=str(raw["liquidity_signal"]),
         publication_lag_policy=str(raw["publication_lag_policy"]),
+        signal_availability_lag_weeks=availability_lag,
         forward_horizons_weeks=horizons,
         correlation_min_periods=correlation_min,
+        non_overlapping_min_periods=non_overlapping_min,
+        confidence_level=confidence_level,
         rolling_window_weeks=rolling_window,
         rolling_min_periods=rolling_min,
         description=str(raw["description"]),

@@ -6,6 +6,7 @@ only the presentation contract so Streamlit Cloud never depends on a cached inst
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
@@ -77,6 +78,12 @@ MARKET_COMPARISON_COLUMNS = [
     "rolling_correlation",
     "rolling_window_weeks",
     "rolling_min_periods",
+    "signal_observation_date",
+    "signal_available_date",
+    "analysis_mode",
+    "publication_lag_weeks",
+    "regime",
+    "is_non_overlapping",
 ]
 
 MARKET_CORRELATION_COLUMNS = [
@@ -89,6 +96,40 @@ MARKET_CORRELATION_COLUMNS = [
     "liquidity_signal_name",
     "correlation",
     "observations",
+    "classification",
+    "analysis_mode",
+    "sample_policy",
+    "confidence_level",
+    "correlation_ci_lower",
+    "correlation_ci_upper",
+]
+
+MARKET_REGIME_COLUMNS = [
+    "model_id",
+    "model_name",
+    "market_id",
+    "series_id",
+    "horizon_weeks",
+    "return_type",
+    "analysis_mode",
+    "regime",
+    "sample_policy",
+    "observations",
+    "mean_return",
+    "median_return",
+    "positive_share",
+    "confidence_level",
+    "mean_ci_lower",
+    "mean_ci_upper",
+    "classification",
+]
+
+MACRO_CONTEXT_COLUMNS = [
+    "date",
+    "treasury_yield_10y",
+    "treasury_yield_2y",
+    "yield_curve_10y_2y",
+    "broad_usd_index",
     "classification",
 ]
 
@@ -107,6 +148,54 @@ _UNIT_TO_BILLIONS = {
 
 class DashboardDataError(ValueError):
     """Raised when snapshot data cannot safely support the dashboard."""
+
+
+class FreshnessStatus:
+    """Presentation-ready assessment of the newest observation in a dataset."""
+
+    __slots__ = ("age_days", "is_stale", "latest_date", "max_age_days")
+
+    def __init__(
+        self,
+        *,
+        latest_date: pd.Timestamp,
+        age_days: int,
+        max_age_days: int,
+        is_stale: bool,
+    ) -> None:
+        self.latest_date = latest_date
+        self.age_days = age_days
+        self.max_age_days = max_age_days
+        self.is_stale = is_stale
+
+
+def assess_freshness(
+    frame: pd.DataFrame,
+    *,
+    as_of: datetime | pd.Timestamp | None = None,
+    max_age_days: int = 14,
+) -> FreshnessStatus:
+    """Assess dataset age from observation dates without treating retrieval time as data time."""
+    if "date" not in frame.columns or frame.empty:
+        raise DashboardDataError("Freshness assessment requires non-empty dated data")
+    if max_age_days < 0:
+        raise DashboardDataError("Freshness threshold cannot be negative")
+    latest = pd.to_datetime(frame["date"], errors="coerce").max()
+    if pd.isna(latest):
+        raise DashboardDataError("Freshness assessment found no valid observation dates")
+    reference = pd.Timestamp(as_of if as_of is not None else datetime.now(UTC))
+    if reference.tzinfo is not None:
+        reference = reference.tz_convert(None)
+    latest = pd.Timestamp(latest)
+    if latest.tzinfo is not None:
+        latest = latest.tz_convert(None)
+    age_days = max(0, (reference.normalize() - latest.normalize()).days)
+    return FreshnessStatus(
+        latest_date=latest,
+        age_days=age_days,
+        max_age_days=max_age_days,
+        is_stale=age_days > max_age_days,
+    )
 
 
 def resolve_dashboard_data_path(processed_path: Path, snapshot_path: Path) -> tuple[Path, str]:
@@ -273,11 +362,36 @@ def latest_ogli_readings(frame: pd.DataFrame) -> pd.DataFrame:
 def load_market_comparisons(path: Path) -> pd.DataFrame:
     """Load package-calculated liquidity-market pairs for local presentation."""
     frame = _read_parquet(path, "Liquidity-market comparison data")
-    missing = sorted(set(MARKET_COMPARISON_COLUMNS) - set(frame.columns))
+    legacy_required = set(MARKET_COMPARISON_COLUMNS) - {
+        "signal_observation_date",
+        "signal_available_date",
+        "analysis_mode",
+        "publication_lag_weeks",
+        "regime",
+        "is_non_overlapping",
+    }
+    missing = sorted(legacy_required - set(frame.columns))
     if missing:
         raise DashboardDataError("Market comparison data is missing columns: " + ", ".join(missing))
+    defaults = {
+        "signal_observation_date": frame["date"],
+        "signal_available_date": frame["date"],
+        "analysis_mode": "observation_date",
+        "publication_lag_weeks": 0,
+        "regime": pd.NA,
+        "is_non_overlapping": False,
+    }
+    for column, value in defaults.items():
+        if column not in frame.columns:
+            frame[column] = value
     result = frame[MARKET_COMPARISON_COLUMNS].copy()
-    for column in ["date", "return_start_date", "return_end_date"]:
+    for column in [
+        "date",
+        "return_start_date",
+        "return_end_date",
+        "signal_observation_date",
+        "signal_available_date",
+    ]:
         result[column] = pd.to_datetime(result[column])
     return result.sort_values(["model_id", "market_id", "horizon_weeks", "date"]).reset_index(
         drop=True
@@ -287,13 +401,54 @@ def load_market_comparisons(path: Path) -> pd.DataFrame:
 def load_market_correlations(path: Path) -> pd.DataFrame:
     """Load package-calculated lagged-correlation summaries for local presentation."""
     frame = _read_parquet(path, "Liquidity-market correlation data")
-    missing = sorted(set(MARKET_CORRELATION_COLUMNS) - set(frame.columns))
+    legacy_required = set(MARKET_CORRELATION_COLUMNS) - {
+        "analysis_mode",
+        "sample_policy",
+        "confidence_level",
+        "correlation_ci_lower",
+        "correlation_ci_upper",
+    }
+    missing = sorted(legacy_required - set(frame.columns))
     if missing:
         raise DashboardDataError(
             "Market correlation data is missing columns: " + ", ".join(missing)
         )
+    defaults = {
+        "analysis_mode": "observation_date",
+        "sample_policy": "overlapping",
+        "confidence_level": 0.95,
+        "correlation_ci_lower": pd.NA,
+        "correlation_ci_upper": pd.NA,
+    }
+    for column, value in defaults.items():
+        if column not in frame.columns:
+            frame[column] = value
     return (
         frame[MARKET_CORRELATION_COLUMNS]
         .sort_values(["model_id", "market_id", "horizon_weeks"])
         .reset_index(drop=True)
     )
+
+
+def load_market_regime_statistics(path: Path) -> pd.DataFrame:
+    """Load package-calculated Bitcoin outcome summaries by OGLI regime."""
+    frame = _read_parquet(path, "Market regime statistics")
+    missing = sorted(set(MARKET_REGIME_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Market regime data is missing columns: " + ", ".join(missing))
+    return (
+        frame[MARKET_REGIME_COLUMNS]
+        .sort_values(["model_id", "analysis_mode", "sample_policy", "horizon_weeks", "regime"])
+        .reset_index(drop=True)
+    )
+
+
+def load_macro_context(path: Path) -> pd.DataFrame:
+    """Load measured Treasury/dollar context and the package-calculated curve slope."""
+    frame = _read_parquet(path, "Macro context data")
+    missing = sorted(set(MACRO_CONTEXT_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Macro context data is missing columns: " + ", ".join(missing))
+    result = frame[MACRO_CONTEXT_COLUMNS].copy()
+    result["date"] = pd.to_datetime(result["date"])
+    return result.sort_values("date").reset_index(drop=True)

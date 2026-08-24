@@ -81,8 +81,15 @@ def build_liquidity_market_comparison(
     market_returns: pd.DataFrame,
     *,
     liquidity_signal: str = "momentum_score",
+    signal_availability_lag_weeks: int = 0,
+    analysis_mode: str = "observation_date",
 ) -> pd.DataFrame:
-    """Join a named liquidity signal at ``t`` to market outcomes anchored at ``t``."""
+    """Join a liquidity signal to market outcomes using an explicit availability policy.
+
+    A zero lag reproduces the exploratory observation-date comparison. A positive lag moves the
+    signal to the first configured weekly anchor on which it is assumed to have been public. The
+    original observation date is retained, so the availability assumption remains auditable.
+    """
     ogli_required = {
         "date",
         "model_id",
@@ -91,6 +98,7 @@ def build_liquidity_market_comparison(
         "momentum_score",
         "growth_3m_annualized",
         "growth_12m_yoy",
+        "regime",
     }
     market_required = {
         "date",
@@ -112,21 +120,36 @@ def build_liquidity_market_comparison(
         )
     if liquidity_signal not in ogli.columns:
         raise MarketAnalysisError(f"Configured liquidity signal does not exist: {liquidity_signal}")
+    if signal_availability_lag_weeks < 0:
+        raise MarketAnalysisError("Signal availability lag cannot be negative")
+    if not analysis_mode:
+        raise MarketAnalysisError("Analysis mode cannot be empty")
 
-    liquidity = ogli[
-        [
-            "date",
-            "model_id",
-            "model_name",
-            "ogli",
-            "momentum_score",
-            "growth_3m_annualized",
-            "growth_12m_yoy",
+    liquidity = (
+        ogli[
+            [
+                "date",
+                "model_id",
+                "model_name",
+                "ogli",
+                "momentum_score",
+                "growth_3m_annualized",
+                "growth_12m_yoy",
+                "regime",
+            ]
         ]
-    ].copy()
+        .copy()
+        .rename(columns={"date": "signal_observation_date"})
+    )
+    liquidity["date"] = liquidity["signal_observation_date"] + pd.to_timedelta(
+        signal_availability_lag_weeks, unit="W"
+    )
+    liquidity["signal_available_date"] = liquidity["date"]
     liquidity["liquidity_signal_name"] = liquidity_signal
     liquidity["liquidity_signal"] = ogli[liquidity_signal]
     result = liquidity.merge(market_returns, on="date", how="inner", validate="many_to_many")
+    result["analysis_mode"] = analysis_mode
+    result["publication_lag_weeks"] = signal_availability_lag_weeks
     result["classification"] = "statistical_transformation"
     return result.sort_values(["model_id", "market_id", "horizon_weeks", "date"]).reset_index(
         drop=True

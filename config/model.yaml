@@ -74,21 +74,29 @@ market_alignment:
   observation_day: "Wednesday"
   daily_asof_components:
     - bitcoin
+    - treasury_yield_10y
+    - treasury_yield_2y
+    - broad_usd_index
   daily_asof_max_staleness_days: 7
   missing_policy: "latest_prior_close"
 
 market_analysis:
   classification: statistical_transformation
   liquidity_signal: momentum_score
-  publication_lag_policy: "observation_date_unadjusted"
+  publication_lag_policy: "observation_and_available_information"
+  signal_availability_lag_weeks: 1
   forward_horizons_weeks: [0, 4, 8, 12, 26, 52]
   correlation_min_periods: 52
+  non_overlapping_min_periods: 8
+  confidence_level: 0.95
   rolling_window_weeks: 52
   rolling_min_periods: 26
   description: >-
     Horizon zero compares the liquidity signal with the contemporaneous one-week market return.
-    Positive horizons compare the signal at t with the market return from t through t+h. These
-    observation-date comparisons do not yet adjust for source publication lags. They are
-    descriptive associations and do not establish causation or calibrate OGLI parameters.
+    Positive horizons compare the signal at t with the market return from t through t+h. The
+    pipeline retains the observation-date view and adds a one-week available-information view,
+    reflecting that Wednesday H.4.1 observations are normally published after that Wednesday's
+    market close. Both remain descriptive associations and do not establish causation or calibrate
+    OGLI parameters.
 
 calibrated_parameters: {}

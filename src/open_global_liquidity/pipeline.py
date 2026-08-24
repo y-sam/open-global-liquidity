@@ -9,9 +9,15 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
+from open_global_liquidity.analysis.context import MacroContextError, build_us_macro_context
 from open_global_liquidity.analysis.correlations import (
     add_rolling_correlations,
     calculate_lagged_correlations,
+)
+from open_global_liquidity.analysis.diagnostics import (
+    DIAGNOSTIC_GROUP_COLUMNS,
+    calculate_regime_return_statistics,
+    select_non_overlapping_returns,
 )
 from open_global_liquidity.analysis.lead_lag import (
     MarketAnalysisError,
@@ -64,6 +70,7 @@ def run_pipeline(
         if item.provider.lower() == "fred" and item.group == "liquidity"
     ]
     market_definitions = [item for item in definitions if item.group == "markets"]
+    context_definitions = [item for item in definitions if item.group == "context"]
     if not liquidity_definitions:
         raise RuntimeError("No FRED liquidity series are configured")
     if not market_definitions:
@@ -158,27 +165,116 @@ def run_pipeline(
     market_returns.to_parquet(market_returns_path, index=False)
     LOGGER.info("Wrote %d market return outcomes to %s", len(market_returns), market_returns_path)
 
-    comparisons = build_liquidity_market_comparison(
+    observation_date_comparisons = build_liquidity_market_comparison(
         ogli,
         market_returns,
         liquidity_signal=model_config.market_analysis.liquidity_signal,
+        analysis_mode="observation_date",
+    )
+    available_information_comparisons = build_liquidity_market_comparison(
+        ogli,
+        market_returns,
+        liquidity_signal=model_config.market_analysis.liquidity_signal,
+        signal_availability_lag_weeks=(model_config.market_analysis.signal_availability_lag_weeks),
+        analysis_mode="available_information",
+    )
+    comparisons = pd.concat(
+        [observation_date_comparisons, available_information_comparisons], ignore_index=True
     )
     comparisons = add_rolling_correlations(
         comparisons,
         window_weeks=model_config.market_analysis.rolling_window_weeks,
         min_periods=model_config.market_analysis.rolling_min_periods,
     )
+    selected_non_overlapping = select_non_overlapping_returns(comparisons)
+    sample_keys = [*DIAGNOSTIC_GROUP_COLUMNS, "date"]
+    selected_keys = selected_non_overlapping[sample_keys].assign(is_non_overlapping=True)
+    comparisons = comparisons.merge(
+        selected_keys,
+        on=sample_keys,
+        how="left",
+        validate="one_to_one",
+    )
+    comparisons["is_non_overlapping"] = comparisons["is_non_overlapping"].fillna(False)
     comparisons_path = output_dir / "us_liquidity_market_comparisons.parquet"
     comparisons.to_parquet(comparisons_path, index=False)
     LOGGER.info("Wrote %d liquidity-market comparisons to %s", len(comparisons), comparisons_path)
 
-    correlations = calculate_lagged_correlations(
+    overlapping_correlations = calculate_lagged_correlations(
         comparisons,
         min_periods=model_config.market_analysis.correlation_min_periods,
+        sample_policy="overlapping",
+        confidence_level=model_config.market_analysis.confidence_level,
+    )
+    non_overlapping_comparisons = comparisons.loc[comparisons["is_non_overlapping"]].copy()
+    non_overlapping_correlations = calculate_lagged_correlations(
+        non_overlapping_comparisons,
+        min_periods=model_config.market_analysis.non_overlapping_min_periods,
+        sample_policy="non_overlapping",
+        confidence_level=model_config.market_analysis.confidence_level,
+    )
+    correlations = pd.concat(
+        [overlapping_correlations, non_overlapping_correlations], ignore_index=True
+    ).sort_values(["model_id", "market_id", "analysis_mode", "sample_policy", "horizon_weeks"])
+    regime_statistics = pd.concat(
+        [
+            calculate_regime_return_statistics(
+                comparisons,
+                sample_policy="overlapping",
+                confidence_level=model_config.market_analysis.confidence_level,
+            ),
+            calculate_regime_return_statistics(
+                non_overlapping_comparisons,
+                sample_policy="non_overlapping",
+                confidence_level=model_config.market_analysis.confidence_level,
+            ),
+        ],
+        ignore_index=True,
     )
     correlations_path = output_dir / "us_liquidity_market_correlations.parquet"
     correlations.to_parquet(correlations_path, index=False)
     LOGGER.info("Wrote %d lagged-correlation estimates to %s", len(correlations), correlations_path)
+    regime_statistics_path = output_dir / "us_liquidity_market_regimes.parquet"
+    regime_statistics.to_parquet(regime_statistics_path, index=False)
+    LOGGER.info(
+        "Wrote %d regime-return estimates to %s",
+        len(regime_statistics),
+        regime_statistics_path,
+    )
+
+    context_outputs: dict[str, pd.DataFrame] = {}
+    if context_definitions:
+        context_frames = [
+            provider.fetch_definition(
+                definition,
+                start=start,
+                end=end,
+                force_refresh=force_refresh,
+            )
+            for definition in context_definitions
+        ]
+        context_source = pd.concat(context_frames, ignore_index=True).sort_values(
+            ["country", "series_id", "date"]
+        )
+        context_weekly = align_market_closes_to_weekly_wednesday(
+            context_source,
+            daily_asof_components=model_config.market_alignment.daily_asof_components,
+            daily_asof_max_staleness_days=(
+                model_config.market_alignment.daily_asof_max_staleness_days
+            ),
+        )
+        context_indicators = build_us_macro_context(context_weekly)
+        context_outputs = {
+            "us_macro_context_series.parquet": context_source,
+            "us_macro_context_weekly.parquet": context_weekly,
+            "us_macro_context_indicators.parquet": context_indicators,
+        }
+        for filename, context_frame in context_outputs.items():
+            context_path = output_dir / filename
+            context_frame.to_parquet(context_path, index=False)
+            LOGGER.info(
+                "Wrote %d macro-context observations to %s", len(context_frame), context_path
+            )
 
     if publish_dashboard_snapshot:
         snapshot_dir = project_root / "data" / "reference"
@@ -193,7 +289,14 @@ def run_pipeline(
             "us_market_returns_snapshot.parquet": market_returns,
             "us_liquidity_market_comparisons_snapshot.parquet": comparisons,
             "us_liquidity_market_correlations_snapshot.parquet": correlations,
+            "us_liquidity_market_regimes_snapshot.parquet": regime_statistics,
         }
+        snapshots.update(
+            {
+                filename.replace(".parquet", "_snapshot.parquet"): frame
+                for filename, frame in context_outputs.items()
+            }
+        )
         for filename, snapshot_frame in snapshots.items():
             snapshot_path = snapshot_dir / filename
             snapshot_frame.to_parquet(snapshot_path, index=False)
@@ -254,6 +357,7 @@ def main() -> None:
         GrowthCalculationError,
         LiquidityModelError,
         MarketAnalysisError,
+        MacroContextError,
         OGLICalculationError,
         UnitConversionError,
         OSError,

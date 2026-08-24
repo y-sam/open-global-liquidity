@@ -108,9 +108,12 @@ market_alignment:
 market_analysis:
   classification: statistical_transformation
   liquidity_signal: momentum_score
-  publication_lag_policy: observation_date_unadjusted
+  publication_lag_policy: observation_and_available_information
+  signal_availability_lag_weeks: 1
   forward_horizons_weeks: [0, 4, 8, 12, 26, 52]
   correlation_min_periods: 2
+  non_overlapping_min_periods: 2
+  confidence_level: 0.95
   rolling_window_weeks: 2
   rolling_min_periods: 2
   description: Test market analysis
@@ -200,6 +203,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     assert len(market_returns) == 6
     assert len(comparisons) == 18
     assert len(correlations) == 18
+    assert set(comparisons["analysis_mode"]) == {"observation_date"}
     pd.testing.assert_frame_equal(correlation_snapshot, correlations)
     pd.testing.assert_frame_equal(comparison_snapshot, comparisons)
     assert snapshot_dir.joinpath("us_market_series_snapshot.parquet").is_file()

@@ -31,6 +31,12 @@ The primary market-validation series is:
   published as Community Data under CC BY-NC 4.0. It is used for independent,
   non-commercial research and can therefore support the complete hosted comparison workspace.
 
+Measured macro context, kept separate from OGLI inputs, now includes:
+
+- [`DGS10`](https://fred.stlouisfed.org/series/DGS10): 10-year Treasury constant-maturity yield;
+- [`DGS2`](https://fred.stlouisfed.org/series/DGS2): 2-year Treasury constant-maturity yield;
+- [`DTWEXBGS`](https://fred.stlouisfed.org/series/DTWEXBGS): nominal broad U.S. dollar index.
+
 The implemented models are transparent project assumptions:
 
 - **Model A — Fed assets:** `fed_assets`;
@@ -120,6 +126,10 @@ is invalid, or no observations are returned. A successful run writes:
   correlations;
 - `data/processed/us_liquidity_market_correlations.parquet`: correlation summaries by model and
   return horizon.
+- `data/processed/us_liquidity_market_regimes.parquet`: Bitcoin return summaries by OGLI regime,
+  timing policy, horizon, and sample policy.
+- `data/processed/us_macro_context_*.parquet`: measured Treasury/dollar context and the transparent
+  10-year-minus-2-year curve slope.
 
 Weekly source series require an exact Wednesday observation. Daily ON RRP uses the latest available
 observation on or before Wednesday, capped at seven calendar days. No balance-sheet values are
@@ -129,7 +139,7 @@ The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. 
 intentionally excluded from Git because it is reproducible from the public API.
 
 The explicit `--publish-dashboard-snapshot` option also writes
-nine Git-versioned public-data artifacts:
+thirteen Git-versioned public-data artifacts:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
 - `data/reference/us_liquidity_weekly_snapshot.parquet` — aligned weekly inputs and lineage;
@@ -142,6 +152,12 @@ nine Git-versioned public-data artifacts:
   pairs and trailing correlations.
 - `data/reference/us_liquidity_market_correlations_snapshot.parquet` — aggregate model/horizon
   correlation estimates and sample sizes.
+- `data/reference/us_liquidity_market_regimes_snapshot.parquet` — mean, median, positive share,
+  and confidence intervals by OGLI regime.
+- `data/reference/us_macro_context_series_snapshot.parquet` — standardized measured macro sources.
+- `data/reference/us_macro_context_weekly_snapshot.parquet` — Wednesday-aligned context data.
+- `data/reference/us_macro_context_indicators_snapshot.parquet` — yields, curve slope, and broad
+  dollar index for dashboard presentation.
 
 These small artifacts let the hosted dashboard run without local processed data, a `.env` file, a
 FRED key, or a download on every visitor session. Publishing snapshots is an explicit maintainer
@@ -152,7 +168,7 @@ mode and source retrieval time.
 
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
-environment, downloads fresh FRED and Coin Metrics observations, regenerates the nine public
+environment, downloads fresh FRED and Coin Metrics observations, regenerates the thirteen public
 snapshots, and runs formatting, linting, and offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 
@@ -241,17 +257,25 @@ CrossBorder Capital GLI.
 
 ## Initial market-validation methodology
 
-For each OGLI model, the pipeline compares the configured `momentum_score` at date `t` with Bitcoin
-USD price returns. Horizon zero is the one-week return ending at `t`; positive horizons are simple
-returns from `t` through 4, 8, 12, 26, or 52 weeks later. Pearson correlation summaries require
-52 paired observations. Rolling correlations use a trailing 52-week window with a 26-observation
-minimum.
+For each OGLI model, the pipeline compares the configured `momentum_score` with Bitcoin USD price
+returns. Horizon zero is a one-week contemporaneous return; positive horizons are simple returns
+through 4, 8, 12, 26, or 52 weeks. It retains two explicitly labeled timing views: an exploratory
+observation-date alignment and an available-information alignment that delays the weekly OGLI
+signal by one week. The lag is a configurable approximation for the Thursday publication of
+Wednesday H.4.1 observations; it is not a real-time release-vintage database.
 
-Forward returns are retrospective outcome variables and never OGLI inputs. Longer forward-return
-windows overlap, observations are not independent, and correlation does not establish causation.
-The current alignment uses observation dates and does not yet adjust signals for source publication
-lags, so it is exploratory analysis rather than an investable historical backtest. The results do
-not currently calibrate weights or regimes.
+The dashboard defaults to non-overlapping outcome windows for robustness and retains the full
+overlapping sample for comparison. Correlation tables include Fisher-transformed 95% confidence
+intervals. Regime summaries report arithmetic mean, median, positive-return share, sample size, and
+a classical Student-t 95% interval around the mean. These intervals assume the retained sample is
+independent and identically distributed enough for descriptive inference; they are not forecast
+intervals.
+
+Forward returns are retrospective outcome variables and never OGLI inputs. The overlapping view has
+dependent observations, while the non-overlapping view has materially smaller samples. Neither the
+one-week availability assumption nor current-vintage FRED observations fully reproduce what an
+investor knew historically. Correlation does not establish causation, and the results do not
+calibrate OGLI weights or regimes.
 
 The dashboard timeline places Bitcoin's unmodified USD price on a logarithmic axis beside OGLI's
 unmodified 0-100 series. Sharing a chart and observation dates does not imply that either series
@@ -259,9 +283,10 @@ causes, predicts, or has been fitted to the other.
 
 ## Roadmap
 
-The next market additions may include gold, Treasury yields, the yield curve, and a USD index after
-each source and its redistribution terms are verified. S&P 500 may return after appropriate public
-display rights are secured. Later versions may add global
+The next market additions may include gold after its source and redistribution terms are verified.
+Treasury yields, the 10-year-minus-2-year slope, and the broad dollar index are now available as
+measured context but are not OGLI inputs. S&P 500 may return after appropriate public-display rights
+are secured. Later versions may add global
 central banks, FX conversion, collateral and repo proxies, shadow monetary base concepts, BIS
 cross-border credit, and explicitly labeled public benchmark calibration.
 

@@ -2,17 +2,29 @@
 
 from __future__ import annotations
 
+import numpy as np
 import pandas as pd
+from scipy import stats
 
 from open_global_liquidity.analysis.lead_lag import MarketAnalysisError
 
-GROUP_COLUMNS = ["model_id", "model_name", "market_id", "series_id", "horizon_weeks", "return_type"]
+GROUP_COLUMNS = [
+    "model_id",
+    "model_name",
+    "market_id",
+    "series_id",
+    "horizon_weeks",
+    "return_type",
+    "analysis_mode",
+]
 
 
 def calculate_lagged_correlations(
     comparisons: pd.DataFrame,
     *,
     min_periods: int = 52,
+    sample_policy: str = "overlapping",
+    confidence_level: float = 0.95,
 ) -> pd.DataFrame:
     """Calculate Pearson correlations between liquidity signals and market outcomes.
 
@@ -25,6 +37,10 @@ def calculate_lagged_correlations(
         raise MarketAnalysisError(f"Correlation data is missing columns: {', '.join(missing)}")
     if min_periods < 2:
         raise MarketAnalysisError("Correlation min_periods must be at least 2")
+    if not sample_policy:
+        raise MarketAnalysisError("Correlation sample_policy cannot be empty")
+    if not 0 < confidence_level < 1:
+        raise MarketAnalysisError("Correlation confidence_level must be between 0 and 1")
 
     rows: list[dict[str, object]] = []
     for keys, group in comparisons.groupby(GROUP_COLUMNS, sort=True, dropna=False):
@@ -34,19 +50,48 @@ def calculate_lagged_correlations(
             if len(paired) >= min_periods
             else float("nan")
         )
+        if len(paired) > 3 and pd.notna(correlation) and abs(correlation) < 1:
+            fisher_z = np.arctanh(correlation)
+            standard_error = 1 / np.sqrt(len(paired) - 3)
+            critical = stats.norm.ppf((1 + confidence_level) / 2)
+            correlation_ci_lower = np.tanh(fisher_z - critical * standard_error)
+            correlation_ci_upper = np.tanh(fisher_z + critical * standard_error)
+        elif pd.notna(correlation) and abs(correlation) == 1:
+            correlation_ci_lower = correlation
+            correlation_ci_upper = correlation
+        else:
+            correlation_ci_lower = float("nan")
+            correlation_ci_upper = float("nan")
         row = dict(zip(GROUP_COLUMNS, keys, strict=True))
         row.update(
             {
                 "liquidity_signal_name": group["liquidity_signal_name"].iloc[0],
                 "correlation": correlation,
                 "observations": len(paired),
+                "sample_policy": sample_policy,
+                "confidence_level": confidence_level,
+                "correlation_ci_lower": correlation_ci_lower,
+                "correlation_ci_upper": correlation_ci_upper,
                 "classification": "statistical_transformation",
             }
         )
         rows.append(row)
+    columns = [
+        *GROUP_COLUMNS,
+        "liquidity_signal_name",
+        "correlation",
+        "observations",
+        "sample_policy",
+        "confidence_level",
+        "correlation_ci_lower",
+        "correlation_ci_upper",
+        "classification",
+    ]
+    if not rows:
+        return pd.DataFrame(columns=columns)
     return (
-        pd.DataFrame(rows)
-        .sort_values(["model_id", "market_id", "horizon_weeks"])
+        pd.DataFrame(rows)[columns]
+        .sort_values(["model_id", "market_id", "analysis_mode", "horizon_weeks"])
         .reset_index(drop=True)
     )
 

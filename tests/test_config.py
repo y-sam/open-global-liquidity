@@ -8,7 +8,7 @@ from open_global_liquidity.config import ConfigurationError, load_model_config, 
 def test_load_walcl_config() -> None:
     definitions = load_series_config(Path("config/series.yaml"))
 
-    assert len(definitions) == 5
+    assert len(definitions) == 8
     by_id = {definition.series_id: definition for definition in definitions}
     assert set(by_id) == {
         "WALCL",
@@ -16,6 +16,9 @@ def test_load_walcl_config() -> None:
         "RRPONTSYD",
         "WRBWFRBL",
         "btc.PriceUSD",
+        "DGS10",
+        "DGS2",
+        "DTWEXBGS",
     }
     walcl = by_id["WALCL"]
     assert walcl.series_id == "WALCL"
@@ -56,10 +59,18 @@ def test_load_model_config() -> None:
         "growth_3m_annualized": 0.6,
     }
     assert config.ogli.regimes[-1].max_value == 100
-    assert config.market_alignment.daily_asof_components == ("bitcoin",)
+    assert config.market_alignment.daily_asof_components == (
+        "bitcoin",
+        "treasury_yield_10y",
+        "treasury_yield_2y",
+        "broad_usd_index",
+    )
     assert config.market_analysis.forward_horizons_weeks == (0, 4, 8, 12, 26, 52)
     assert config.market_analysis.liquidity_signal == "momentum_score"
-    assert config.market_analysis.publication_lag_policy == "observation_date_unadjusted"
+    assert config.market_analysis.publication_lag_policy == "observation_and_available_information"
+    assert config.market_analysis.signal_availability_lag_weeks == 1
+    assert config.market_analysis.non_overlapping_min_periods == 8
+    assert config.market_analysis.confidence_level == 0.95
 
 
 def test_model_config_rejects_ogli_weights_that_do_not_sum_to_one(tmp_path: Path) -> None:

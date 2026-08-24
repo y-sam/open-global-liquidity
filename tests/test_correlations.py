@@ -18,6 +18,7 @@ def _comparisons() -> pd.DataFrame:
             "series_id": "SP500",
             "horizon_weeks": 4,
             "return_type": "forward",
+            "analysis_mode": "observation_date",
             "liquidity_signal_name": "momentum_score",
             "liquidity_signal": values,
             "market_return": values * 0.1,
@@ -30,6 +31,8 @@ def test_lagged_correlation_reports_observation_count_and_perfect_relationship()
 
     assert np.isclose(result["correlation"], 1.0)
     assert result["observations"] == 8
+    assert result["sample_policy"] == "overlapping"
+    assert result["correlation_ci_lower"] == 1.0
 
 
 def test_rolling_correlation_respects_minimum_history() -> None:

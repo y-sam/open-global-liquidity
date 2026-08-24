@@ -40,6 +40,7 @@ def test_comparison_preserves_liquidity_signal_at_anchor_date() -> None:
             "momentum_score": [-0.2, 0.0, 0.2],
             "growth_3m_annualized": [0.01, 0.02, 0.03],
             "growth_12m_yoy": [0.02, 0.03, 0.04],
+            "regime": ["Contraction", "Neutral", "Expansion"],
         }
     )
     returns = pd.DataFrame(
@@ -59,3 +60,42 @@ def test_comparison_preserves_liquidity_signal_at_anchor_date() -> None:
 
     assert result["liquidity_signal"].tolist() == [-0.2, 0.0, 0.2]
     assert result["liquidity_signal_name"].unique().tolist() == ["momentum_score"]
+
+
+def test_comparison_can_delay_signal_until_assumed_publication_week() -> None:
+    dates = pd.date_range("2024-01-03", periods=3, freq="W-WED")
+    ogli = pd.DataFrame(
+        {
+            "date": dates,
+            "model_id": "model_a",
+            "model_name": "Model A",
+            "ogli": [40.0, 50.0, 60.0],
+            "momentum_score": [-0.2, 0.0, 0.2],
+            "growth_3m_annualized": [0.01, 0.02, 0.03],
+            "growth_12m_yoy": [0.02, 0.03, 0.04],
+            "regime": ["Contraction", "Neutral", "Expansion"],
+        }
+    )
+    returns = pd.DataFrame(
+        {
+            "date": dates,
+            "market_id": "bitcoin",
+            "series_id": "btc.PriceUSD",
+            "horizon_weeks": 4,
+            "return_type": "forward",
+            "market_return": [0.03, 0.04, 0.05],
+            "return_start_date": dates,
+            "return_end_date": dates + pd.Timedelta(weeks=4),
+        }
+    )
+
+    result = build_liquidity_market_comparison(
+        ogli,
+        returns,
+        signal_availability_lag_weeks=1,
+        analysis_mode="available_information",
+    )
+
+    assert result["date"].tolist() == dates[1:].tolist()
+    assert result["signal_observation_date"].tolist() == dates[:-1].tolist()
+    assert result["publication_lag_weeks"].unique().tolist() == [1]
