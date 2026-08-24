@@ -465,10 +465,10 @@
       "sha256": "7c79169800df187c003adab1448302443094d0c1f0a9380551c437cf54265772"
     }
   },
-  "generated_at": "2026-08-24T13:40:03.041613+00:00",
+  "generated_at": "2026-08-24T13:46:59.686115+00:00",
   "pipeline_version": "0.1.0",
   "schema_version": 1,
   "snapshot_count": 14,
-  "source_commit": "fca3ac8a9d21d88398c4c8da49919c4eb4f213ef",
-  "working_tree_dirty": true
+  "source_commit": "4072aae57f7c82929c0de0b12a5f17b00c7127b9",
+  "working_tree_dirty": false
 }
