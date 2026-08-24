@@ -148,6 +148,19 @@ FRED key, or a download on every visitor session. Publishing snapshots is an exp
 action. Review the generated files before committing them; the dashboard displays the active data
 mode and source retrieval time.
 
+### Automated weekly refresh
+
+The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
+also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
+environment, downloads fresh FRED and Coin Metrics observations, regenerates the nine public
+snapshots, and runs formatting, linting, and offline tests. Only successful runs can commit changed
+snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
+
+The workflow requires a repository Actions secret named `FRED_API_KEY` and **Read and write**
+workflow permissions. Coin Metrics Community Data does not require a key. The workflow deliberately
+uses the start dates in `config/series.yaml`, preserving the complete configured Bitcoin history.
+Never store the FRED key in the workflow file or repository.
+
 Bitcoin market source data, individual returns, paired comparisons, scatter points, and rolling
 correlations are available in the hosted dashboard. Coin Metrics Community Data is licensed under
 [CC BY-NC 4.0](https://creativecommons.org/licenses/by-nc/4.0/); this project attributes Coin

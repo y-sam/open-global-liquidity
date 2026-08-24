@@ -1,0 +1,87 @@
+name: Refresh public dashboard data
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Friday at 12:00 UTC, after the weekly Federal Reserve H.4.1 release.
+    - cron: "0 12 * * 5"
+
+permissions:
+  contents: write
+
+concurrency:
+  group: refresh-public-dashboard-data
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@v6
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.12.5"
+          enable-cache: true
+
+      - name: Install locked dependencies
+        run: uv sync --frozen --all-groups
+
+      - name: Verify FRED credentials are configured
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: |
+          if [[ -z "$FRED_API_KEY" ]]; then
+            echo "FRED_API_KEY is not configured as a GitHub Actions repository secret."
+            exit 1
+          fi
+
+      - name: Refresh public dashboard snapshots
+        env:
+          FRED_API_KEY: ${{ secrets.FRED_API_KEY }}
+        run: >-
+          uv run python -m open_global_liquidity.pipeline
+          --force-refresh
+          --publish-dashboard-snapshot
+
+      - name: Check formatting
+        run: uv run ruff format --check .
+
+      - name: Run lint checks
+        run: uv run ruff check .
+
+      - name: Run tests
+        run: uv run pytest
+
+      - name: Commit refreshed public snapshots
+        run: |
+          git add \
+            data/reference/us_fred_series_snapshot.parquet \
+            data/reference/us_liquidity_weekly_snapshot.parquet \
+            data/reference/us_liquidity_models_snapshot.parquet \
+            data/reference/us_ogli_snapshot.parquet \
+            data/reference/us_market_series_snapshot.parquet \
+            data/reference/us_market_weekly_snapshot.parquet \
+            data/reference/us_market_returns_snapshot.parquet \
+            data/reference/us_liquidity_market_comparisons_snapshot.parquet \
+            data/reference/us_liquidity_market_correlations_snapshot.parquet
+
+          if git diff --cached --quiet; then
+            echo "Public dashboard snapshots are already current."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Refresh public dashboard data"
+          git push
