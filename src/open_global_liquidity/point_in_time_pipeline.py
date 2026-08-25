@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 from datetime import date
+from importlib.metadata import version
 from pathlib import Path
 
 import pandas as pd
@@ -18,6 +19,7 @@ from open_global_liquidity.point_in_time import (
     calculate_point_in_time_ogli,
     compare_point_in_time_to_current,
 )
+from open_global_liquidity.provenance import ProvenanceError, write_snapshot_manifest
 
 LOGGER = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
@@ -29,6 +31,7 @@ def run_point_in_time_pipeline(
     start: str | date | None = None,
     end: str | date | None = None,
     force_refresh: bool = False,
+    publish_dashboard_snapshot: bool = False,
 ) -> Path:
     """Fetch monthly ALFRED information sets and write local vintage OGLI research files."""
     load_dotenv(project_root / ".env")
@@ -90,12 +93,33 @@ def run_point_in_time_pipeline(
     comparison_path = output_dir / "us_point_in_time_comparison.parquet"
     comparison.to_parquet(comparison_path, index=False)
     LOGGER.info("Wrote %d current-vintage comparisons to %s", len(comparison), comparison_path)
+    if publish_dashboard_snapshot:
+        _publish_dashboard_snapshot(comparison, project_root=project_root)
 
     print(
         f"Point-in-time pilot complete: {len(information_dates)} month ends, "
         f"{point_in_time['model_id'].nunique()} models -> {output_path}"
     )
     return output_path
+
+
+def _publish_dashboard_snapshot(comparison: pd.DataFrame, *, project_root: Path) -> Path:
+    """Publish the small derived comparison and refresh whole-bundle provenance."""
+    snapshot_dir = project_root / "data" / "reference"
+    snapshot_dir.mkdir(parents=True, exist_ok=True)
+    snapshot_path = snapshot_dir / "us_point_in_time_comparison_snapshot.parquet"
+    comparison.to_parquet(snapshot_path, index=False)
+    snapshots = {
+        path.name: pd.read_parquet(path) for path in sorted(snapshot_dir.glob("*_snapshot.parquet"))
+    }
+    write_snapshot_manifest(
+        snapshot_dir,
+        snapshots,
+        project_root=project_root,
+        pipeline_version=version("open-global-liquidity"),
+    )
+    LOGGER.info("Published %d-row point-in-time snapshot to %s", len(comparison), snapshot_path)
+    return snapshot_path
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -107,6 +131,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--force-refresh",
         action="store_true",
         help="Redownload the requested ALFRED batch instead of using its local cache",
+    )
+    parser.add_argument(
+        "--publish-dashboard-snapshot",
+        action="store_true",
+        help="Also publish the derived comparison used by the hosted dashboard",
     )
     return parser
 
@@ -120,8 +149,16 @@ def main() -> None:
             start=args.start,
             end=args.end,
             force_refresh=args.force_refresh,
+            publish_dashboard_snapshot=args.publish_dashboard_snapshot,
         )
-    except (ConfigurationError, FredError, OSError, PointInTimeError, ValueError) as exc:
+    except (
+        ConfigurationError,
+        FredError,
+        OSError,
+        PointInTimeError,
+        ProvenanceError,
+        ValueError,
+    ) as exc:
         raise SystemExit(f"Point-in-time pilot failed: {exc}") from exc
 
 

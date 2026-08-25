@@ -68,6 +68,9 @@ MACRO_CONTEXT_SNAPSHOT_PATH = (
 POINT_IN_TIME_COMPARISON_PATH = (
     DATA_ROOT / "vintages" / "fred" / "monthly_pilot" / "us_point_in_time_comparison.parquet"
 )
+POINT_IN_TIME_COMPARISON_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_point_in_time_comparison_snapshot.parquet"
+)
 COMPONENT_ORDER = list(COMPONENT_LABELS)
 WINDOW_DAYS = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
 COLORS = {
@@ -237,13 +240,15 @@ def _macro_context_data() -> pd.DataFrame | None:
     return _load_macro_context(str(path), path.stat().st_mtime_ns)
 
 
-def _point_in_time_data() -> pd.DataFrame | None:
-    if not POINT_IN_TIME_COMPARISON_PATH.is_file():
+def _point_in_time_data() -> tuple[pd.DataFrame, str] | None:
+    try:
+        path, origin = resolve_dashboard_data_path(
+            POINT_IN_TIME_COMPARISON_PATH,
+            POINT_IN_TIME_COMPARISON_SNAPSHOT_PATH,
+        )
+    except DashboardDataError:
         return None
-    return _load_point_in_time_comparison(
-        str(POINT_IN_TIME_COMPARISON_PATH),
-        POINT_IN_TIME_COMPARISON_PATH.stat().st_mtime_ns,
-    )
+    return _load_point_in_time_comparison(str(path), path.stat().st_mtime_ns), origin
 
 
 def _show_freshness(frame: pd.DataFrame, label: str, *, max_age_days: int = 14) -> None:
@@ -1054,21 +1059,22 @@ def vintage_pilot_page() -> None:
     st.title("Point-in-time OGLI pilot")
     st.caption(
         "Monthly reconstruction using ALFRED information sets available on each month end. "
-        "This is a local research pilot, not a revised production index."
+        "This is a research pilot, not a revised production index."
     )
     try:
-        data = _point_in_time_data()
+        loaded = _point_in_time_data()
     except DashboardDataError as exc:
         st.error(str(exc), icon=":material/error:")
         return
-    if data is None:
+    if loaded is None:
         st.info(
-            "The local vintage pilot has not been generated in this environment. Run the "
-            "command below with your FRED API key; no additional account is required.",
+            "The vintage pilot has not been published in this environment. Maintainers can "
+            "generate it with the command below; the existing FRED key is sufficient.",
             icon=":material/history:",
         )
-        st.code("uv run ogli-point-in-time", language="zsh")
+        st.code("uv run ogli-point-in-time --publish-dashboard-snapshot", language="zsh")
         return
+    data, data_origin = loaded
 
     model_options = dict(data[["model_name", "model_id"]].drop_duplicates().itertuples(index=False))
     with st.sidebar:
@@ -1081,6 +1087,7 @@ def vintage_pilot_page() -> None:
             key="vintage_model",
         )
         st.caption("Information frequency: calendar month end")
+        st.caption(f"Data mode: {data_origin}")
 
     selected = data.loc[data["model_id"] == model_options[selected_name]].copy()
     latest = selected.iloc[-1]

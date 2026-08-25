@@ -173,6 +173,7 @@ weekly signal observation date:
 
 ```zsh
 uv run ogli-point-in-time
+uv run ogli-point-in-time --publish-dashboard-snapshot
 ```
 
 The configured pilot begins on 2021-01-31. `RRPONTSYD` has usable history only from December 2017,
@@ -183,13 +184,15 @@ The command writes three ignored local files under `data/vintages/fred/monthly_p
 ALFRED input archive, one monthly reading per model and information date, and exact-date
 current-vintage comparisons. Raw multi-vintage responses are cached under
 `data/raw/fred/vintage_batches/`. These files are reproducible but intentionally not committed.
-The pilot does not reconstruct intraday release timestamps, market-close availability, or every
-provider publication lag, so it is not yet a strict tradable-signal backtest.
+The explicit publication option writes only the small derived comparison to
+`data/reference/us_point_in_time_comparison_snapshot.parquet`; it does not publish the raw ALFRED
+archive. The pilot does not reconstruct intraday release timestamps, market-close availability,
+or every provider publication lag, so it is not yet a strict tradable-signal backtest.
 
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
 
-The explicit `--publish-dashboard-snapshot` option also writes fourteen Git-versioned Parquet
+The publication commands together write fifteen Git-versioned Parquet
 artifacts plus a JSON provenance manifest:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
@@ -211,6 +214,8 @@ artifacts plus a JSON provenance manifest:
 - `data/reference/us_macro_context_weekly_snapshot.parquet` — Wednesday-aligned context data.
 - `data/reference/us_macro_context_indicators_snapshot.parquet` — yields, curve slope, and broad
   dollar index for dashboard presentation.
+- `data/reference/us_point_in_time_comparison_snapshot.parquet` — derived monthly vintage/current
+  OGLI comparisons; raw ALFRED observations remain excluded.
 - `data/reference/dashboard_snapshot_manifest.json` — generation time, pipeline version, source
   commit, row/date coverage, and SHA-256 digest for every published Parquet file.
 
@@ -223,8 +228,8 @@ mode and source retrieval time.
 
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
-environment, downloads fresh FRED and Coin Metrics observations, regenerates the fourteen public
-Parquet snapshots and provenance manifest, and runs formatting, linting, and offline tests. Only
+environment, downloads fresh FRED, ALFRED, and Coin Metrics observations, regenerates the fifteen
+public Parquet snapshots and provenance manifest, and runs formatting, linting, and offline tests. Only
 successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 

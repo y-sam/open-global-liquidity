@@ -1,3 +1,4 @@
+import json
 from datetime import UTC, date
 from pathlib import Path
 
@@ -12,6 +13,7 @@ from open_global_liquidity.point_in_time import (
     calculate_point_in_time_ogli,
     compare_point_in_time_to_current,
 )
+from open_global_liquidity.point_in_time_pipeline import _publish_dashboard_snapshot
 
 
 def test_build_month_end_grid_uses_only_completed_months() -> None:
@@ -129,3 +131,29 @@ def test_compare_point_in_time_rejects_missing_exact_date() -> None:
 
     with pytest.raises(PointInTimeError, match="lacks an exact comparison"):
         compare_point_in_time_to_current(point_in_time, current)
+
+
+def test_publish_dashboard_snapshot_refreshes_whole_manifest(tmp_path: Path) -> None:
+    reference = tmp_path / "data" / "reference"
+    reference.mkdir(parents=True)
+    pd.DataFrame({"date": pd.to_datetime(["2024-01-03"]), "value": [1.0]}).to_parquet(
+        reference / "existing_snapshot.parquet", index=False
+    )
+    comparison = pd.DataFrame(
+        {
+            "information_date": pd.to_datetime(["2024-01-31"]),
+            "signal_observation_date": pd.to_datetime(["2024-01-24"]),
+            "model_id": ["model_a"],
+            "vintage_ogli": [40.0],
+            "current_ogli": [44.0],
+        }
+    )
+
+    path = _publish_dashboard_snapshot(comparison, project_root=tmp_path)
+    manifest = json.loads(
+        (reference / "dashboard_snapshot_manifest.json").read_text(encoding="utf-8")
+    )
+
+    assert path.name == "us_point_in_time_comparison_snapshot.parquet"
+    assert manifest["snapshot_count"] == 2
+    assert path.name in manifest["files"]
