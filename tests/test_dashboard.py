@@ -310,3 +310,49 @@ def test_load_snapshot_manifest_validates_point_in_time_metadata(tmp_path: Path)
 
     assert manifest["source_commit"] == "abc123"
     assert manifest["snapshot_count"] == 1
+
+
+def test_loads_published_bitcoin_research_snapshots() -> None:
+    support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
+    spec = importlib.util.spec_from_file_location("dashboard_support_bitcoin_test", support_path)
+    assert spec is not None and spec.loader is not None
+    support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(support)
+    snapshots = Path(__file__).resolve().parents[1] / "data" / "reference"
+
+    outcomes = support.load_bitcoin_outcomes(
+        snapshots / "us_point_in_time_bitcoin_outcomes_snapshot.parquet"
+    )
+    regimes = support.load_bitcoin_regime_summary(
+        snapshots / "us_point_in_time_bitcoin_regimes_snapshot.parquet"
+    )
+    revisions = support.load_bitcoin_revision_summary(
+        snapshots / "us_point_in_time_bitcoin_revisions_snapshot.parquet"
+    )
+
+    assert set(outcomes["market_id"]) == {"bitcoin"}
+    assert regimes["mean_return_ci_lower"].notna().any()
+    assert revisions["regime_agreement_share"].between(0, 1).all()
+
+
+def test_bitcoin_snapshot_loader_rejects_impossible_path_statistic(tmp_path: Path) -> None:
+    support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
+    spec = importlib.util.spec_from_file_location(
+        "dashboard_support_bitcoin_invalid_test", support_path
+    )
+    assert spec is not None and spec.loader is not None
+    support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(support)
+    source = (
+        Path(__file__).resolve().parents[1]
+        / "data"
+        / "reference"
+        / "us_point_in_time_bitcoin_outcomes_snapshot.parquet"
+    )
+    frame = pd.read_parquet(source).head(1)
+    frame.loc[:, "maximum_drawdown_from_peak"] = 0.10
+    invalid_path = tmp_path / "invalid_bitcoin_outcomes.parquet"
+    frame.to_parquet(invalid_path, index=False)
+
+    with pytest.raises(support.DashboardDataError, match="impossible path statistics"):
+        support.load_bitcoin_outcomes(invalid_path)

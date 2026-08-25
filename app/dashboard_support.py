@@ -751,6 +751,16 @@ def load_bitcoin_outcomes(path: Path) -> pd.DataFrame:
         raise DashboardDataError("Bitcoin research outcomes contain invalid dates")
     if set(result["bitcoin_research_classification"]) != {"statistical_transformation"}:
         raise DashboardDataError("Bitcoin research outcomes have an unsupported classification")
+    if set(result["market_id"]) != {"bitcoin"}:
+        raise DashboardDataError("Bitcoin research outcomes contain a non-Bitcoin market")
+    invalid_paths = (
+        result["maximum_upside_from_start"].lt(0)
+        | result["maximum_downside_from_start"].gt(0)
+        | result["maximum_drawdown_from_peak"].gt(0)
+        | result["maximum_drawdown_from_peak"].lt(-1)
+    )
+    if invalid_paths.any():
+        raise DashboardDataError("Bitcoin research outcomes contain impossible path statistics")
     return result.sort_values(
         ["model_id", "publication_lag_weeks", "horizon_months", "information_date"]
     ).reset_index(drop=True)
@@ -767,6 +777,29 @@ def load_bitcoin_regime_summary(path: Path) -> pd.DataFrame:
         {"vintage_regime", "transition_direction"}
     ):
         raise DashboardDataError("Bitcoin regime summary has an unsupported dimension")
+    if not set(result["sample_policy"]).issubset({"overlapping", "non_overlapping"}):
+        raise DashboardDataError("Bitcoin regime summary has an unsupported sample policy")
+    if set(result["classification"]) != {"descriptive_statistic"}:
+        raise DashboardDataError("Bitcoin regime summary has an unsupported classification")
+    invalid_ranges = (
+        result["observations"].le(0)
+        | ~result["positive_share"].between(0, 1)
+        | ~result["confidence_level"].between(0, 1, inclusive="neither")
+        | result["standard_error"].dropna().lt(0).reindex(result.index, fill_value=False)
+        | result["mean_maximum_upside"].lt(0)
+        | result["mean_maximum_downside"].gt(0)
+        | result["mean_maximum_drawdown"].gt(0)
+        | result["mean_maximum_drawdown"].lt(-1)
+    )
+    complete_intervals = (
+        result[["mean_return_ci_lower", "mean_return", "mean_return_ci_upper"]].notna().all(axis=1)
+    )
+    invalid_intervals = complete_intervals & (
+        result["mean_return_ci_lower"].gt(result["mean_return"])
+        | result["mean_return_ci_upper"].lt(result["mean_return"])
+    )
+    if invalid_ranges.any() or invalid_intervals.any():
+        raise DashboardDataError("Bitcoin regime summary contains invalid statistics")
     return result.sort_values(
         [
             "model_id",
@@ -790,6 +823,16 @@ def load_bitcoin_revision_summary(path: Path) -> pd.DataFrame:
         {"overlapping", "non_overlapping"}
     ):
         raise DashboardDataError("Bitcoin revision summary has an unsupported sample policy")
+    if set(result["classification"]) != {"descriptive_statistic"}:
+        raise DashboardDataError("Bitcoin revision summary has an unsupported classification")
+    invalid_ranges = (
+        result["observations"].le(0)
+        | result["mean_absolute_momentum_revision"].lt(0)
+        | ~result["regime_agreement_share"].between(0, 1)
+    )
+    correlations = result[["vintage_signal_correlation", "current_vintage_signal_correlation"]]
+    if invalid_ranges.any() or correlations.abs().gt(1).any().any():
+        raise DashboardDataError("Bitcoin revision summary contains invalid statistics")
     return result.sort_values(
         ["model_id", "sample_policy", "publication_lag_weeks", "horizon_months"]
     ).reset_index(drop=True)
