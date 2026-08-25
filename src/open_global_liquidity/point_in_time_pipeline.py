@@ -121,6 +121,9 @@ def run_point_in_time_pipeline(
     market_summary = summarize_point_in_time_market_pairs(
         market_pairs,
         min_periods=config.point_in_time_pilot.market_correlation_min_periods,
+        non_overlapping_min_periods=(
+            config.point_in_time_pilot.market_non_overlapping_correlation_min_periods
+        ),
     )
     market_summary_path = output_dir / "us_point_in_time_market_summary.parquet"
     market_summary.to_parquet(market_summary_path, index=False)

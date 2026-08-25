@@ -72,7 +72,9 @@ def test_summary_separates_overlapping_and_non_overlapping_samples() -> None:
         publication_lag_weeks=[0],
         forward_horizons_months=[3],
     )
-    summary = summarize_point_in_time_market_pairs(pairs, min_periods=3).set_index("sample_policy")
+    summary = summarize_point_in_time_market_pairs(
+        pairs, min_periods=3, non_overlapping_min_periods=3
+    ).set_index("sample_policy")
 
     assert summary.loc["overlapping", "observations"] == 18
     assert summary.loc["non_overlapping", "observations"] == 6

@@ -596,7 +596,7 @@
       "sha256": "5da5faaa876cf33420538d6ba053aabff604c318342d52fee7bbaec933fac99f"
     },
     "us_point_in_time_market_summary_snapshot.parquet": {
-      "bytes": 12377,
+      "bytes": 12679,
       "columns": [
         "model_id",
         "model_name",
@@ -628,13 +628,13 @@
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "9c37c24b9c850d3fde97f701e289bd3bd9d6c8035a1bb911473df83b482dd70a"
+      "sha256": "bc35f16d678c9d2143dcbae9291173523701fc6c9098f0e11ad9d4e725ecbf29"
     }
   },
-  "generated_at": "2026-08-25T13:03:06.627323+00:00",
+  "generated_at": "2026-08-25T13:42:20.037648+00:00",
   "pipeline_version": "0.1.0",
   "schema_version": 1,
   "snapshot_count": 18,
-  "source_commit": "b5b904021e961d6d37807bfedd391a02f6a3f71f",
+  "source_commit": "198a46f2c531d12489ba446c087468dcb6c968f3",
   "working_tree_dirty": true
 }

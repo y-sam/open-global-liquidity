@@ -138,6 +138,7 @@ point_in_time_pilot:
     publication_lag_weeks: [0, 1, 2, 4]
     forward_horizons_months: [1, 3, 6, 12]
     correlation_min_periods: 12
+    non_overlapping_correlation_min_periods: 8
 """.strip(),
         encoding="utf-8",
     )

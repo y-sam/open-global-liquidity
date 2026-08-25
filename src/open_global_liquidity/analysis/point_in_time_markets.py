@@ -192,6 +192,7 @@ def summarize_point_in_time_market_pairs(
     pairs: pd.DataFrame,
     *,
     min_periods: int = 12,
+    non_overlapping_min_periods: int = 8,
 ) -> pd.DataFrame:
     """Calculate descriptive correlations and return statistics for both sample policies."""
     missing = sorted(set(PAIR_COLUMNS) - set(pairs.columns))
@@ -201,6 +202,8 @@ def summarize_point_in_time_market_pairs(
         )
     if min_periods < 3:
         raise PointInTimeMarketError("min_periods must be at least 3")
+    if non_overlapping_min_periods < 3:
+        raise PointInTimeMarketError("non_overlapping_min_periods must be at least 3")
     groups = [
         "model_id",
         "model_name",
@@ -212,12 +215,15 @@ def summarize_point_in_time_market_pairs(
     rows: list[dict[str, object]] = []
     for sample_policy in ("overlapping", "non_overlapping"):
         sample = pairs if sample_policy == "overlapping" else pairs.loc[pairs["is_non_overlapping"]]
+        required_observations = (
+            min_periods if sample_policy == "overlapping" else non_overlapping_min_periods
+        )
         for keys, group in sample.groupby(groups, sort=True):
             valid = group.dropna(subset=["vintage_momentum_score", "market_return"])
             observations = len(valid)
             correlation = (
                 valid["vintage_momentum_score"].corr(valid["market_return"])
-                if observations >= min_periods
+                if observations >= required_observations
                 else math.nan
             )
             rows.append(

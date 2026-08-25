@@ -154,6 +154,7 @@ class PointInTimePilotConfig:
     market_publication_lag_weeks: tuple[int, ...]
     market_forward_horizons_months: tuple[int, ...]
     market_correlation_min_periods: int
+    market_non_overlapping_correlation_min_periods: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -349,6 +350,7 @@ def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
         "publication_lag_weeks",
         "forward_horizons_months",
         "correlation_min_periods",
+        "non_overlapping_correlation_min_periods",
     }
     market_missing = sorted(market_required - market.keys())
     if market_missing:
@@ -363,6 +365,7 @@ def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
         lags = tuple(int(item) for item in market["publication_lag_weeks"])
         horizons = tuple(int(item) for item in market["forward_horizons_months"])
         min_periods = int(market["correlation_min_periods"])
+        non_overlapping_min_periods = int(market["non_overlapping_correlation_min_periods"])
     except (TypeError, ValueError) as exc:
         raise ConfigurationError("point-in-time market periods must be integers") from exc
     if not lags or lags != tuple(sorted(set(lags))) or any(item < 0 for item in lags):
@@ -379,6 +382,10 @@ def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
         )
     if min_periods < 3:
         raise ConfigurationError("point-in-time correlation_min_periods must be at least 3")
+    if non_overlapping_min_periods < 3:
+        raise ConfigurationError(
+            "point-in-time non_overlapping_correlation_min_periods must be at least 3"
+        )
     return PointInTimePilotConfig(
         classification=str(raw["classification"]),
         frequency=str(raw["frequency"]),
@@ -387,6 +394,7 @@ def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
         market_publication_lag_weeks=lags,
         market_forward_horizons_months=horizons,
         market_correlation_min_periods=min_periods,
+        market_non_overlapping_correlation_min_periods=non_overlapping_min_periods,
     )
 
 

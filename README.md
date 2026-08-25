@@ -381,7 +381,10 @@ Bitcoin, gold, and broad-dollar returns over 1, 3, 6, and 12 months. The predecl
 4-week delays test sensitivity to assumed signal usability; they do not claim to reconstruct exact
 release timestamps. Gold is the World Bank Pink Sheet monthly average, not a spot or month-end
 fixing. A positive dollar return means dollar strength and is never sign-inverted to improve fit.
-Both overlapping and mechanically non-overlapping samples are retained. A stricter investable
+Both overlapping and mechanically non-overlapping samples are retained. Correlations require at
+least 12 overlapping observations or 8 non-overlapping observations; the lower non-overlapping
+threshold preserves a limited view of six-month outcomes while keeping sparser estimates hidden
+and explicitly warning that small samples are fragile. A stricter investable
 backtest still requires source-specific publication timestamps and availability rules; the
 published index therefore remains clearly labeled current-vintage.
 

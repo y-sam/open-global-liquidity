@@ -1289,23 +1289,47 @@ def vintage_pilot_page() -> None:
         st.metric("Mean forward return", f"{metric_row['mean_return']:.1%}", border=True)
         st.metric("Positive outcomes", f"{metric_row['positive_share']:.0%}", border=True)
 
-    lag_figure = px.bar(
-        summary_selection,
-        x="publication_lag_weeks",
-        y="correlation",
-        text_auto="+.2f",
-        title=(
-            f"{selected_name} vs {market_labels[market_id]} · "
-            f"{horizon}-month correlation sensitivity"
-        ),
-        labels={
-            "publication_lag_weeks": "Assumed OGLI availability delay (weeks)",
-            "correlation": "Pearson correlation",
-        },
+    chart_summary = summary_selection.dropna(subset=["correlation"])
+    chart_title = (
+        f"{selected_name} vs {market_labels[market_id]} · {horizon}-month correlation sensitivity"
     )
-    lag_figure.add_hline(y=0, line_color="#6B7280", line_width=1)
-    lag_figure.update_traces(marker_color="#D97706")
-    st.plotly_chart(lag_figure, width="stretch", config={"displaylogo": False})
+    if chart_summary.empty:
+        with st.container(border=True):
+            st.subheader(chart_title)
+            st.info(
+                "No correlation is reported because every delay has fewer than the declared "
+                "minimum observations. Select overlapping outcomes or a shorter horizon.",
+                icon=":material/data_alert:",
+            )
+    else:
+        lag_figure = px.bar(
+            chart_summary,
+            x="publication_lag_weeks",
+            y="correlation",
+            title=chart_title,
+            labels={
+                "publication_lag_weeks": "Assumed OGLI availability delay (weeks)",
+                "correlation": "Pearson correlation",
+            },
+        )
+        lag_figure.add_hline(y=0, line_color="#6B7280", line_width=1)
+        lag_figure.update_traces(
+            marker_color="#D97706",
+            texttemplate="%{y:+.2f}",
+            textposition="auto",
+            hovertemplate=(
+                "Availability delay: %{x} weeks<br>Correlation: %{y:+.2f}<extra></extra>"
+            ),
+        )
+        lag_figure.update_yaxes(tickformat=".2f")
+        st.plotly_chart(lag_figure, width="stretch", config={"displaylogo": False})
+
+    if sample_policy == "non_overlapping" and 8 <= int(metric_row["observations"]) < 12:
+        st.info(
+            "This non-overlapping estimate clears the declared 8-observation display minimum "
+            "but remains a small-sample result. Treat its sign and magnitude as fragile.",
+            icon=":material/science:",
+        )
 
     selected_pairs = pairs.loc[
         (pairs["model_id"] == model_id)
