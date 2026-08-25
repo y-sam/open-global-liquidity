@@ -139,6 +139,13 @@ point_in_time_pilot:
     forward_horizons_months: [1, 3, 6, 12]
     correlation_min_periods: 12
     non_overlapping_correlation_min_periods: 8
+    primary_bitcoin_specification:
+      classification: model_assumption
+      model_id: model_b
+      publication_lag_weeks: 1
+      sample_policy: non_overlapping
+      forward_horizons_months: [1, 3, 6, 12]
+      description: Test primary Bitcoin specification
 """.strip(),
         encoding="utf-8",
     )

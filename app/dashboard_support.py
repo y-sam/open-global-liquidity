@@ -246,6 +246,8 @@ BITCOIN_REGIME_SUMMARY_COLUMNS = [
     "mean_maximum_upside",
     "mean_maximum_downside",
     "mean_maximum_drawdown",
+    "specification_role",
+    "specification_classification",
     "classification",
 ]
 
@@ -261,6 +263,8 @@ BITCOIN_REVISION_SUMMARY_COLUMNS = [
     "correlation_difference",
     "mean_absolute_momentum_revision",
     "regime_agreement_share",
+    "specification_role",
+    "specification_classification",
     "classification",
 ]
 
@@ -781,6 +785,16 @@ def load_bitcoin_regime_summary(path: Path) -> pd.DataFrame:
         raise DashboardDataError("Bitcoin regime summary has an unsupported sample policy")
     if set(result["classification"]) != {"descriptive_statistic"}:
         raise DashboardDataError("Bitcoin regime summary has an unsupported classification")
+    if not set(result["specification_role"]).issubset({"primary", "robustness_check"}):
+        raise DashboardDataError("Bitcoin regime summary has an unsupported specification role")
+    if set(result["specification_classification"]) != {"model_assumption"}:
+        raise DashboardDataError("Bitcoin regime summary misclassifies its specification role")
+    primary = result.loc[result["specification_role"] == "primary"]
+    if primary.empty or any(
+        primary[column].nunique() != 1
+        for column in ["model_id", "publication_lag_weeks", "sample_policy"]
+    ):
+        raise DashboardDataError("Bitcoin regime summary has an ambiguous primary specification")
     invalid_ranges = (
         result["observations"].le(0)
         | ~result["positive_share"].between(0, 1)
@@ -825,6 +839,12 @@ def load_bitcoin_revision_summary(path: Path) -> pd.DataFrame:
         raise DashboardDataError("Bitcoin revision summary has an unsupported sample policy")
     if set(result["classification"]) != {"descriptive_statistic"}:
         raise DashboardDataError("Bitcoin revision summary has an unsupported classification")
+    if not set(result["specification_role"]).issubset({"primary", "robustness_check"}):
+        raise DashboardDataError("Bitcoin revision summary has an unsupported specification role")
+    if set(result["specification_classification"]) != {"model_assumption"}:
+        raise DashboardDataError("Bitcoin revision summary misclassifies its specification role")
+    if result.loc[result["specification_role"] == "primary"].empty:
+        raise DashboardDataError("Bitcoin revision summary has no primary specification")
     invalid_ranges = (
         result["observations"].le(0)
         | result["mean_absolute_momentum_revision"].lt(0)

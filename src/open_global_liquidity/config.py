@@ -144,6 +144,18 @@ class MarketResearchSubperiod:
 
 
 @dataclass(frozen=True, slots=True)
+class BitcoinPrimarySpecification:
+    """Predeclared Bitcoin display policy, classified as a model assumption."""
+
+    classification: str
+    model_id: str
+    publication_lag_weeks: int
+    sample_policy: str
+    forward_horizons_months: tuple[int, ...]
+    description: str
+
+
+@dataclass(frozen=True, slots=True)
 class PointInTimePilotConfig:
     """Predeclared information-date policy for the monthly vintage pilot."""
 
@@ -155,6 +167,7 @@ class PointInTimePilotConfig:
     market_forward_horizons_months: tuple[int, ...]
     market_correlation_min_periods: int
     market_non_overlapping_correlation_min_periods: int
+    primary_bitcoin_specification: BitcoinPrimarySpecification
 
 
 @dataclass(frozen=True, slots=True)
@@ -306,7 +319,10 @@ def load_model_config(path: Path) -> ModelConfig:
     ogli = _parse_ogli_config(payload.get("ogli"))
     market_alignment = _parse_market_alignment(payload.get("market_alignment"))
     market_analysis = _parse_market_analysis(payload.get("market_analysis"))
-    point_in_time_pilot = _parse_point_in_time_pilot(payload.get("point_in_time_pilot"))
+    point_in_time_pilot = _parse_point_in_time_pilot(
+        payload.get("point_in_time_pilot"),
+        model_ids={model.model_id for model in models},
+    )
     return ModelConfig(
         alignment=alignment,
         models=tuple(models),
@@ -317,7 +333,7 @@ def load_model_config(path: Path) -> ModelConfig:
     )
 
 
-def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
+def _parse_point_in_time_pilot(raw: Any, *, model_ids: set[str]) -> PointInTimePilotConfig:
     if not isinstance(raw, dict):
         raise ConfigurationError("point_in_time_pilot must be a mapping")
     required = {
@@ -351,6 +367,7 @@ def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
         "forward_horizons_months",
         "correlation_min_periods",
         "non_overlapping_correlation_min_periods",
+        "primary_bitcoin_specification",
     }
     market_missing = sorted(market_required - market.keys())
     if market_missing:
@@ -386,6 +403,12 @@ def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
         raise ConfigurationError(
             "point-in-time non_overlapping_correlation_min_periods must be at least 3"
         )
+    primary = _parse_primary_bitcoin_specification(
+        market["primary_bitcoin_specification"],
+        model_ids=model_ids,
+        available_lags=lags,
+        available_horizons=horizons,
+    )
     return PointInTimePilotConfig(
         classification=str(raw["classification"]),
         frequency=str(raw["frequency"]),
@@ -395,6 +418,65 @@ def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
         market_forward_horizons_months=horizons,
         market_correlation_min_periods=min_periods,
         market_non_overlapping_correlation_min_periods=non_overlapping_min_periods,
+        primary_bitcoin_specification=primary,
+    )
+
+
+def _parse_primary_bitcoin_specification(
+    raw: Any,
+    *,
+    model_ids: set[str],
+    available_lags: tuple[int, ...],
+    available_horizons: tuple[int, ...],
+) -> BitcoinPrimarySpecification:
+    if not isinstance(raw, dict):
+        raise ConfigurationError("primary_bitcoin_specification must be a mapping")
+    required = {
+        "classification",
+        "model_id",
+        "publication_lag_weeks",
+        "sample_policy",
+        "forward_horizons_months",
+        "description",
+    }
+    missing = sorted(required - raw.keys())
+    if missing:
+        raise ConfigurationError(
+            "primary_bitcoin_specification is missing fields: " + ", ".join(missing)
+        )
+    if raw["classification"] != "model_assumption":
+        raise ConfigurationError("primary_bitcoin_specification must be a model_assumption")
+    model_id = str(raw["model_id"])
+    if model_id not in model_ids:
+        raise ConfigurationError("primary_bitcoin_specification model_id is not configured")
+    try:
+        lag = int(raw["publication_lag_weeks"])
+        horizons = tuple(int(item) for item in raw["forward_horizons_months"])
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError("primary Bitcoin lag and horizons must be integers") from exc
+    if lag not in available_lags:
+        raise ConfigurationError("primary Bitcoin lag must be available in the point-in-time pilot")
+    if (
+        not horizons
+        or horizons != tuple(sorted(set(horizons)))
+        or not set(horizons).issubset(available_horizons)
+    ):
+        raise ConfigurationError(
+            "primary Bitcoin horizons must be unique, increasing, and available in the pilot"
+        )
+    sample_policy = str(raw["sample_policy"])
+    if sample_policy not in {"overlapping", "non_overlapping"}:
+        raise ConfigurationError("primary Bitcoin sample_policy is unsupported")
+    description = str(raw["description"]).strip()
+    if not description:
+        raise ConfigurationError("primary Bitcoin description cannot be empty")
+    return BitcoinPrimarySpecification(
+        classification="model_assumption",
+        model_id=model_id,
+        publication_lag_weeks=lag,
+        sample_policy=sample_policy,
+        forward_horizons_months=horizons,
+        description=description,
     )
 
 

@@ -3,6 +3,7 @@ import pytest
 
 from open_global_liquidity.analysis.bitcoin import (
     build_bitcoin_research_outcomes,
+    label_bitcoin_specification_role,
     summarize_bitcoin_regimes,
     summarize_bitcoin_revision_comparison,
 )
@@ -115,3 +116,22 @@ def test_bitcoin_summaries_keep_regimes_transitions_and_revision_labels() -> Non
     assert regimes.loc[regimes["observations"] >= 2, "mean_return_ci_lower"].notna().all()
     assert revisions["regime_agreement_share"].eq(1.0).all()
     assert revisions["observations"].eq(4).all()
+
+
+def test_primary_bitcoin_specification_is_a_label_not_a_calculation() -> None:
+    outcomes = build_bitcoin_research_outcomes(_pairs(), _levels(), _comparison())
+    summary = summarize_bitcoin_regimes(outcomes)
+
+    labeled = label_bitcoin_specification_role(
+        summary,
+        model_id="model_b",
+        publication_lag_weeks=0,
+        sample_policy="non_overlapping",
+        forward_horizons_months=(1,),
+    )
+
+    primary = labeled.loc[labeled["specification_role"] == "primary"]
+    assert not primary.empty
+    assert set(primary["sample_policy"]) == {"non_overlapping"}
+    assert set(labeled["specification_classification"]) == {"model_assumption"}
+    pd.testing.assert_series_equal(labeled["mean_return"], summary["mean_return"])

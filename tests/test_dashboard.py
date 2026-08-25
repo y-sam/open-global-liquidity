@@ -332,6 +332,7 @@ def test_loads_published_bitcoin_research_snapshots() -> None:
 
     assert set(outcomes["market_id"]) == {"bitcoin"}
     assert regimes["mean_return_ci_lower"].notna().any()
+    assert set(regimes.loc[regimes["specification_role"] == "primary", "model_id"]) == {"model_b"}
     assert revisions["regime_agreement_share"].between(0, 1).all()
 
 

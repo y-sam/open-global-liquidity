@@ -87,6 +87,12 @@ def test_load_model_config() -> None:
     assert config.point_in_time_pilot.market_publication_lag_weeks == (0, 1, 2, 4)
     assert config.point_in_time_pilot.market_forward_horizons_months == (1, 3, 6, 12)
     assert config.point_in_time_pilot.market_non_overlapping_correlation_min_periods == 8
+    primary = config.point_in_time_pilot.primary_bitcoin_specification
+    assert primary.classification == "model_assumption"
+    assert primary.model_id == "model_b"
+    assert primary.publication_lag_weeks == 1
+    assert primary.sample_policy == "non_overlapping"
+    assert primary.forward_horizons_months == (1, 3, 6, 12)
 
 
 def test_model_config_rejects_ogli_weights_that_do_not_sum_to_one(tmp_path: Path) -> None:

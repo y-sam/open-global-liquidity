@@ -61,6 +61,8 @@ REGIME_SUMMARY_COLUMNS = [
     "mean_maximum_upside",
     "mean_maximum_downside",
     "mean_maximum_drawdown",
+    "specification_role",
+    "specification_classification",
     "classification",
 ]
 
@@ -76,6 +78,8 @@ REVISION_SUMMARY_COLUMNS = [
     "correlation_difference",
     "mean_absolute_momentum_revision",
     "regime_agreement_share",
+    "specification_role",
+    "specification_classification",
     "classification",
 ]
 
@@ -333,6 +337,39 @@ def summarize_bitcoin_revision_comparison(
         .sort_values(["model_id", "sample_policy", "publication_lag_weeks", "horizon_months"])
         .reset_index(drop=True)
     )
+
+
+def label_bitcoin_specification_role(
+    summary: pd.DataFrame,
+    *,
+    model_id: str,
+    publication_lag_weeks: int,
+    sample_policy: str,
+    forward_horizons_months: tuple[int, ...],
+) -> pd.DataFrame:
+    """Label predeclared primary rows without changing their calculated statistics.
+
+    The designation is a model assumption used for presentation and interpretation. It is not an
+    empirical calibration, and every non-primary row remains available as a robustness check.
+    """
+    required = {"model_id", "publication_lag_weeks", "sample_policy", "horizon_months"}
+    missing = sorted(required - set(summary.columns))
+    if missing:
+        raise BitcoinResearchError("Bitcoin summary is missing: " + ", ".join(missing))
+    if sample_policy not in {"overlapping", "non_overlapping"}:
+        raise BitcoinResearchError("Primary Bitcoin sample policy is unsupported")
+    if not forward_horizons_months:
+        raise BitcoinResearchError("Primary Bitcoin horizons cannot be empty")
+    result = summary.copy()
+    primary = (
+        result["model_id"].eq(model_id)
+        & result["publication_lag_weeks"].eq(publication_lag_weeks)
+        & result["sample_policy"].eq(sample_policy)
+        & result["horizon_months"].isin(forward_horizons_months)
+    )
+    result["specification_role"] = primary.map({True: "primary", False: "robustness_check"})
+    result["specification_classification"] = "model_assumption"
+    return result
 
 
 def _transition_label(row: pd.Series) -> str:

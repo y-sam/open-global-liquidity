@@ -397,6 +397,19 @@ and explicitly warning that small samples are fragile. A stricter investable
 backtest still requires source-specific publication timestamps and availability rules; the
 published index therefore remains clearly labeled current-vintage.
 
+### Primary Bitcoin research specification
+
+The landing page emphasizes a predeclared point-in-time Bitcoin specification: **Model B — Net Fed
+liquidity proxy**, a **one-week assumed availability delay**, **non-overlapping outcome windows**,
+and **1-, 3-, 6-, and 12-month horizons**. This designation is stored in `config/model.yaml`,
+validated by the package, and attached to the published summary rows as a `model_assumption`.
+
+This is a presentation and interpretation policy, not an empirical calibration. It was selected to
+use the commonly discussed net-liquidity proxy, allow a conservative delay between observation and
+signal use, and reduce dependence between outcome windows. All other models, delays, and the larger
+overlapping samples remain visible as robustness checks. Bitcoin outcomes never enter the OGLI
+calculation, and the primary designation does not imply forecast validity or investment utility.
+
 Published snapshots are auditable at the bundle level through
 `data/reference/dashboard_snapshot_manifest.json`. Its generation timestamp is distinct from each
 series' observation and retrieval timestamps. The manifest's source commit identifies the code used

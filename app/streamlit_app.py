@@ -773,11 +773,10 @@ def landing_page() -> None:
             )
 
         try:
-            comparisons, correlations, market_origin = _market_data()
+            comparisons, _correlations, market_origin = _market_data()
             ogli_data, _ogli_origin = _ogli_data()
         except DashboardDataError:
             comparisons = None
-            correlations = pd.DataFrame()
             ogli_data = pd.DataFrame()
             market_origin = "Unavailable"
 
@@ -790,24 +789,10 @@ def landing_page() -> None:
             latest_ogli = ogli_data.loc[
                 (ogli_data["model_id"] == "model_b") & ogli_data["ogli"].notna()
             ]
-            relationship = correlations.loc[
-                (correlations["model_id"] == "model_b")
-                & (correlations["market_id"] == "bitcoin")
-                & (correlations["horizon_weeks"] == 12)
-                & (correlations["analysis_mode"] == "available_information")
-                & (correlations["sample_policy"] == "non_overlapping")
-            ]
-            if relationship.empty:
-                relationship = correlations.loc[
-                    (correlations["model_id"] == "model_b")
-                    & (correlations["market_id"] == "bitcoin")
-                    & (correlations["horizon_weeks"] == 12)
-                ]
-            if not current_btc.empty and not latest_ogli.empty and not relationship.empty:
+            if not current_btc.empty and not latest_ogli.empty:
                 btc_row = current_btc.iloc[-1]
                 ogli_row = latest_ogli.iloc[-1]
-                relationship_row = relationship.iloc[0]
-                st.subheader("Bitcoin and liquidity momentum")
+                st.subheader("Current Bitcoin and liquidity snapshot")
                 with st.container(horizontal=True):
                     bitcoin_price = btc_row.get("value")
                     if pd.notna(bitcoin_price):
@@ -823,16 +808,68 @@ def landing_page() -> None:
                         str(ogli_row["regime"]),
                         border=True,
                     )
-                    correlation = relationship_row["correlation"]
                     st.metric(
-                        "BTC correlation · 12w forward",
-                        "Insufficient history" if pd.isna(correlation) else f"{correlation:+.2f}",
-                        f"{int(relationship_row['observations']):,} paired observations",
+                        "Research status",
+                        "Point-in-time",
+                        "Primary specification predeclared",
                         border=True,
                     )
                 st.caption(
                     f"Bitcoin data through {btc_row['date']:%Y-%m-%d} · {market_origin} · "
-                    "Correlation is descriptive, not a forecast."
+                    "Market outcomes are never inputs to OGLI."
+                )
+
+        try:
+            bitcoin_research = _bitcoin_research_data()
+        except DashboardDataError:
+            bitcoin_research = None
+        if bitcoin_research is not None:
+            _outcomes, regime_summaries, _revisions, research_origin = bitcoin_research
+            primary = regime_summaries.loc[
+                (regime_summaries["specification_role"] == "primary")
+                & (regime_summaries["analysis_dimension"] == "overall")
+            ].sort_values("horizon_months")
+            if not primary.empty:
+                st.subheader("Primary point-in-time Bitcoin study")
+                st.badge(
+                    "Model B · 1-week availability delay · non-overlapping outcomes",
+                    icon=":material/check_circle:",
+                    color="blue",
+                )
+                with st.container(horizontal=True):
+                    for row in primary.itertuples(index=False):
+                        horizon_label = (
+                            f"{row.horizon_months}-month" if row.horizon_months != 1 else "1-month"
+                        )
+                        st.metric(
+                            f"{horizon_label} BTC outcome",
+                            f"{row.mean_return:.1%} mean",
+                            f"{row.positive_share:.0%} positive · n={row.observations}",
+                            border=True,
+                            help=(
+                                f"Descriptive arithmetic mean. Classical 95% interval: "
+                                f"{row.mean_return_ci_lower:.1%} to "
+                                f"{row.mean_return_ci_upper:.1%}."
+                            ),
+                        )
+                st.caption(
+                    f"Data mode: {research_origin}. The primary designation is a transparent "
+                    "Open Global Liquidity model assumption, selected for interpretability—not "
+                    "calibrated to maximize Bitcoin returns or correlation. Alternative models, "
+                    "lags, and overlapping samples remain available as robustness checks."
+                )
+                if primary["observations"].min() < 8:
+                    sparse = primary.loc[primary["observations"].idxmin()]
+                    st.warning(
+                        f"The {int(sparse['horizon_months'])}-month primary estimate currently "
+                        f"contains only {int(sparse['observations'])} non-overlapping outcomes. "
+                        "Treat its magnitude and sign as especially fragile.",
+                        icon=":material/science:",
+                    )
+                st.page_link(
+                    bitcoin_page,
+                    label="Open the full Bitcoin research workspace",
+                    icon=":material/currency_bitcoin:",
                 )
 
     st.subheader("A practical way to think about global liquidity")
@@ -1185,10 +1222,37 @@ def bitcoin_research_page() -> None:
         return
     outcomes, regime_summaries, revision_summaries, data_origin = loaded
 
+    primary_rows = regime_summaries.loc[
+        (regime_summaries["specification_role"] == "primary")
+        & (regime_summaries["analysis_dimension"] == "overall")
+    ]
+    primary_model_id = str(primary_rows["model_id"].iloc[0])
+    primary_lag = int(primary_rows["publication_lag_weeks"].iloc[0])
+    primary_horizons = sorted(primary_rows["horizon_months"].unique())
+    primary_sample_label = (
+        "Non-overlapping"
+        if primary_rows["sample_policy"].iloc[0] == "non_overlapping"
+        else "Overlapping"
+    )
+    st.badge(
+        "Primary: Model B · 1-week delay · non-overlapping · 1/3/6/12 months",
+        icon=":material/check_circle:",
+        color="blue",
+    )
+    st.caption(
+        "This primary display policy is a predeclared model assumption. Change any control to "
+        "inspect robustness alternatives; no Bitcoin outcome was used to calculate OGLI."
+    )
+
     model_options = dict(
         outcomes[["model_name", "model_id"]].drop_duplicates().itertuples(index=False)
     )
     default_name = "Model B — Net Fed liquidity proxy"
+    default_name = next(
+        name
+        for name, configured_model_id in model_options.items()
+        if configured_model_id == primary_model_id
+    )
     with st.sidebar:
         st.header("Bitcoin research controls")
         selected_name = st.selectbox(
@@ -1200,21 +1264,23 @@ def bitcoin_research_page() -> None:
         horizon = st.selectbox(
             "Forward horizon",
             sorted(outcomes["horizon_months"].unique()),
-            index=1,
+            index=sorted(outcomes["horizon_months"].unique()).index(
+                3 if 3 in primary_horizons else primary_horizons[0]
+            ),
             format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
             key="bitcoin_horizon",
         )
         publication_lag = st.selectbox(
             "Assumed availability delay",
             sorted(outcomes["publication_lag_weeks"].unique()),
-            index=1,
+            index=sorted(outcomes["publication_lag_weeks"].unique()).index(primary_lag),
             format_func=lambda value: f"{value} week{'s' if value != 1 else ''}",
             key="bitcoin_lag",
         )
         sample_policy = st.segmented_control(
             "Sample",
             ["Non-overlapping", "Overlapping"],
-            default="Non-overlapping",
+            default=primary_sample_label,
             key="bitcoin_sample",
         )
         st.caption(f"Data mode: {data_origin}")
@@ -1233,6 +1299,19 @@ def bitcoin_research_page() -> None:
     )
     model_id = model_options[selected_name]
     sample_key = "non_overlapping" if sample_policy == "Non-overlapping" else "overlapping"
+    selected_is_primary = (
+        model_id == primary_model_id
+        and publication_lag == primary_lag
+        and sample_key == str(primary_rows["sample_policy"].iloc[0])
+        and horizon in primary_horizons
+    )
+    st.badge(
+        "Selected controls: Primary specification"
+        if selected_is_primary
+        else "Selected controls: Robustness check",
+        icon=":material/check_circle:" if selected_is_primary else ":material/science:",
+        color="green" if selected_is_primary else "gray",
+    )
     selected = outcomes.loc[
         (outcomes["model_id"] == model_id)
         & (outcomes["horizon_months"] == horizon)

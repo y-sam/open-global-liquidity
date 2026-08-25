@@ -14,6 +14,7 @@ from dotenv import load_dotenv
 from open_global_liquidity.analysis.bitcoin import (
     BitcoinResearchError,
     build_bitcoin_research_outcomes,
+    label_bitcoin_specification_role,
     summarize_bitcoin_regimes,
     summarize_bitcoin_revision_comparison,
 )
@@ -149,6 +150,14 @@ def run_point_in_time_pipeline(
         bitcoin_outcomes,
         confidence_level=config.market_analysis.confidence_level,
     )
+    primary = config.point_in_time_pilot.primary_bitcoin_specification
+    bitcoin_regimes = label_bitcoin_specification_role(
+        bitcoin_regimes,
+        model_id=primary.model_id,
+        publication_lag_weeks=primary.publication_lag_weeks,
+        sample_policy=primary.sample_policy,
+        forward_horizons_months=primary.forward_horizons_months,
+    )
     bitcoin_regimes_path = output_dir / "us_point_in_time_bitcoin_regimes.parquet"
     bitcoin_regimes.to_parquet(bitcoin_regimes_path, index=False)
     bitcoin_revisions = summarize_bitcoin_revision_comparison(
@@ -157,6 +166,13 @@ def run_point_in_time_pipeline(
         non_overlapping_min_periods=(
             config.point_in_time_pilot.market_non_overlapping_correlation_min_periods
         ),
+    )
+    bitcoin_revisions = label_bitcoin_specification_role(
+        bitcoin_revisions,
+        model_id=primary.model_id,
+        publication_lag_weeks=primary.publication_lag_weeks,
+        sample_policy=primary.sample_policy,
+        forward_horizons_months=primary.forward_horizons_months,
     )
     bitcoin_revisions_path = output_dir / "us_point_in_time_bitcoin_revisions.parquet"
     bitcoin_revisions.to_parquet(bitcoin_revisions_path, index=False)
