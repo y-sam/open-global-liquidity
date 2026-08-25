@@ -4,6 +4,7 @@ import pytest
 from open_global_liquidity.analysis.bitcoin import (
     build_bitcoin_research_outcomes,
     label_bitcoin_specification_role,
+    summarize_bitcoin_directional_contrasts,
     summarize_bitcoin_regimes,
     summarize_bitcoin_revision_comparison,
 )
@@ -135,3 +136,20 @@ def test_primary_bitcoin_specification_is_a_label_not_a_calculation() -> None:
     assert set(primary["sample_policy"]) == {"non_overlapping"}
     assert set(labeled["specification_classification"]) == {"model_assumption"}
     pd.testing.assert_series_equal(labeled["mean_return"], summary["mean_return"])
+
+
+def test_directional_contrast_uses_vintage_regimes_and_labels_small_samples() -> None:
+    outcomes = build_bitcoin_research_outcomes(_pairs(), _levels(), _comparison())
+
+    contrasts = summarize_bitcoin_directional_contrasts(
+        outcomes,
+        expansionary_regimes=("Above normal", "Expansion", "Strong expansion"),
+        contractionary_regimes=("Below normal", "Contraction", "Strong contraction"),
+    )
+
+    overlapping = contrasts.loc[contrasts["sample_policy"] == "overlapping"].iloc[0]
+    assert overlapping["expansionary_observations"] == 2
+    assert overlapping["contractionary_observations"] == 1
+    assert overlapping["mean_return_spread"] == pytest.approx(-0.045)
+    assert pd.isna(overlapping["spread_ci_lower"])
+    assert overlapping["regime_group_classification"] == "model_assumption"

@@ -156,6 +156,17 @@ class BitcoinPrimarySpecification:
 
 
 @dataclass(frozen=True, slots=True)
+class BitcoinDirectionalRegimeConfig:
+    """Predeclared grouping used for directional Bitcoin regime contrasts."""
+
+    classification: str
+    expansionary: tuple[str, ...]
+    contractionary: tuple[str, ...]
+    excluded: tuple[str, ...]
+    description: str
+
+
+@dataclass(frozen=True, slots=True)
 class PointInTimePilotConfig:
     """Predeclared information-date policy for the monthly vintage pilot."""
 
@@ -167,6 +178,7 @@ class PointInTimePilotConfig:
     market_forward_horizons_months: tuple[int, ...]
     market_correlation_min_periods: int
     market_non_overlapping_correlation_min_periods: int
+    bitcoin_directional_regimes: BitcoinDirectionalRegimeConfig
     primary_bitcoin_specification: BitcoinPrimarySpecification
 
 
@@ -367,6 +379,7 @@ def _parse_point_in_time_pilot(raw: Any, *, model_ids: set[str]) -> PointInTimeP
         "forward_horizons_months",
         "correlation_min_periods",
         "non_overlapping_correlation_min_periods",
+        "bitcoin_directional_regimes",
         "primary_bitcoin_specification",
     }
     market_missing = sorted(market_required - market.keys())
@@ -409,6 +422,7 @@ def _parse_point_in_time_pilot(raw: Any, *, model_ids: set[str]) -> PointInTimeP
         available_lags=lags,
         available_horizons=horizons,
     )
+    directional_regimes = _parse_bitcoin_directional_regimes(market["bitcoin_directional_regimes"])
     return PointInTimePilotConfig(
         classification=str(raw["classification"]),
         frequency=str(raw["frequency"]),
@@ -418,7 +432,53 @@ def _parse_point_in_time_pilot(raw: Any, *, model_ids: set[str]) -> PointInTimeP
         market_forward_horizons_months=horizons,
         market_correlation_min_periods=min_periods,
         market_non_overlapping_correlation_min_periods=non_overlapping_min_periods,
+        bitcoin_directional_regimes=directional_regimes,
         primary_bitcoin_specification=primary,
+    )
+
+
+def _parse_bitcoin_directional_regimes(raw: Any) -> BitcoinDirectionalRegimeConfig:
+    if not isinstance(raw, dict):
+        raise ConfigurationError("bitcoin_directional_regimes must be a mapping")
+    required = {"classification", "expansionary", "contractionary", "excluded", "description"}
+    missing = sorted(required - raw.keys())
+    if missing:
+        raise ConfigurationError("bitcoin_directional_regimes is missing: " + ", ".join(missing))
+    if raw["classification"] != "model_assumption":
+        raise ConfigurationError("bitcoin_directional_regimes must be a model_assumption")
+    groups: dict[str, tuple[str, ...]] = {}
+    for name in ("expansionary", "contractionary", "excluded"):
+        values = raw[name]
+        if (
+            not isinstance(values, list)
+            or not values
+            or not all(isinstance(value, str) and value.strip() for value in values)
+        ):
+            raise ConfigurationError(f"bitcoin_directional_regimes.{name} must be a string list")
+        groups[name] = tuple(values)
+    configured = [value for values in groups.values() for value in values]
+    expected = {
+        "Strong contraction",
+        "Contraction",
+        "Below normal",
+        "Neutral",
+        "Above normal",
+        "Expansion",
+        "Strong expansion",
+    }
+    if len(configured) != len(set(configured)) or set(configured) != expected:
+        raise ConfigurationError(
+            "bitcoin_directional_regimes must assign every OGLI regime exactly once"
+        )
+    description = str(raw["description"]).strip()
+    if not description:
+        raise ConfigurationError("bitcoin_directional_regimes description cannot be empty")
+    return BitcoinDirectionalRegimeConfig(
+        classification="model_assumption",
+        expansionary=groups["expansionary"],
+        contractionary=groups["contractionary"],
+        excluded=groups["excluded"],
+        description=description,
     )
 
 

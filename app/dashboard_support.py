@@ -268,6 +268,32 @@ BITCOIN_REVISION_SUMMARY_COLUMNS = [
     "classification",
 ]
 
+BITCOIN_CONTRAST_SUMMARY_COLUMNS = [
+    "model_id",
+    "model_name",
+    "publication_lag_weeks",
+    "horizon_months",
+    "sample_policy",
+    "expansionary_observations",
+    "contractionary_observations",
+    "expansionary_mean_return",
+    "contractionary_mean_return",
+    "expansionary_median_return",
+    "contractionary_median_return",
+    "expansionary_positive_share",
+    "contractionary_positive_share",
+    "mean_return_spread",
+    "spread_standard_error",
+    "confidence_level",
+    "spread_ci_lower",
+    "spread_ci_upper",
+    "interval_method",
+    "regime_group_classification",
+    "specification_role",
+    "specification_classification",
+    "classification",
+]
+
 COMPONENT_LABELS = {
     "fed_assets": "Fed total assets",
     "treasury_general_account": "Treasury General Account",
@@ -853,6 +879,48 @@ def load_bitcoin_revision_summary(path: Path) -> pd.DataFrame:
     correlations = result[["vintage_signal_correlation", "current_vintage_signal_correlation"]]
     if invalid_ranges.any() or correlations.abs().gt(1).any().any():
         raise DashboardDataError("Bitcoin revision summary contains invalid statistics")
+    return result.sort_values(
+        ["model_id", "sample_policy", "publication_lag_weeks", "horizon_months"]
+    ).reset_index(drop=True)
+
+
+def load_bitcoin_contrast_summary(path: Path) -> pd.DataFrame:
+    """Load directional expansionary-minus-contractionary Bitcoin return contrasts."""
+    frame = _read_parquet(path, "Bitcoin directional contrast summary")
+    missing = sorted(set(BITCOIN_CONTRAST_SUMMARY_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Bitcoin contrast summary is missing: " + ", ".join(missing))
+    result = frame[BITCOIN_CONTRAST_SUMMARY_COLUMNS].copy()
+    if result.empty or not set(result["sample_policy"]).issubset(
+        {"overlapping", "non_overlapping"}
+    ):
+        raise DashboardDataError("Bitcoin contrast summary has an unsupported sample policy")
+    if set(result["classification"]) != {"descriptive_statistic"}:
+        raise DashboardDataError("Bitcoin contrast summary has an unsupported classification")
+    if set(result["regime_group_classification"]) != {"model_assumption"}:
+        raise DashboardDataError("Bitcoin contrast summary misclassifies its regime groups")
+    if set(result["specification_classification"]) != {"model_assumption"}:
+        raise DashboardDataError("Bitcoin contrast summary misclassifies its specification role")
+    if not set(result["specification_role"]).issubset({"primary", "robustness_check"}):
+        raise DashboardDataError("Bitcoin contrast summary has an unsupported specification role")
+    if result.loc[result["specification_role"] == "primary"].empty:
+        raise DashboardDataError("Bitcoin contrast summary has no primary specification")
+    count_columns = ["expansionary_observations", "contractionary_observations"]
+    share_columns = ["expansionary_positive_share", "contractionary_positive_share"]
+    if (
+        result[count_columns].lt(0).any().any()
+        or not result[share_columns].apply(lambda column: column.dropna().between(0, 1).all()).all()
+    ):
+        raise DashboardDataError("Bitcoin contrast summary contains invalid statistics")
+    complete_intervals = (
+        result[["spread_ci_lower", "mean_return_spread", "spread_ci_upper"]].notna().all(axis=1)
+    )
+    invalid_intervals = complete_intervals & (
+        result["spread_ci_lower"].gt(result["mean_return_spread"])
+        | result["spread_ci_upper"].lt(result["mean_return_spread"])
+    )
+    if invalid_intervals.any():
+        raise DashboardDataError("Bitcoin contrast summary contains an invalid interval")
     return result.sort_values(
         ["model_id", "sample_policy", "publication_lag_weeks", "horizon_months"]
     ).reset_index(drop=True)

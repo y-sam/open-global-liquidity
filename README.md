@@ -239,6 +239,9 @@ artifacts plus a JSON provenance manifest:
   OGLI regime, and by expansionary/contractionary transition direction.
 - `data/reference/us_point_in_time_bitcoin_revisions_snapshot.parquet` — real-time-vintage versus
   recomputed-today signal correlations, regime agreement, and revision magnitudes.
+- `data/reference/us_point_in_time_bitcoin_contrasts_snapshot.parquet` — predeclared directional
+  regime comparisons reporting expansionary and contractionary Bitcoin outcomes, their arithmetic
+  mean spread, group sample sizes, and a descriptive Welch interval.
 - `data/reference/dashboard_snapshot_manifest.json` — generation time, pipeline version, source
   commit, row/date coverage, and SHA-256 digest for every published Parquet file.
 
@@ -409,6 +412,15 @@ use the commonly discussed net-liquidity proxy, allow a conservative delay betwe
 signal use, and reduce dependence between outcome windows. All other models, delays, and the larger
 overlapping samples remain visible as robustness checks. Bitcoin outcomes never enter the OGLI
 calculation, and the primary designation does not imply forecast validity or investment utility.
+
+The primary landing-page comparison reports the mean Bitcoin return after expansionary
+point-in-time regimes minus the mean after contractionary point-in-time regimes. `Above normal`,
+`Expansion`, and `Strong expansion` form the expansionary group; `Below normal`, `Contraction`, and
+`Strong contraction` form the contractionary group; `Neutral` observations are excluded. This
+grouping is a declared `model_assumption`. The spread's classical Welch interval permits unequal
+group variances but does not correct for serial dependence, multiple comparisons, revisions, or
+small-sample selection. An interval crossing zero is not evidence of a stable directional
+relationship, and no contrast is used to calculate or calibrate OGLI.
 
 Published snapshots are auditable at the bundle level through
 `data/reference/dashboard_snapshot_manifest.json`. Its generation timestamp is distinct from each

@@ -15,6 +15,7 @@ from open_global_liquidity.analysis.bitcoin import (
     BitcoinResearchError,
     build_bitcoin_research_outcomes,
     label_bitcoin_specification_role,
+    summarize_bitcoin_directional_contrasts,
     summarize_bitcoin_regimes,
     summarize_bitcoin_revision_comparison,
 )
@@ -176,11 +177,29 @@ def run_point_in_time_pipeline(
     )
     bitcoin_revisions_path = output_dir / "us_point_in_time_bitcoin_revisions.parquet"
     bitcoin_revisions.to_parquet(bitcoin_revisions_path, index=False)
+    directional = config.point_in_time_pilot.bitcoin_directional_regimes
+    bitcoin_contrasts = summarize_bitcoin_directional_contrasts(
+        bitcoin_outcomes,
+        expansionary_regimes=directional.expansionary,
+        contractionary_regimes=directional.contractionary,
+        confidence_level=config.market_analysis.confidence_level,
+    )
+    bitcoin_contrasts = label_bitcoin_specification_role(
+        bitcoin_contrasts,
+        model_id=primary.model_id,
+        publication_lag_weeks=primary.publication_lag_weeks,
+        sample_policy=primary.sample_policy,
+        forward_horizons_months=primary.forward_horizons_months,
+    )
+    bitcoin_contrasts_path = output_dir / "us_point_in_time_bitcoin_contrasts.parquet"
+    bitcoin_contrasts.to_parquet(bitcoin_contrasts_path, index=False)
     LOGGER.info(
-        "Wrote %d Bitcoin outcomes, %d regime summaries, and %d revision comparisons",
+        "Wrote %d Bitcoin outcomes, %d regime summaries, %d revision comparisons, and %d "
+        "directional contrasts",
         len(bitcoin_outcomes),
         len(bitcoin_regimes),
         len(bitcoin_revisions),
+        len(bitcoin_contrasts),
     )
     if publish_dashboard_snapshot:
         _publish_dashboard_snapshot(
@@ -191,6 +210,7 @@ def run_point_in_time_pipeline(
             bitcoin_outcomes=bitcoin_outcomes,
             bitcoin_regimes=bitcoin_regimes,
             bitcoin_revisions=bitcoin_revisions,
+            bitcoin_contrasts=bitcoin_contrasts,
             project_root=project_root,
         )
 
@@ -258,6 +278,7 @@ def _publish_dashboard_snapshot(
     bitcoin_outcomes: pd.DataFrame | None = None,
     bitcoin_regimes: pd.DataFrame | None = None,
     bitcoin_revisions: pd.DataFrame | None = None,
+    bitcoin_contrasts: pd.DataFrame | None = None,
 ) -> Path:
     """Publish the small derived comparison and refresh whole-bundle provenance."""
     snapshot_dir = project_root / "data" / "reference"
@@ -271,6 +292,7 @@ def _publish_dashboard_snapshot(
         "us_point_in_time_bitcoin_outcomes_snapshot.parquet": bitcoin_outcomes,
         "us_point_in_time_bitcoin_regimes_snapshot.parquet": bitcoin_regimes,
         "us_point_in_time_bitcoin_revisions_snapshot.parquet": bitcoin_revisions,
+        "us_point_in_time_bitcoin_contrasts_snapshot.parquet": bitcoin_contrasts,
     }
     for filename, frame in additions.items():
         if frame is not None:

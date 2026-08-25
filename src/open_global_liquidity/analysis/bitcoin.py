@@ -83,6 +83,32 @@ REVISION_SUMMARY_COLUMNS = [
     "classification",
 ]
 
+CONTRAST_SUMMARY_COLUMNS = [
+    "model_id",
+    "model_name",
+    "publication_lag_weeks",
+    "horizon_months",
+    "sample_policy",
+    "expansionary_observations",
+    "contractionary_observations",
+    "expansionary_mean_return",
+    "contractionary_mean_return",
+    "expansionary_median_return",
+    "contractionary_median_return",
+    "expansionary_positive_share",
+    "contractionary_positive_share",
+    "mean_return_spread",
+    "spread_standard_error",
+    "confidence_level",
+    "spread_ci_lower",
+    "spread_ci_upper",
+    "interval_method",
+    "regime_group_classification",
+    "specification_role",
+    "specification_classification",
+    "classification",
+]
+
 
 def build_bitcoin_research_outcomes(
     market_pairs: pd.DataFrame,
@@ -337,6 +363,110 @@ def summarize_bitcoin_revision_comparison(
         .sort_values(["model_id", "sample_policy", "publication_lag_weeks", "horizon_months"])
         .reset_index(drop=True)
     )
+
+
+def summarize_bitcoin_directional_contrasts(
+    outcomes: pd.DataFrame,
+    *,
+    expansionary_regimes: tuple[str, ...],
+    contractionary_regimes: tuple[str, ...],
+    confidence_level: float = 0.95,
+) -> pd.DataFrame:
+    """Compare Bitcoin returns after expansionary versus contractionary vintage regimes.
+
+    The reported spread is the expansionary-group arithmetic mean minus the contractionary-group
+    arithmetic mean. Its classical Welch interval allows unequal sample variances. It is a
+    descriptive interval, not a causal estimate or forecast; serial dependence and small samples
+    can make it too narrow or unstable.
+    """
+    missing = sorted(set(OUTCOME_COLUMNS) - set(outcomes.columns))
+    if missing:
+        raise BitcoinResearchError("Bitcoin outcomes are missing: " + ", ".join(missing))
+    if not 0 < confidence_level < 1:
+        raise BitcoinResearchError("confidence_level must be between 0 and 1")
+    expansionary = set(expansionary_regimes)
+    contractionary = set(contractionary_regimes)
+    if not expansionary or not contractionary or expansionary & contractionary:
+        raise BitcoinResearchError(
+            "Directional Bitcoin regime groups must be non-empty and disjoint"
+        )
+
+    group_columns = ["model_id", "model_name", "publication_lag_weeks", "horizon_months"]
+    rows: list[dict[str, object]] = []
+    for sample_policy in ("overlapping", "non_overlapping"):
+        sample = (
+            outcomes
+            if sample_policy == "overlapping"
+            else outcomes.loc[outcomes["is_non_overlapping"]]
+        )
+        for keys, group in sample.groupby(group_columns, sort=True):
+            expansionary_returns = group.loc[
+                group["vintage_regime"].isin(expansionary), "market_return"
+            ].dropna()
+            contractionary_returns = group.loc[
+                group["vintage_regime"].isin(contractionary), "market_return"
+            ].dropna()
+            expansionary_mean = expansionary_returns.mean()
+            contractionary_mean = contractionary_returns.mean()
+            spread = expansionary_mean - contractionary_mean
+            standard_error, ci_lower, ci_upper = _welch_mean_difference_interval(
+                expansionary_returns,
+                contractionary_returns,
+                confidence_level=confidence_level,
+            )
+            rows.append(
+                {
+                    **dict(zip(group_columns, keys, strict=True)),
+                    "sample_policy": sample_policy,
+                    "expansionary_observations": len(expansionary_returns),
+                    "contractionary_observations": len(contractionary_returns),
+                    "expansionary_mean_return": expansionary_mean,
+                    "contractionary_mean_return": contractionary_mean,
+                    "expansionary_median_return": expansionary_returns.median(),
+                    "contractionary_median_return": contractionary_returns.median(),
+                    "expansionary_positive_share": expansionary_returns.gt(0).mean(),
+                    "contractionary_positive_share": contractionary_returns.gt(0).mean(),
+                    "mean_return_spread": spread,
+                    "spread_standard_error": standard_error,
+                    "confidence_level": confidence_level,
+                    "spread_ci_lower": ci_lower,
+                    "spread_ci_upper": ci_upper,
+                    "interval_method": "welch_mean_difference_t_interval",
+                    "regime_group_classification": "model_assumption",
+                    "specification_role": None,
+                    "specification_classification": None,
+                    "classification": "descriptive_statistic",
+                }
+            )
+    return (
+        pd.DataFrame(rows, columns=CONTRAST_SUMMARY_COLUMNS)
+        .sort_values(["model_id", "sample_policy", "publication_lag_weeks", "horizon_months"])
+        .reset_index(drop=True)
+    )
+
+
+def _welch_mean_difference_interval(
+    first: pd.Series,
+    second: pd.Series,
+    *,
+    confidence_level: float,
+) -> tuple[float, float, float]:
+    if len(first) < 2 or len(second) < 2:
+        return math.nan, math.nan, math.nan
+    first_component = first.var(ddof=1) / len(first)
+    second_component = second.var(ddof=1) / len(second)
+    standard_error = math.sqrt(first_component + second_component)
+    if not np.isfinite(standard_error):
+        return math.nan, math.nan, math.nan
+    spread = first.mean() - second.mean()
+    if standard_error == 0:
+        return 0.0, spread, spread
+    degrees_of_freedom = (first_component + second_component) ** 2 / (
+        first_component**2 / (len(first) - 1) + second_component**2 / (len(second) - 1)
+    )
+    critical = stats.t.ppf((1 + confidence_level) / 2, df=degrees_of_freedom)
+    margin = critical * standard_error
+    return standard_error, spread - margin, spread + margin
 
 
 def label_bitcoin_specification_role(

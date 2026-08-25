@@ -24,6 +24,7 @@ from dashboard_support import (  # noqa: E402
     latest_model_readings,
     latest_ogli_readings,
     latest_readings,
+    load_bitcoin_contrast_summary,
     load_bitcoin_outcomes,
     load_bitcoin_regime_summary,
     load_bitcoin_revision_summary,
@@ -105,6 +106,12 @@ BITCOIN_REVISIONS_PATH = (
 )
 BITCOIN_REVISIONS_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_point_in_time_bitcoin_revisions_snapshot.parquet"
+)
+BITCOIN_CONTRASTS_PATH = (
+    DATA_ROOT / "vintages" / "fred" / "monthly_pilot" / "us_point_in_time_bitcoin_contrasts.parquet"
+)
+BITCOIN_CONTRASTS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_point_in_time_bitcoin_contrasts_snapshot.parquet"
 )
 COMPONENT_ORDER = list(COMPONENT_LABELS)
 WINDOW_DAYS = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
@@ -233,6 +240,13 @@ def _load_bitcoin_revisions(path: str, modified_ns: int) -> pd.DataFrame:
     return load_bitcoin_revision_summary(Path(path))
 
 
+@st.cache_data(show_spinner=False)
+def _load_bitcoin_contrasts(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated directional Bitcoin regime contrasts."""
+    del modified_ns
+    return load_bitcoin_contrast_summary(Path(path))
+
+
 def _source_data() -> tuple[pd.DataFrame, Path, str]:
     data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
     return _load_data(str(data_path), data_path.stat().st_mtime_ns), data_path, data_origin
@@ -338,7 +352,9 @@ def _point_in_time_market_data() -> tuple[pd.DataFrame, pd.DataFrame, str] | Non
     return pairs, summary, pairs_origin
 
 
-def _bitcoin_research_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str] | None:
+def _bitcoin_research_data() -> (
+    tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, pd.DataFrame, str] | None
+):
     try:
         outcomes_path, origin = resolve_dashboard_data_path(
             BITCOIN_OUTCOMES_PATH,
@@ -352,12 +368,17 @@ def _bitcoin_research_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, 
             BITCOIN_REVISIONS_PATH,
             BITCOIN_REVISIONS_SNAPSHOT_PATH,
         )
+        contrasts_path, _ = resolve_dashboard_data_path(
+            BITCOIN_CONTRASTS_PATH,
+            BITCOIN_CONTRASTS_SNAPSHOT_PATH,
+        )
     except DashboardDataError:
         return None
     outcomes = _load_bitcoin_outcomes(str(outcomes_path), outcomes_path.stat().st_mtime_ns)
     regimes = _load_bitcoin_regimes(str(regimes_path), regimes_path.stat().st_mtime_ns)
     revisions = _load_bitcoin_revisions(str(revisions_path), revisions_path.stat().st_mtime_ns)
-    return outcomes, regimes, revisions, origin
+    contrasts = _load_bitcoin_contrasts(str(contrasts_path), contrasts_path.stat().st_mtime_ns)
+    return outcomes, regimes, revisions, contrasts, origin
 
 
 def _show_freshness(frame: pd.DataFrame, label: str, *, max_age_days: int = 14) -> None:
@@ -824,45 +845,100 @@ def landing_page() -> None:
         except DashboardDataError:
             bitcoin_research = None
         if bitcoin_research is not None:
-            _outcomes, regime_summaries, _revisions, research_origin = bitcoin_research
+            _outcomes, regime_summaries, _revisions, contrast_summaries, research_origin = (
+                bitcoin_research
+            )
             primary = regime_summaries.loc[
                 (regime_summaries["specification_role"] == "primary")
                 & (regime_summaries["analysis_dimension"] == "overall")
             ].sort_values("horizon_months")
-            if not primary.empty:
+            primary_contrasts = contrast_summaries.loc[
+                contrast_summaries["specification_role"] == "primary"
+            ].sort_values("horizon_months")
+            if not primary.empty and not primary_contrasts.empty:
                 st.subheader("Primary point-in-time Bitcoin study")
                 st.badge(
                     "Model B · 1-week availability delay · non-overlapping outcomes",
                     icon=":material/check_circle:",
                     color="blue",
                 )
+                st.markdown("**OGLI directional contrast**")
                 with st.container(horizontal=True):
-                    for row in primary.itertuples(index=False):
+                    for row in primary_contrasts.itertuples(index=False):
                         horizon_label = (
                             f"{row.horizon_months}-month" if row.horizon_months != 1 else "1-month"
                         )
+                        interval = (
+                            f"Welch 95% interval: {row.spread_ci_lower:.1%} to "
+                            f"{row.spread_ci_upper:.1%}."
+                            if pd.notna(row.spread_ci_lower)
+                            else (
+                                "Welch interval unavailable because a group has fewer than two "
+                                "observations."
+                            )
+                        )
                         st.metric(
-                            f"{horizon_label} BTC outcome",
-                            f"{row.mean_return:.1%} mean",
-                            f"{row.positive_share:.0%} positive · n={row.observations}",
+                            f"{horizon_label} return spread",
+                            f"{row.mean_return_spread:+.1%}",
+                            (
+                                f"n={row.expansionary_observations} expansionary · "
+                                f"n={row.contractionary_observations} contractionary"
+                            ),
                             border=True,
                             help=(
-                                f"Descriptive arithmetic mean. Classical 95% interval: "
-                                f"{row.mean_return_ci_lower:.1%} to "
-                                f"{row.mean_return_ci_upper:.1%}."
+                                "Expansionary-regime mean minus contractionary-regime mean. "
+                                f"Expansionary: {row.expansionary_mean_return:.1%}; "
+                                f"contractionary: {row.contractionary_mean_return:.1%}. {interval}"
                             ),
                         )
+                st.caption(
+                    "A positive spread means subsequent Bitcoin returns were higher on average "
+                    "after expansionary point-in-time OGLI regimes than after contractionary "
+                    "regimes. Neutral observations are excluded. This is descriptive association, "
+                    "not evidence of causation or a forecast."
+                )
+                with st.expander("Unconditional Bitcoin outcome baseline"):
+                    st.caption(
+                        "These figures describe all completed Bitcoin outcomes in the primary "
+                        "sample, without conditioning on OGLI. They are context—not evidence that "
+                        "the liquidity signal adds information."
+                    )
+                    with st.container(horizontal=True):
+                        for row in primary.itertuples(index=False):
+                            horizon_label = (
+                                f"{row.horizon_months}-month"
+                                if row.horizon_months != 1
+                                else "1-month"
+                            )
+                            st.metric(
+                                f"{horizon_label} BTC outcome",
+                                f"{row.mean_return:.1%} mean",
+                                f"{row.positive_share:.0%} positive · n={row.observations}",
+                                border=True,
+                            )
                 st.caption(
                     f"Data mode: {research_origin}. The primary designation is a transparent "
                     "Open Global Liquidity model assumption, selected for interpretability—not "
                     "calibrated to maximize Bitcoin returns or correlation. Alternative models, "
                     "lags, and overlapping samples remain available as robustness checks."
                 )
-                if primary["observations"].min() < 8:
-                    sparse = primary.loc[primary["observations"].idxmin()]
+                smallest_group = primary_contrasts[
+                    ["expansionary_observations", "contractionary_observations"]
+                ].min(axis=1)
+                if smallest_group.min() < 8:
+                    sparse = primary_contrasts.loc[smallest_group.idxmin()]
+                    sparse_group_size = int(
+                        min(
+                            sparse["expansionary_observations"],
+                            sparse["contractionary_observations"],
+                        )
+                    )
+                    observation_label = "observation" if sparse_group_size == 1 else "observations"
                     st.warning(
                         f"The {int(sparse['horizon_months'])}-month primary estimate currently "
-                        f"contains only {int(sparse['observations'])} non-overlapping outcomes. "
+                        "contains only "
+                        f"{sparse_group_size} "
+                        f"{observation_label} in its smaller directional group. "
                         "Treat its magnitude and sign as especially fragile.",
                         icon=":material/science:",
                     )
@@ -1220,7 +1296,7 @@ def bitcoin_research_page() -> None:
         )
         st.code("uv run ogli-point-in-time --publish-dashboard-snapshot", language="zsh")
         return
-    outcomes, regime_summaries, revision_summaries, data_origin = loaded
+    outcomes, regime_summaries, revision_summaries, contrast_summaries, data_origin = loaded
 
     primary_rows = regime_summaries.loc[
         (regime_summaries["specification_role"] == "primary")
@@ -1288,13 +1364,14 @@ def bitcoin_research_page() -> None:
     view = st.segmented_control(
         "Research view",
         [
+            "Regime contrast",
             "Across horizons",
             "Regimes",
             "Transitions",
             "Path outcomes",
             "Signal revisions",
         ],
-        default="Regimes",
+        default="Regime contrast",
         key="bitcoin_view",
     )
     model_id = model_options[selected_name]
@@ -1323,22 +1400,129 @@ def bitcoin_research_page() -> None:
         st.warning("The selected Bitcoin research sample contains no complete outcomes.")
         return
 
-    with st.container(horizontal=True):
-        st.metric("Observations", f"{len(selected):,}", border=True)
-        st.metric("Mean forward return", f"{selected['market_return'].mean():.1%}", border=True)
-        st.metric("Positive outcomes", f"{selected['market_return'].gt(0).mean():.0%}", border=True)
-        st.metric(
-            "Average maximum drawdown",
-            f"{selected['maximum_drawdown_from_peak'].mean():.1%}",
-            border=True,
+    selected_contrast = contrast_summaries.loc[
+        (contrast_summaries["model_id"] == model_id)
+        & (contrast_summaries["horizon_months"] == horizon)
+        & (contrast_summaries["publication_lag_weeks"] == publication_lag)
+        & (contrast_summaries["sample_policy"] == sample_key)
+    ]
+    if view == "Regime contrast" and not selected_contrast.empty:
+        contrast_row = selected_contrast.iloc[0]
+        with st.container(horizontal=True):
+            st.metric(
+                "Expansionary minus contractionary",
+                f"{contrast_row['mean_return_spread']:+.1%}",
+                border=True,
+            )
+            st.metric(
+                "Expansionary mean",
+                f"{contrast_row['expansionary_mean_return']:.1%}",
+                f"n={int(contrast_row['expansionary_observations'])}",
+                border=True,
+            )
+            st.metric(
+                "Contractionary mean",
+                f"{contrast_row['contractionary_mean_return']:.1%}",
+                f"n={int(contrast_row['contractionary_observations'])}",
+                border=True,
+            )
+            interval_value = (
+                f"{contrast_row['spread_ci_lower']:.1%} to {contrast_row['spread_ci_upper']:.1%}"
+                if pd.notna(contrast_row["spread_ci_lower"])
+                else "Unavailable"
+            )
+            st.metric("Welch 95% interval", interval_value, border=True)
+    else:
+        with st.container(horizontal=True):
+            st.metric("Observations", f"{len(selected):,}", border=True)
+            st.metric("Mean forward return", f"{selected['market_return'].mean():.1%}", border=True)
+            st.metric(
+                "Positive outcomes", f"{selected['market_return'].gt(0).mean():.0%}", border=True
+            )
+            st.metric(
+                "Average maximum drawdown",
+                f"{selected['maximum_drawdown_from_peak'].mean():.1%}",
+                border=True,
+            )
+            st.metric(
+                "Average maximum upside",
+                f"{selected['maximum_upside_from_start'].mean():.1%}",
+                border=True,
+            )
+
+    if view == "Regime contrast":
+        contrast_history = contrast_summaries.loc[
+            (contrast_summaries["model_id"] == model_id)
+            & (contrast_summaries["publication_lag_weeks"] == publication_lag)
+            & (contrast_summaries["sample_policy"] == sample_key)
+        ].copy()
+        contrast_history["ci_error_plus"] = (
+            contrast_history["spread_ci_upper"] - contrast_history["mean_return_spread"]
         )
-        st.metric(
-            "Average maximum upside",
-            f"{selected['maximum_upside_from_start'].mean():.1%}",
-            border=True,
+        contrast_history["ci_error_minus"] = (
+            contrast_history["mean_return_spread"] - contrast_history["spread_ci_lower"]
+        )
+        contrast_figure = px.line(
+            contrast_history,
+            x="horizon_months",
+            y="mean_return_spread",
+            markers=True,
+            error_y="ci_error_plus",
+            error_y_minus="ci_error_minus",
+            title="Expansionary minus contractionary Bitcoin return",
+            labels={
+                "horizon_months": "Forward horizon (months)",
+                "mean_return_spread": "Mean Bitcoin return spread",
+            },
+        )
+        contrast_figure.add_hline(y=0, line_color="#6B7280", line_width=1)
+        contrast_figure.update_xaxes(dtick=1)
+        contrast_figure.update_yaxes(tickformat=".0%")
+        st.plotly_chart(contrast_figure, width="stretch", config={"displaylogo": False})
+        st.dataframe(
+            contrast_history[
+                [
+                    "horizon_months",
+                    "expansionary_observations",
+                    "contractionary_observations",
+                    "expansionary_mean_return",
+                    "contractionary_mean_return",
+                    "mean_return_spread",
+                    "spread_ci_lower",
+                    "spread_ci_upper",
+                ]
+            ],
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "horizon_months": st.column_config.NumberColumn("Horizon (months)", format="%d"),
+                "expansionary_observations": st.column_config.NumberColumn(
+                    "Expansionary n", format="%d"
+                ),
+                "contractionary_observations": st.column_config.NumberColumn(
+                    "Contractionary n", format="%d"
+                ),
+                "expansionary_mean_return": st.column_config.NumberColumn(
+                    "Expansionary mean", format="percent"
+                ),
+                "contractionary_mean_return": st.column_config.NumberColumn(
+                    "Contractionary mean", format="percent"
+                ),
+                "mean_return_spread": st.column_config.NumberColumn(
+                    "Mean spread", format="percent"
+                ),
+                "spread_ci_lower": st.column_config.NumberColumn("95% CI lower", format="percent"),
+                "spread_ci_upper": st.column_config.NumberColumn("95% CI upper", format="percent"),
+            },
+        )
+        st.caption(
+            "Expansionary regimes are Above normal, Expansion, and Strong expansion. "
+            "Contractionary regimes are Below normal, Contraction, and Strong contraction. "
+            "Neutral observations are excluded. Error bars are classical Welch intervals and "
+            "do not adjust for serial dependence, multiple comparisons, or data revisions."
         )
 
-    if view == "Across horizons":
+    elif view == "Across horizons":
         horizon_summary = regime_summaries.loc[
             (regime_summaries["model_id"] == model_id)
             & (regime_summaries["publication_lag_weeks"] == publication_lag)

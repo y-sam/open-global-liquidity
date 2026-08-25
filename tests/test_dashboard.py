@@ -329,11 +329,17 @@ def test_loads_published_bitcoin_research_snapshots() -> None:
     revisions = support.load_bitcoin_revision_summary(
         snapshots / "us_point_in_time_bitcoin_revisions_snapshot.parquet"
     )
+    contrasts = support.load_bitcoin_contrast_summary(
+        snapshots / "us_point_in_time_bitcoin_contrasts_snapshot.parquet"
+    )
 
     assert set(outcomes["market_id"]) == {"bitcoin"}
     assert regimes["mean_return_ci_lower"].notna().any()
     assert set(regimes.loc[regimes["specification_role"] == "primary", "model_id"]) == {"model_b"}
     assert revisions["regime_agreement_share"].between(0, 1).all()
+    primary_contrasts = contrasts.loc[contrasts["specification_role"] == "primary"]
+    assert set(primary_contrasts["model_id"]) == {"model_b"}
+    assert set(primary_contrasts["horizon_months"]) == {1, 3, 6, 12}
 
 
 def test_bitcoin_snapshot_loader_rejects_impossible_path_statistic(tmp_path: Path) -> None:

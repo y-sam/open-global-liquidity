@@ -478,8 +478,43 @@
       "rows": 1977,
       "sha256": "00b60c51d9cdfdaf6991e7974880bde41f1881d75a742d32a2c62de0ee64aa2e"
     },
+    "us_point_in_time_bitcoin_contrasts_snapshot.parquet": {
+      "bytes": 22047,
+      "columns": [
+        "model_id",
+        "model_name",
+        "publication_lag_weeks",
+        "horizon_months",
+        "sample_policy",
+        "expansionary_observations",
+        "contractionary_observations",
+        "expansionary_mean_return",
+        "contractionary_mean_return",
+        "expansionary_median_return",
+        "contractionary_median_return",
+        "expansionary_positive_share",
+        "contractionary_positive_share",
+        "mean_return_spread",
+        "spread_standard_error",
+        "confidence_level",
+        "spread_ci_lower",
+        "spread_ci_upper",
+        "interval_method",
+        "regime_group_classification",
+        "specification_role",
+        "specification_classification",
+        "classification"
+      ],
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "rows": 96,
+      "sha256": "c233ad8a8cf7999ada21cba27ae52e19e194c456d034b077f2d5684c4df83045"
+    },
     "us_point_in_time_bitcoin_outcomes_snapshot.parquet": {
-      "bytes": 96265,
+      "bytes": 96268,
       "columns": [
         "information_date",
         "signal_observation_date",
@@ -534,7 +569,7 @@
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "700c58f156386be5fe6796677d5d84baa5913f52dbdcd85e0cef95ebb10af737"
+      "sha256": "fbc01513d2c38cc28109ea083b22b6ebb1730b183e140d043a8274fcf10bc804"
     },
     "us_point_in_time_bitcoin_regimes_snapshot.parquet": {
       "bytes": 56943,
@@ -567,7 +602,7 @@
         "model_c"
       ],
       "rows": 816,
-      "sha256": "8c2dc72aff2c8b5f162b51b3cb1b44d864ca5007857e52c46e80bdf94177797d"
+      "sha256": "4e91fcc8c13cbe223b33c273057201839ad2fe77e099351d45b3db0a9d4ebf77"
     },
     "us_point_in_time_bitcoin_revisions_snapshot.parquet": {
       "bytes": 11831,
@@ -593,10 +628,10 @@
         "model_c"
       ],
       "rows": 96,
-      "sha256": "101b0e0ae9b21a49ab77e03a8235fbb52471f77d98356cb337beba5031339384"
+      "sha256": "45a59556ecc0a109b0cb1f174cd4b0cb619641a56738507811ffa69d1ad3e53b"
     },
     "us_point_in_time_comparison_snapshot.parquet": {
-      "bytes": 26451,
+      "bytes": 26454,
       "columns": [
         "information_date",
         "signal_observation_date",
@@ -618,17 +653,17 @@
         "momentum_revision",
         "comparison_policy"
       ],
-      "latest_retrieval": "2026-08-25T15:01:46.463911+00:00",
+      "latest_retrieval": "2026-08-25T13:03:03.793914+00:00",
       "model_ids": [
         "model_a",
         "model_b",
         "model_c"
       ],
       "rows": 201,
-      "sha256": "5c1d4e10a87a6f7f5ac88487a54afae63899d5f9df6b1346efbaf6eeb332238a"
+      "sha256": "355d08312e0a6464492abc36b146f5f2ec9bbeb141f56a7aed23fdb88af8844c"
     },
     "us_point_in_time_market_pairs_snapshot.parquet": {
-      "bytes": 96239,
+      "bytes": 94624,
       "columns": [
         "information_date",
         "signal_observation_date",
@@ -670,16 +705,16 @@
         "FRED",
         "World Bank"
       ],
-      "rows": 8544,
+      "rows": 8520,
       "series_ids": [
         "CMO-GOLD-MONTHLY",
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "abdeedf3c19c699bd68fbe37725342a43bcc27c75b7f9a6d8b404ebd0780e372"
+      "sha256": "1e622c86958b825ad758acb77fad0f3305dc6990b288bd549857e7157e70c8b1"
     },
     "us_point_in_time_market_series_snapshot.parquet": {
-      "bytes": 179314,
+      "bytes": 184327,
       "columns": [
         "date",
         "country",
@@ -697,23 +732,23 @@
         "gold"
       ],
       "earliest_observation": "2006-01-02",
-      "latest_observation": "2026-08-24",
-      "latest_retrieval": "2026-08-25T15:01:53.157039+00:00",
+      "latest_observation": "2026-08-23",
+      "latest_retrieval": "2026-08-25T13:03:06.284310+00:00",
       "providers": [
         "Coin Metrics",
         "FRED",
         "World Bank"
       ],
-      "rows": 11327,
+      "rows": 11321,
       "series_ids": [
         "CMO-GOLD-MONTHLY",
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "a760758fb40a3684b298ffdddfeba863298c72bb0017965e8ef1058b0ab459a6"
+      "sha256": "5da5faaa876cf33420538d6ba053aabff604c318342d52fee7bbaec933fac99f"
     },
     "us_point_in_time_market_summary_snapshot.parquet": {
-      "bytes": 12715,
+      "bytes": 12679,
       "columns": [
         "model_id",
         "model_name",
@@ -745,13 +780,13 @@
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "bdf8208b16142b692540fa8c8678830a1654de0b26ca361190b01f968bac9e37"
+      "sha256": "bc35f16d678c9d2143dcbae9291173523701fc6c9098f0e11ad9d4e725ecbf29"
     }
   },
-  "generated_at": "2026-08-25T15:01:55.745484+00:00",
+  "generated_at": "2026-08-25T15:30:43.815425+00:00",
   "pipeline_version": "0.1.0",
   "schema_version": 1,
-  "snapshot_count": 21,
-  "source_commit": "fa8b9f5cc6145c07bbd85377280751ee7ca1d9e8",
-  "working_tree_dirty": false
+  "snapshot_count": 22,
+  "source_commit": "035ff7d67d37b82e44a41b36748e00ed54aa24de",
+  "working_tree_dirty": true
 }

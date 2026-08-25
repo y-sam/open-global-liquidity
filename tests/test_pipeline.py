@@ -139,6 +139,12 @@ point_in_time_pilot:
     forward_horizons_months: [1, 3, 6, 12]
     correlation_min_periods: 12
     non_overlapping_correlation_min_periods: 8
+    bitcoin_directional_regimes:
+      classification: model_assumption
+      expansionary: [Above normal, Expansion, Strong expansion]
+      contractionary: [Below normal, Contraction, Strong contraction]
+      excluded: [Neutral]
+      description: Test directional grouping
     primary_bitcoin_specification:
       classification: model_assumption
       model_id: model_b

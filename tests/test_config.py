@@ -93,6 +93,15 @@ def test_load_model_config() -> None:
     assert primary.publication_lag_weeks == 1
     assert primary.sample_policy == "non_overlapping"
     assert primary.forward_horizons_months == (1, 3, 6, 12)
+    directional = config.point_in_time_pilot.bitcoin_directional_regimes
+    assert directional.classification == "model_assumption"
+    assert directional.expansionary == ("Above normal", "Expansion", "Strong expansion")
+    assert directional.contractionary == (
+        "Below normal",
+        "Contraction",
+        "Strong contraction",
+    )
+    assert directional.excluded == ("Neutral",)
 
 
 def test_model_config_rejects_ogli_weights_that_do_not_sum_to_one(tmp_path: Path) -> None:
