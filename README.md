@@ -188,10 +188,11 @@ The configured pilot begins on 2021-01-31. `RRPONTSYD` has usable history only f
 and the index then needs 52 weeks for year-over-year growth plus 104 valid observations for its
 expanding normalization. Starting earlier would require weakening the declared history rule.
 
-The command writes six ignored local files under `data/vintages/fred/monthly_pilot/`: the long
+The command writes nine ignored local files under `data/vintages/fred/monthly_pilot/`: the long
 ALFRED input archive, one monthly reading per model and information date, exact-date
 current-vintage comparisons, standardized Bitcoin/gold/dollar levels, point-in-time outcome pairs,
-and descriptive summaries. Raw multi-vintage responses are cached under
+descriptive market summaries, Bitcoin path outcomes, regime/transition summaries, and
+vintage-versus-revised signal diagnostics. Raw multi-vintage responses are cached under
 `data/raw/fred/vintage_batches/`. These files are reproducible but intentionally not committed.
 The explicit publication option writes the small derived comparison and market-research files to
 `data/reference/`; it does not publish the raw ALFRED archive. The pilot does not reconstruct
@@ -201,7 +202,7 @@ intraday release timestamps or exact trade availability. Instead, it reports pre
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
 
-The publication commands together write eighteen Git-versioned Parquet
+The publication commands together write twenty-one Git-versioned Parquet
 artifacts plus a JSON provenance manifest:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
@@ -231,6 +232,12 @@ artifacts plus a JSON provenance manifest:
   with subsequent 1-, 3-, 6-, and 12-month returns under four availability-delay assumptions.
 - `data/reference/us_point_in_time_market_summary_snapshot.parquet` — correlations, sample sizes,
   mean/median returns, and positive-return shares for overlapping and non-overlapping samples.
+- `data/reference/us_point_in_time_bitcoin_outcomes_snapshot.parquet` — point-in-time signals,
+  forward Bitcoin returns, maximum upside/downside, peak-to-trough drawdown, and revision labels.
+- `data/reference/us_point_in_time_bitcoin_regimes_snapshot.parquet` — return and path-risk
+  summaries by point-in-time OGLI regime and expansionary/contractionary transition direction.
+- `data/reference/us_point_in_time_bitcoin_revisions_snapshot.parquet` — real-time-vintage versus
+  recomputed-today signal correlations, regime agreement, and revision magnitudes.
 - `data/reference/dashboard_snapshot_manifest.json` — generation time, pipeline version, source
   commit, row/date coverage, and SHA-256 digest for every published Parquet file.
 
@@ -243,9 +250,9 @@ mode and source retrieval time.
 
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
-environment, downloads fresh FRED, ALFRED, Coin Metrics, and World Bank observations, regenerates the eighteen
-public Parquet snapshots and provenance manifest, and runs formatting, linting, and offline tests. Only
-successful runs can commit changed
+environment, downloads fresh FRED, ALFRED, Coin Metrics, and World Bank observations, regenerates
+the twenty-one public Parquet snapshots and provenance manifest, and runs formatting, linting, and
+offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 
 The workflow requires a repository Actions secret named `FRED_API_KEY` and **Read and write**
@@ -270,9 +277,9 @@ uv run streamlit run app/streamlit_app.py
 ```
 
 Streamlit opens the dashboard at `http://localhost:8501`. The app shows latest measured balances,
-the three model levels, an OGLI page, a local point-in-time pilot, a Liquidity vs markets workspace,
-a log-scale Bitcoin/OGLI
-timeline, Bitcoin-focused landing metrics, history, a component explorer, recent source
+the three model levels, an OGLI page, a point-in-time pilot, a dedicated Bitcoin research page, a
+Liquidity vs markets workspace, a log-scale Bitcoin/OGLI timeline, Bitcoin-focused landing metrics,
+history, a component explorer, recent source
 observations, and methodology notes. Top navigation separates a
 plain-language landing page, the OGLI index, market validation, the data dashboard, and a research
 guide with definitions, assumptions, limitations, and primary-source links. All

@@ -478,6 +478,115 @@
       "rows": 1977,
       "sha256": "7c79169800df187c003adab1448302443094d0c1f0a9380551c437cf54265772"
     },
+    "us_point_in_time_bitcoin_outcomes_snapshot.parquet": {
+      "bytes": 96268,
+      "columns": [
+        "information_date",
+        "signal_observation_date",
+        "signal_available_date",
+        "model_id",
+        "model_name",
+        "vintage_ogli",
+        "vintage_momentum_score",
+        "vintage_regime",
+        "market_id",
+        "series_id",
+        "provider",
+        "unit",
+        "source_frequency",
+        "publication_lag_weeks",
+        "horizon_months",
+        "start_target_date",
+        "start_observation_date",
+        "start_value",
+        "end_target_date",
+        "end_observation_date",
+        "end_value",
+        "market_return",
+        "is_non_overlapping",
+        "classification",
+        "current_ogli",
+        "current_momentum_score",
+        "current_regime",
+        "ogli_revision",
+        "momentum_revision",
+        "regime_agrees_with_current",
+        "previous_vintage_regime",
+        "regime_transition",
+        "transition_direction",
+        "maximum_upside_from_start",
+        "maximum_downside_from_start",
+        "maximum_drawdown_from_peak",
+        "bitcoin_research_classification"
+      ],
+      "market_ids": [
+        "bitcoin"
+      ],
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "providers": [
+        "Coin Metrics"
+      ],
+      "rows": 2940,
+      "series_ids": [
+        "btc.PriceUSD"
+      ],
+      "sha256": "fbc01513d2c38cc28109ea083b22b6ebb1730b183e140d043a8274fcf10bc804"
+    },
+    "us_point_in_time_bitcoin_regimes_snapshot.parquet": {
+      "bytes": 36886,
+      "columns": [
+        "model_id",
+        "model_name",
+        "publication_lag_weeks",
+        "horizon_months",
+        "sample_policy",
+        "analysis_dimension",
+        "group_label",
+        "observations",
+        "mean_return",
+        "median_return",
+        "positive_share",
+        "mean_maximum_upside",
+        "mean_maximum_downside",
+        "mean_maximum_drawdown",
+        "classification"
+      ],
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "rows": 720,
+      "sha256": "7ea7a12b6de7e7c0a731051bdf09a03f4436757ee03f4d063495449d1f8c042a"
+    },
+    "us_point_in_time_bitcoin_revisions_snapshot.parquet": {
+      "bytes": 10460,
+      "columns": [
+        "model_id",
+        "model_name",
+        "publication_lag_weeks",
+        "horizon_months",
+        "sample_policy",
+        "observations",
+        "vintage_signal_correlation",
+        "current_vintage_signal_correlation",
+        "correlation_difference",
+        "mean_absolute_momentum_revision",
+        "regime_agreement_share",
+        "classification"
+      ],
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "rows": 96,
+      "sha256": "f821f7939bb54d2e9d92fc7d502632a5509e23dbd67c857f03a02d8b1aa2c192"
+    },
     "us_point_in_time_comparison_snapshot.parquet": {
       "bytes": 26454,
       "columns": [
@@ -631,10 +740,10 @@
       "sha256": "bc35f16d678c9d2143dcbae9291173523701fc6c9098f0e11ad9d4e725ecbf29"
     }
   },
-  "generated_at": "2026-08-25T13:42:20.037648+00:00",
+  "generated_at": "2026-08-25T14:15:20.808990+00:00",
   "pipeline_version": "0.1.0",
   "schema_version": 1,
-  "snapshot_count": 18,
-  "source_commit": "198a46f2c531d12489ba446c087468dcb6c968f3",
+  "snapshot_count": 21,
+  "source_commit": "3e15f65d59fc62aad392cd8a5c9b7f04adb7b41f",
   "working_tree_dirty": true
 }

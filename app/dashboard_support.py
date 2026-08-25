@@ -210,6 +210,56 @@ POINT_IN_TIME_MARKET_SUMMARY_COLUMNS = [
     "classification",
 ]
 
+BITCOIN_OUTCOME_COLUMNS = [
+    *POINT_IN_TIME_MARKET_PAIR_COLUMNS,
+    "current_ogli",
+    "current_momentum_score",
+    "current_regime",
+    "ogli_revision",
+    "momentum_revision",
+    "regime_agrees_with_current",
+    "previous_vintage_regime",
+    "regime_transition",
+    "transition_direction",
+    "maximum_upside_from_start",
+    "maximum_downside_from_start",
+    "maximum_drawdown_from_peak",
+    "bitcoin_research_classification",
+]
+
+BITCOIN_REGIME_SUMMARY_COLUMNS = [
+    "model_id",
+    "model_name",
+    "publication_lag_weeks",
+    "horizon_months",
+    "sample_policy",
+    "analysis_dimension",
+    "group_label",
+    "observations",
+    "mean_return",
+    "median_return",
+    "positive_share",
+    "mean_maximum_upside",
+    "mean_maximum_downside",
+    "mean_maximum_drawdown",
+    "classification",
+]
+
+BITCOIN_REVISION_SUMMARY_COLUMNS = [
+    "model_id",
+    "model_name",
+    "publication_lag_weeks",
+    "horizon_months",
+    "sample_policy",
+    "observations",
+    "vintage_signal_correlation",
+    "current_vintage_signal_correlation",
+    "correlation_difference",
+    "mean_absolute_momentum_revision",
+    "regime_agreement_share",
+    "classification",
+]
+
 COMPONENT_LABELS = {
     "fed_assets": "Fed total assets",
     "treasury_general_account": "Treasury General Account",
@@ -675,4 +725,67 @@ def load_point_in_time_market_summary(path: Path) -> pd.DataFrame:
         raise DashboardDataError("Point-in-time market summary has an unsupported sample policy")
     return result.sort_values(
         ["market_id", "model_id", "sample_policy", "publication_lag_weeks", "horizon_months"]
+    ).reset_index(drop=True)
+
+
+def load_bitcoin_outcomes(path: Path) -> pd.DataFrame:
+    """Load package-calculated Bitcoin path outcomes and vintage diagnostics."""
+    frame = _read_parquet(path, "Bitcoin research outcomes")
+    missing = sorted(set(BITCOIN_OUTCOME_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Bitcoin research outcomes are missing: " + ", ".join(missing))
+    result = frame[BITCOIN_OUTCOME_COLUMNS].copy()
+    date_columns = [
+        "information_date",
+        "signal_available_date",
+        "start_observation_date",
+        "end_observation_date",
+    ]
+    for column in date_columns:
+        result[column] = pd.to_datetime(result[column], errors="coerce")
+    if result.empty or result[date_columns].isna().any().any():
+        raise DashboardDataError("Bitcoin research outcomes contain invalid dates")
+    if set(result["bitcoin_research_classification"]) != {"statistical_transformation"}:
+        raise DashboardDataError("Bitcoin research outcomes have an unsupported classification")
+    return result.sort_values(
+        ["model_id", "publication_lag_weeks", "horizon_months", "information_date"]
+    ).reset_index(drop=True)
+
+
+def load_bitcoin_regime_summary(path: Path) -> pd.DataFrame:
+    """Load Bitcoin return and path-risk summaries by vintage regime and transition."""
+    frame = _read_parquet(path, "Bitcoin regime summary")
+    missing = sorted(set(BITCOIN_REGIME_SUMMARY_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Bitcoin regime summary is missing: " + ", ".join(missing))
+    result = frame[BITCOIN_REGIME_SUMMARY_COLUMNS].copy()
+    if result.empty or not set(result["analysis_dimension"]).issubset(
+        {"vintage_regime", "transition_direction"}
+    ):
+        raise DashboardDataError("Bitcoin regime summary has an unsupported dimension")
+    return result.sort_values(
+        [
+            "model_id",
+            "sample_policy",
+            "publication_lag_weeks",
+            "horizon_months",
+            "analysis_dimension",
+            "group_label",
+        ]
+    ).reset_index(drop=True)
+
+
+def load_bitcoin_revision_summary(path: Path) -> pd.DataFrame:
+    """Load vintage-versus-revised Bitcoin signal comparison summaries."""
+    frame = _read_parquet(path, "Bitcoin revision summary")
+    missing = sorted(set(BITCOIN_REVISION_SUMMARY_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Bitcoin revision summary is missing: " + ", ".join(missing))
+    result = frame[BITCOIN_REVISION_SUMMARY_COLUMNS].copy()
+    if result.empty or not set(result["sample_policy"]).issubset(
+        {"overlapping", "non_overlapping"}
+    ):
+        raise DashboardDataError("Bitcoin revision summary has an unsupported sample policy")
+    return result.sort_values(
+        ["model_id", "sample_policy", "publication_lag_weeks", "horizon_months"]
     ).reset_index(drop=True)

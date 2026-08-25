@@ -11,6 +11,12 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
+from open_global_liquidity.analysis.bitcoin import (
+    BitcoinResearchError,
+    build_bitcoin_research_outcomes,
+    summarize_bitcoin_regimes,
+    summarize_bitcoin_revision_comparison,
+)
 from open_global_liquidity.analysis.point_in_time_markets import (
     PointInTimeMarketError,
     build_point_in_time_market_pairs,
@@ -132,12 +138,40 @@ def run_point_in_time_pipeline(
         len(market_pairs),
         len(market_summary),
     )
+    bitcoin_outcomes = build_bitcoin_research_outcomes(
+        market_pairs,
+        market_levels,
+        comparison,
+    )
+    bitcoin_outcomes_path = output_dir / "us_point_in_time_bitcoin_outcomes.parquet"
+    bitcoin_outcomes.to_parquet(bitcoin_outcomes_path, index=False)
+    bitcoin_regimes = summarize_bitcoin_regimes(bitcoin_outcomes)
+    bitcoin_regimes_path = output_dir / "us_point_in_time_bitcoin_regimes.parquet"
+    bitcoin_regimes.to_parquet(bitcoin_regimes_path, index=False)
+    bitcoin_revisions = summarize_bitcoin_revision_comparison(
+        bitcoin_outcomes,
+        overlapping_min_periods=config.point_in_time_pilot.market_correlation_min_periods,
+        non_overlapping_min_periods=(
+            config.point_in_time_pilot.market_non_overlapping_correlation_min_periods
+        ),
+    )
+    bitcoin_revisions_path = output_dir / "us_point_in_time_bitcoin_revisions.parquet"
+    bitcoin_revisions.to_parquet(bitcoin_revisions_path, index=False)
+    LOGGER.info(
+        "Wrote %d Bitcoin outcomes, %d regime summaries, and %d revision comparisons",
+        len(bitcoin_outcomes),
+        len(bitcoin_regimes),
+        len(bitcoin_revisions),
+    )
     if publish_dashboard_snapshot:
         _publish_dashboard_snapshot(
             comparison,
             market_levels=market_levels,
             market_pairs=market_pairs,
             market_summary=market_summary,
+            bitcoin_outcomes=bitcoin_outcomes,
+            bitcoin_regimes=bitcoin_regimes,
+            bitcoin_revisions=bitcoin_revisions,
             project_root=project_root,
         )
 
@@ -202,6 +236,9 @@ def _publish_dashboard_snapshot(
     market_levels: pd.DataFrame | None = None,
     market_pairs: pd.DataFrame | None = None,
     market_summary: pd.DataFrame | None = None,
+    bitcoin_outcomes: pd.DataFrame | None = None,
+    bitcoin_regimes: pd.DataFrame | None = None,
+    bitcoin_revisions: pd.DataFrame | None = None,
 ) -> Path:
     """Publish the small derived comparison and refresh whole-bundle provenance."""
     snapshot_dir = project_root / "data" / "reference"
@@ -212,6 +249,9 @@ def _publish_dashboard_snapshot(
         "us_point_in_time_market_series_snapshot.parquet": market_levels,
         "us_point_in_time_market_pairs_snapshot.parquet": market_pairs,
         "us_point_in_time_market_summary_snapshot.parquet": market_summary,
+        "us_point_in_time_bitcoin_outcomes_snapshot.parquet": bitcoin_outcomes,
+        "us_point_in_time_bitcoin_regimes_snapshot.parquet": bitcoin_regimes,
+        "us_point_in_time_bitcoin_revisions_snapshot.parquet": bitcoin_revisions,
     }
     for filename, frame in additions.items():
         if frame is not None:
@@ -260,6 +300,7 @@ def main() -> None:
         )
     except (
         ConfigurationError,
+        BitcoinResearchError,
         FredError,
         OSError,
         PointInTimeError,

@@ -92,6 +92,9 @@ jobs:
             data/reference/us_point_in_time_market_series_snapshot.parquet \
             data/reference/us_point_in_time_market_pairs_snapshot.parquet \
             data/reference/us_point_in_time_market_summary_snapshot.parquet \
+            data/reference/us_point_in_time_bitcoin_outcomes_snapshot.parquet \
+            data/reference/us_point_in_time_bitcoin_regimes_snapshot.parquet \
+            data/reference/us_point_in_time_bitcoin_revisions_snapshot.parquet \
             data/reference/dashboard_snapshot_manifest.json
 
           if git diff --cached --quiet; then

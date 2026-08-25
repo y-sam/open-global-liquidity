@@ -24,6 +24,9 @@ from dashboard_support import (  # noqa: E402
     latest_model_readings,
     latest_ogli_readings,
     latest_readings,
+    load_bitcoin_outcomes,
+    load_bitcoin_regime_summary,
+    load_bitcoin_revision_summary,
     load_dashboard_data,
     load_liquidity_model_data,
     load_macro_context,
@@ -84,6 +87,24 @@ POINT_IN_TIME_MARKET_SUMMARY_PATH = (
 )
 POINT_IN_TIME_MARKET_SUMMARY_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_point_in_time_market_summary_snapshot.parquet"
+)
+BITCOIN_OUTCOMES_PATH = (
+    DATA_ROOT / "vintages" / "fred" / "monthly_pilot" / "us_point_in_time_bitcoin_outcomes.parquet"
+)
+BITCOIN_OUTCOMES_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_point_in_time_bitcoin_outcomes_snapshot.parquet"
+)
+BITCOIN_REGIMES_PATH = (
+    DATA_ROOT / "vintages" / "fred" / "monthly_pilot" / "us_point_in_time_bitcoin_regimes.parquet"
+)
+BITCOIN_REGIMES_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_point_in_time_bitcoin_regimes_snapshot.parquet"
+)
+BITCOIN_REVISIONS_PATH = (
+    DATA_ROOT / "vintages" / "fred" / "monthly_pilot" / "us_point_in_time_bitcoin_revisions.parquet"
+)
+BITCOIN_REVISIONS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_point_in_time_bitcoin_revisions_snapshot.parquet"
 )
 COMPONENT_ORDER = list(COMPONENT_LABELS)
 WINDOW_DAYS = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
@@ -191,6 +212,27 @@ def _load_point_in_time_market_summary(path: str, modified_ns: int) -> pd.DataFr
     return load_point_in_time_market_summary(Path(path))
 
 
+@st.cache_data(show_spinner=False)
+def _load_bitcoin_outcomes(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated Bitcoin forward paths and vintage diagnostics."""
+    del modified_ns
+    return load_bitcoin_outcomes(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_bitcoin_regimes(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated Bitcoin regime and transition summaries."""
+    del modified_ns
+    return load_bitcoin_regime_summary(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_bitcoin_revisions(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated Bitcoin signal-revision summaries."""
+    del modified_ns
+    return load_bitcoin_revision_summary(Path(path))
+
+
 def _source_data() -> tuple[pd.DataFrame, Path, str]:
     data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
     return _load_data(str(data_path), data_path.stat().st_mtime_ns), data_path, data_origin
@@ -294,6 +336,28 @@ def _point_in_time_market_data() -> tuple[pd.DataFrame, pd.DataFrame, str] | Non
     pairs = _load_point_in_time_market_pairs(str(pairs_path), pairs_path.stat().st_mtime_ns)
     summary = _load_point_in_time_market_summary(str(summary_path), summary_path.stat().st_mtime_ns)
     return pairs, summary, pairs_origin
+
+
+def _bitcoin_research_data() -> tuple[pd.DataFrame, pd.DataFrame, pd.DataFrame, str] | None:
+    try:
+        outcomes_path, origin = resolve_dashboard_data_path(
+            BITCOIN_OUTCOMES_PATH,
+            BITCOIN_OUTCOMES_SNAPSHOT_PATH,
+        )
+        regimes_path, _ = resolve_dashboard_data_path(
+            BITCOIN_REGIMES_PATH,
+            BITCOIN_REGIMES_SNAPSHOT_PATH,
+        )
+        revisions_path, _ = resolve_dashboard_data_path(
+            BITCOIN_REVISIONS_PATH,
+            BITCOIN_REVISIONS_SNAPSHOT_PATH,
+        )
+    except DashboardDataError:
+        return None
+    outcomes = _load_bitcoin_outcomes(str(outcomes_path), outcomes_path.stat().st_mtime_ns)
+    regimes = _load_bitcoin_regimes(str(regimes_path), regimes_path.stat().st_mtime_ns)
+    revisions = _load_bitcoin_revisions(str(revisions_path), revisions_path.stat().st_mtime_ns)
+    return outcomes, regimes, revisions, origin
 
 
 def _show_freshness(frame: pd.DataFrame, label: str, *, max_age_days: int = 14) -> None:
@@ -1098,6 +1162,319 @@ def ogli_page() -> None:
             ),
             hide_index=True,
         )
+
+
+def bitcoin_research_page() -> None:
+    st.title("Bitcoin research")
+    st.caption(
+        "Point-in-time OGLI regimes, transitions, and subsequent Bitcoin paths. Outcomes are "
+        "retrospective diagnostics—not forecasts, trading signals, or OGLI calibration targets."
+    )
+    try:
+        loaded = _bitcoin_research_data()
+    except DashboardDataError as exc:
+        st.error(str(exc), icon=":material/error:")
+        return
+    if loaded is None:
+        st.info(
+            "Bitcoin research outputs have not been generated in this environment. The existing "
+            "FRED key is sufficient and Coin Metrics Community Data requires no key.",
+            icon=":material/currency_bitcoin:",
+        )
+        st.code("uv run ogli-point-in-time --publish-dashboard-snapshot", language="zsh")
+        return
+    outcomes, regime_summaries, revision_summaries, data_origin = loaded
+
+    model_options = dict(
+        outcomes[["model_name", "model_id"]].drop_duplicates().itertuples(index=False)
+    )
+    default_name = "Model B — Net Fed liquidity proxy"
+    with st.sidebar:
+        st.header("Bitcoin research controls")
+        selected_name = st.selectbox(
+            "Liquidity definition",
+            list(model_options),
+            index=list(model_options).index(default_name),
+            key="bitcoin_model",
+        )
+        horizon = st.selectbox(
+            "Forward horizon",
+            sorted(outcomes["horizon_months"].unique()),
+            index=1,
+            format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
+            key="bitcoin_horizon",
+        )
+        publication_lag = st.selectbox(
+            "Assumed availability delay",
+            sorted(outcomes["publication_lag_weeks"].unique()),
+            index=1,
+            format_func=lambda value: f"{value} week{'s' if value != 1 else ''}",
+            key="bitcoin_lag",
+        )
+        sample_policy = st.segmented_control(
+            "Sample",
+            ["Non-overlapping", "Overlapping"],
+            default="Non-overlapping",
+            key="bitcoin_sample",
+        )
+        st.caption(f"Data mode: {data_origin}")
+
+    view = st.segmented_control(
+        "Research view",
+        ["Regimes", "Transitions", "Path outcomes", "Signal revisions"],
+        default="Regimes",
+        key="bitcoin_view",
+    )
+    model_id = model_options[selected_name]
+    sample_key = "non_overlapping" if sample_policy == "Non-overlapping" else "overlapping"
+    selected = outcomes.loc[
+        (outcomes["model_id"] == model_id)
+        & (outcomes["horizon_months"] == horizon)
+        & (outcomes["publication_lag_weeks"] == publication_lag)
+    ].copy()
+    if sample_key == "non_overlapping":
+        selected = selected.loc[selected["is_non_overlapping"]].copy()
+    if selected.empty:
+        st.warning("The selected Bitcoin research sample contains no complete outcomes.")
+        return
+
+    with st.container(horizontal=True):
+        st.metric("Observations", f"{len(selected):,}", border=True)
+        st.metric("Mean forward return", f"{selected['market_return'].mean():.1%}", border=True)
+        st.metric("Positive outcomes", f"{selected['market_return'].gt(0).mean():.0%}", border=True)
+        st.metric(
+            "Average maximum drawdown",
+            f"{selected['maximum_drawdown_from_peak'].mean():.1%}",
+            border=True,
+        )
+        st.metric(
+            "Average maximum upside",
+            f"{selected['maximum_upside_from_start'].mean():.1%}",
+            border=True,
+        )
+
+    if view in {"Regimes", "Transitions"}:
+        dimension = "vintage_regime" if view == "Regimes" else "transition_direction"
+        summary = regime_summaries.loc[
+            (regime_summaries["model_id"] == model_id)
+            & (regime_summaries["horizon_months"] == horizon)
+            & (regime_summaries["publication_lag_weeks"] == publication_lag)
+            & (regime_summaries["sample_policy"] == sample_key)
+            & (regime_summaries["analysis_dimension"] == dimension)
+        ].copy()
+        minimum_display = 3
+        summary = summary.loc[summary["observations"] >= minimum_display]
+        if summary.empty:
+            st.info(
+                "No group has at least three observations under this selection. Choose the "
+                "overlapping sample or a shorter horizon.",
+                icon=":material/data_alert:",
+            )
+        else:
+            chart_title = (
+                "Bitcoin forward return by point-in-time OGLI regime"
+                if view == "Regimes"
+                else "Bitcoin forward return after OGLI regime transitions"
+            )
+            figure = px.bar(
+                summary,
+                x="group_label",
+                y="mean_return",
+                color="positive_share",
+                text="observations",
+                color_continuous_scale="RdYlGn",
+                range_color=[0, 1],
+                title=chart_title,
+                labels={
+                    "group_label": "OGLI regime" if view == "Regimes" else "Transition",
+                    "mean_return": f"Mean {horizon}-month Bitcoin return",
+                    "positive_share": "Positive share",
+                    "observations": "Observations",
+                },
+            )
+            figure.update_traces(
+                texttemplate="n=%{text}",
+                hovertemplate=(
+                    "%{x}<br>Mean return: %{y:.1%}<br>Observations: %{text}<extra></extra>"
+                ),
+            )
+            figure.update_yaxes(tickformat=".0%", zeroline=True)
+            st.plotly_chart(figure, width="stretch", config={"displaylogo": False})
+            st.dataframe(
+                summary[
+                    [
+                        "group_label",
+                        "observations",
+                        "mean_return",
+                        "median_return",
+                        "positive_share",
+                        "mean_maximum_upside",
+                        "mean_maximum_downside",
+                        "mean_maximum_drawdown",
+                    ]
+                ],
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "group_label": st.column_config.TextColumn("Group", pinned=True),
+                    "observations": st.column_config.NumberColumn("n", format="%d"),
+                    "mean_return": st.column_config.NumberColumn("Mean return", format="percent"),
+                    "median_return": st.column_config.NumberColumn(
+                        "Median return", format="percent"
+                    ),
+                    "positive_share": st.column_config.NumberColumn(
+                        "Positive share", format="percent"
+                    ),
+                    "mean_maximum_upside": st.column_config.NumberColumn(
+                        "Avg. max upside", format="percent"
+                    ),
+                    "mean_maximum_downside": st.column_config.NumberColumn(
+                        "Avg. downside", format="percent"
+                    ),
+                    "mean_maximum_drawdown": st.column_config.NumberColumn(
+                        "Avg. max drawdown", format="percent"
+                    ),
+                },
+            )
+
+    elif view == "Path outcomes":
+        path_figure = px.scatter(
+            selected,
+            x="maximum_drawdown_from_peak",
+            y="maximum_upside_from_start",
+            color="vintage_regime",
+            size="vintage_ogli",
+            hover_data={
+                "information_date": "|%Y-%m-%d",
+                "market_return": ":.1%",
+                "maximum_downside_from_start": ":.1%",
+                "vintage_ogli": ":.1f",
+            },
+            title=(
+                f"Bitcoin path outcomes over the next {horizon} month{'s' if horizon != 1 else ''}"
+            ),
+            labels={
+                "maximum_drawdown_from_peak": "Maximum peak-to-trough drawdown",
+                "maximum_upside_from_start": "Maximum upside from starting price",
+                "vintage_regime": "Point-in-time OGLI regime",
+                "vintage_ogli": "Point-in-time OGLI",
+            },
+        )
+        path_figure.update_xaxes(tickformat=".0%")
+        path_figure.update_yaxes(tickformat=".0%")
+        st.plotly_chart(path_figure, width="stretch", config={"displaylogo": False})
+        st.caption(
+            "Maximum drawdown is the worst peak-to-trough loss inside the outcome window. "
+            "Maximum downside is measured separately from the starting Bitcoin price."
+        )
+
+    else:
+        revision = revision_summaries.loc[
+            (revision_summaries["model_id"] == model_id)
+            & (revision_summaries["horizon_months"] == horizon)
+            & (revision_summaries["publication_lag_weeks"] == publication_lag)
+            & (revision_summaries["sample_policy"] == sample_key)
+        ]
+        if revision.empty:
+            st.info("No signal-revision summary is available for this selection.")
+        else:
+            row = revision.iloc[0]
+            correlations = pd.DataFrame(
+                {
+                    "Signal version": ["As known then", "Recomputed today"],
+                    "Correlation": [
+                        row["vintage_signal_correlation"],
+                        row["current_vintage_signal_correlation"],
+                    ],
+                }
+            ).dropna()
+            with st.container(horizontal=True):
+                st.metric(
+                    "Point-in-time correlation",
+                    (
+                        "Insufficient sample"
+                        if pd.isna(row["vintage_signal_correlation"])
+                        else f"{row['vintage_signal_correlation']:+.2f}"
+                    ),
+                    border=True,
+                )
+                st.metric(
+                    "Recomputed correlation",
+                    (
+                        "Insufficient sample"
+                        if pd.isna(row["current_vintage_signal_correlation"])
+                        else f"{row['current_vintage_signal_correlation']:+.2f}"
+                    ),
+                    border=True,
+                )
+                st.metric("Regime agreement", f"{row['regime_agreement_share']:.0%}", border=True)
+                st.metric(
+                    "Mean absolute momentum revision",
+                    f"{row['mean_absolute_momentum_revision']:.3f}",
+                    border=True,
+                )
+            if not correlations.empty:
+                revision_figure = px.bar(
+                    correlations,
+                    x="Signal version",
+                    y="Correlation",
+                    text_auto=".2f",
+                    title="Same Bitcoin outcomes, different data-vintage signal",
+                )
+                revision_figure.add_hline(y=0, line_color="#6B7280", line_width=1)
+                revision_figure.update_traces(marker_color=["#2563EB", "#D97706"])
+                st.plotly_chart(
+                    revision_figure,
+                    width="stretch",
+                    config={"displaylogo": False},
+                )
+            st.warning(
+                "The recomputed-today signal uses revised data that was not available "
+                "historically. It is a revision diagnostic, never the real-time backtest result.",
+                icon=":material/history:",
+            )
+
+    download_columns = [
+        "information_date",
+        "signal_available_date",
+        "model_name",
+        "vintage_ogli",
+        "vintage_momentum_score",
+        "vintage_regime",
+        "regime_transition",
+        "transition_direction",
+        "horizon_months",
+        "publication_lag_weeks",
+        "market_return",
+        "maximum_upside_from_start",
+        "maximum_downside_from_start",
+        "maximum_drawdown_from_peak",
+        "current_ogli",
+        "current_momentum_score",
+        "current_regime",
+    ]
+    st.download_button(
+        "Download selected research sample",
+        data=selected[download_columns].to_csv(index=False).encode("utf-8"),
+        file_name=(f"ogli_bitcoin_{model_id}_{horizon}m_{publication_lag}w_{sample_key}.csv"),
+        mime="text/csv",
+        icon=":material/download:",
+    )
+    if len(selected) < 12:
+        st.info(
+            "This selection has fewer than 12 observations. Descriptive statistics remain "
+            "visible, but their sign and magnitude are especially fragile.",
+            icon=":material/science:",
+        )
+    st.warning(
+        "Forward windows can overlap, regimes can proxy for broader macro conditions, and the "
+        "sample is short. These results do not establish causation or an investable strategy.",
+        icon=":material/warning:",
+    )
+    st.caption(
+        "Source: Coin Metrics Community Data (CC BY-NC 4.0). OGLI inputs: ALFRED monthly "
+        "information sets. All market outcomes occur after the stated assumed availability date."
+    )
 
 
 def vintage_pilot_page() -> None:
@@ -2157,6 +2534,12 @@ markets_index_page = st.Page(
     icon=":material/query_stats:",
     url_path="markets",
 )
+bitcoin_page = st.Page(
+    bitcoin_research_page,
+    title="Bitcoin research",
+    icon=":material/currency_bitcoin:",
+    url_path="bitcoin-research",
+)
 ogli_index_page = st.Page(
     ogli_page,
     title="OGLI index",
@@ -2180,6 +2563,7 @@ navigation = st.navigation(
         home_page,
         ogli_index_page,
         vintage_page,
+        bitcoin_page,
         markets_index_page,
         data_page,
         guide_page,
