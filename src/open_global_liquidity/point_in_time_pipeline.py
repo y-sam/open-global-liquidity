@@ -145,7 +145,10 @@ def run_point_in_time_pipeline(
     )
     bitcoin_outcomes_path = output_dir / "us_point_in_time_bitcoin_outcomes.parquet"
     bitcoin_outcomes.to_parquet(bitcoin_outcomes_path, index=False)
-    bitcoin_regimes = summarize_bitcoin_regimes(bitcoin_outcomes)
+    bitcoin_regimes = summarize_bitcoin_regimes(
+        bitcoin_outcomes,
+        confidence_level=config.market_analysis.confidence_level,
+    )
     bitcoin_regimes_path = output_dir / "us_point_in_time_bitcoin_regimes.parquet"
     bitcoin_regimes.to_parquet(bitcoin_regimes_path, index=False)
     bitcoin_revisions = summarize_bitcoin_revision_comparison(

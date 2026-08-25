@@ -104,5 +104,7 @@ def test_bitcoin_summaries_keep_regimes_transitions_and_revision_labels() -> Non
 
     assert set(regimes["analysis_dimension"]) == {"vintage_regime", "transition_direction"}
     assert "Expansionary transition" in set(regimes["group_label"])
+    assert set(regimes["confidence_level"]) == {0.95}
+    assert regimes.loc[regimes["observations"] >= 2, "mean_return_ci_lower"].notna().all()
     assert revisions["regime_agreement_share"].eq(1.0).all()
     assert revisions["observations"].eq(4).all()

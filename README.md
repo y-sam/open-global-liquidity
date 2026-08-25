@@ -235,7 +235,8 @@ artifacts plus a JSON provenance manifest:
 - `data/reference/us_point_in_time_bitcoin_outcomes_snapshot.parquet` — point-in-time signals,
   forward Bitcoin returns, maximum upside/downside, peak-to-trough drawdown, and revision labels.
 - `data/reference/us_point_in_time_bitcoin_regimes_snapshot.parquet` — return and path-risk
-  summaries by point-in-time OGLI regime and expansionary/contractionary transition direction.
+  summaries and descriptive Student-t mean-return intervals by point-in-time OGLI regime and
+  expansionary/contractionary transition direction.
 - `data/reference/us_point_in_time_bitcoin_revisions_snapshot.parquet` — real-time-vintage versus
   recomputed-today signal correlations, regime agreement, and revision magnitudes.
 - `data/reference/dashboard_snapshot_manifest.json` — generation time, pipeline version, source

@@ -1276,12 +1276,16 @@ def bitcoin_research_page() -> None:
                 if view == "Regimes"
                 else "Bitcoin forward return after OGLI regime transitions"
             )
+            summary["ci_error_plus"] = summary["mean_return_ci_upper"] - summary["mean_return"]
+            summary["ci_error_minus"] = summary["mean_return"] - summary["mean_return_ci_lower"]
             figure = px.bar(
                 summary,
                 x="group_label",
                 y="mean_return",
                 color="positive_share",
                 text="observations",
+                error_y="ci_error_plus",
+                error_y_minus="ci_error_minus",
                 color_continuous_scale="RdYlGn",
                 range_color=[0, 1],
                 title=chart_title,
@@ -1308,6 +1312,8 @@ def bitcoin_research_page() -> None:
                         "mean_return",
                         "median_return",
                         "positive_share",
+                        "mean_return_ci_lower",
+                        "mean_return_ci_upper",
                         "mean_maximum_upside",
                         "mean_maximum_downside",
                         "mean_maximum_drawdown",
@@ -1325,6 +1331,12 @@ def bitcoin_research_page() -> None:
                     "positive_share": st.column_config.NumberColumn(
                         "Positive share", format="percent"
                     ),
+                    "mean_return_ci_lower": st.column_config.NumberColumn(
+                        "95% CI lower", format="percent"
+                    ),
+                    "mean_return_ci_upper": st.column_config.NumberColumn(
+                        "95% CI upper", format="percent"
+                    ),
                     "mean_maximum_upside": st.column_config.NumberColumn(
                         "Avg. max upside", format="percent"
                     ),
@@ -1335,6 +1347,11 @@ def bitcoin_research_page() -> None:
                         "Avg. max drawdown", format="percent"
                     ),
                 },
+            )
+            st.caption(
+                "Error bars are classical 95% Student-t intervals around the arithmetic mean. "
+                "They are descriptive, not forecast intervals; overlapping outcomes can make "
+                "them too narrow."
             )
 
     elif view == "Path outcomes":

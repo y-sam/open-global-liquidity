@@ -537,7 +537,7 @@
       "sha256": "700c58f156386be5fe6796677d5d84baa5913f52dbdcd85e0cef95ebb10af737"
     },
     "us_point_in_time_bitcoin_regimes_snapshot.parquet": {
-      "bytes": 36886,
+      "bytes": 52699,
       "columns": [
         "model_id",
         "model_name",
@@ -550,6 +550,10 @@
         "mean_return",
         "median_return",
         "positive_share",
+        "standard_error",
+        "confidence_level",
+        "mean_return_ci_lower",
+        "mean_return_ci_upper",
         "mean_maximum_upside",
         "mean_maximum_downside",
         "mean_maximum_drawdown",
@@ -561,7 +565,7 @@
         "model_c"
       ],
       "rows": 720,
-      "sha256": "7ea7a12b6de7e7c0a731051bdf09a03f4436757ee03f4d063495449d1f8c042a"
+      "sha256": "7ea496ead5db11c1a06032958b3abd507a4629c42d0baf40a0085db8b909ae76"
     },
     "us_point_in_time_bitcoin_revisions_snapshot.parquet": {
       "bytes": 10460,
@@ -740,10 +744,10 @@
       "sha256": "bdf8208b16142b692540fa8c8678830a1654de0b26ca361190b01f968bac9e37"
     }
   },
-  "generated_at": "2026-08-25T14:27:12.695381+00:00",
+  "generated_at": "2026-08-25T14:27:26.698569+00:00",
   "pipeline_version": "0.1.0",
   "schema_version": 1,
   "snapshot_count": 21,
   "source_commit": "5d9d346d41a6b6dc31a1c839d968eb8a8d3f5e07",
-  "working_tree_dirty": false
+  "working_tree_dirty": true
 }

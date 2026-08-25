@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import math
 
+import numpy as np
 import pandas as pd
+from scipy import stats
 
 from open_global_liquidity.analysis.point_in_time_markets import PAIR_COLUMNS
 
@@ -52,6 +54,10 @@ REGIME_SUMMARY_COLUMNS = [
     "mean_return",
     "median_return",
     "positive_share",
+    "standard_error",
+    "confidence_level",
+    "mean_return_ci_lower",
+    "mean_return_ci_upper",
     "mean_maximum_upside",
     "mean_maximum_downside",
     "mean_maximum_drawdown",
@@ -194,11 +200,21 @@ def build_bitcoin_research_outcomes(
     )
 
 
-def summarize_bitcoin_regimes(outcomes: pd.DataFrame) -> pd.DataFrame:
-    """Summarize forward returns and path risk by vintage regime and transition direction."""
+def summarize_bitcoin_regimes(
+    outcomes: pd.DataFrame,
+    *,
+    confidence_level: float = 0.95,
+) -> pd.DataFrame:
+    """Summarize returns and path risk by vintage regime and transition direction.
+
+    The mean-return interval is the classical Student-t interval. It is a descriptive uncertainty
+    diagnostic, not a forecast interval; overlapping-window dependence can make it too narrow.
+    """
     missing = sorted(set(OUTCOME_COLUMNS) - set(outcomes.columns))
     if missing:
         raise BitcoinResearchError("Bitcoin outcomes are missing: " + ", ".join(missing))
+    if not 0 < confidence_level < 1:
+        raise BitcoinResearchError("confidence_level must be between 0 and 1")
     rows: list[dict[str, object]] = []
     base_groups = ["model_id", "model_name", "publication_lag_weeks", "horizon_months"]
     for sample_policy in ("overlapping", "non_overlapping"):
@@ -216,16 +232,29 @@ def summarize_bitcoin_regimes(outcomes: pd.DataFrame) -> pd.DataFrame:
         for dimension, dimension_sample in dimensions.items():
             for keys, group in dimension_sample.groupby([*base_groups, dimension], sort=True):
                 values = group.dropna(subset=["market_return", "maximum_drawdown_from_peak"])
+                observations = len(values)
+                mean_return = values["market_return"].mean()
+                standard_error = values["market_return"].sem() if observations >= 2 else math.nan
+                if observations >= 2 and np.isfinite(standard_error):
+                    critical = stats.t.ppf((1 + confidence_level) / 2, df=observations - 1)
+                    margin = critical * standard_error
+                    ci_lower, ci_upper = mean_return - margin, mean_return + margin
+                else:
+                    ci_lower, ci_upper = math.nan, math.nan
                 rows.append(
                     {
                         **dict(zip(base_groups, keys[:-1], strict=True)),
                         "sample_policy": sample_policy,
                         "analysis_dimension": dimension,
                         "group_label": keys[-1],
-                        "observations": len(values),
-                        "mean_return": values["market_return"].mean(),
+                        "observations": observations,
+                        "mean_return": mean_return,
                         "median_return": values["market_return"].median(),
                         "positive_share": values["market_return"].gt(0).mean(),
+                        "standard_error": standard_error,
+                        "confidence_level": confidence_level,
+                        "mean_return_ci_lower": ci_lower,
+                        "mean_return_ci_upper": ci_upper,
                         "mean_maximum_upside": values["maximum_upside_from_start"].mean(),
                         "mean_maximum_downside": values["maximum_downside_from_start"].mean(),
                         "mean_maximum_drawdown": values["maximum_drawdown_from_peak"].mean(),
