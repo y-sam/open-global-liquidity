@@ -477,12 +477,44 @@
       ],
       "rows": 1977,
       "sha256": "7c79169800df187c003adab1448302443094d0c1f0a9380551c437cf54265772"
+    },
+    "us_point_in_time_comparison_snapshot.parquet": {
+      "bytes": 26454,
+      "columns": [
+        "information_date",
+        "signal_observation_date",
+        "model_id",
+        "model_name",
+        "vintage_ogli",
+        "vintage_momentum_score",
+        "vintage_regime",
+        "vintage_growth_3m_annualized",
+        "vintage_growth_12m_yoy",
+        "zscore_mode",
+        "zscore_min_periods",
+        "information_set_classification",
+        "retrieved_at",
+        "current_ogli",
+        "current_momentum_score",
+        "current_regime",
+        "ogli_revision",
+        "momentum_revision",
+        "comparison_policy"
+      ],
+      "latest_retrieval": "2026-08-25T12:23:26.431793+00:00",
+      "model_ids": [
+        "model_a",
+        "model_b",
+        "model_c"
+      ],
+      "rows": 201,
+      "sha256": "7e9bcd89a1a2a700d15ca59c5edbacbcd814247741ec785d00846e00cacd83e8"
     }
   },
-  "generated_at": "2026-08-24T16:17:55.524778+00:00",
+  "generated_at": "2026-08-25T12:50:04.524270+00:00",
   "pipeline_version": "0.1.0",
   "schema_version": 1,
-  "snapshot_count": 14,
-  "source_commit": "9c9213e79f3df9a23a804b9f30019c3c69064bee",
+  "snapshot_count": 15,
+  "source_commit": "37351d6bb424a767a3aa91ecc03308156ce7ad36",
   "working_tree_dirty": false
 }
