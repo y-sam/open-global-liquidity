@@ -33,6 +33,8 @@ from dashboard_support import (  # noqa: E402
     load_market_subperiod_statistics,
     load_ogli_data,
     load_point_in_time_comparison,
+    load_point_in_time_market_pairs,
+    load_point_in_time_market_summary,
     load_snapshot_manifest,
     resolve_dashboard_data_path,
 )
@@ -70,6 +72,18 @@ POINT_IN_TIME_COMPARISON_PATH = (
 )
 POINT_IN_TIME_COMPARISON_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_point_in_time_comparison_snapshot.parquet"
+)
+POINT_IN_TIME_MARKET_PAIRS_PATH = (
+    DATA_ROOT / "vintages" / "fred" / "monthly_pilot" / "us_point_in_time_market_pairs.parquet"
+)
+POINT_IN_TIME_MARKET_PAIRS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_point_in_time_market_pairs_snapshot.parquet"
+)
+POINT_IN_TIME_MARKET_SUMMARY_PATH = (
+    DATA_ROOT / "vintages" / "fred" / "monthly_pilot" / "us_point_in_time_market_summary.parquet"
+)
+POINT_IN_TIME_MARKET_SUMMARY_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_point_in_time_market_summary_snapshot.parquet"
 )
 COMPONENT_ORDER = list(COMPONENT_LABELS)
 WINDOW_DAYS = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
@@ -163,6 +177,20 @@ def _load_point_in_time_comparison(path: str, modified_ns: int) -> pd.DataFrame:
     return load_point_in_time_comparison(Path(path))
 
 
+@st.cache_data(show_spinner=False)
+def _load_point_in_time_market_pairs(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated vintage signal/outcome pairs."""
+    del modified_ns
+    return load_point_in_time_market_pairs(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_point_in_time_market_summary(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated vintage market summaries."""
+    del modified_ns
+    return load_point_in_time_market_summary(Path(path))
+
+
 def _source_data() -> tuple[pd.DataFrame, Path, str]:
     data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
     return _load_data(str(data_path), data_path.stat().st_mtime_ns), data_path, data_origin
@@ -249,6 +277,23 @@ def _point_in_time_data() -> tuple[pd.DataFrame, str] | None:
     except DashboardDataError:
         return None
     return _load_point_in_time_comparison(str(path), path.stat().st_mtime_ns), origin
+
+
+def _point_in_time_market_data() -> tuple[pd.DataFrame, pd.DataFrame, str] | None:
+    try:
+        pairs_path, pairs_origin = resolve_dashboard_data_path(
+            POINT_IN_TIME_MARKET_PAIRS_PATH,
+            POINT_IN_TIME_MARKET_PAIRS_SNAPSHOT_PATH,
+        )
+        summary_path, _summary_origin = resolve_dashboard_data_path(
+            POINT_IN_TIME_MARKET_SUMMARY_PATH,
+            POINT_IN_TIME_MARKET_SUMMARY_SNAPSHOT_PATH,
+        )
+    except DashboardDataError:
+        return None
+    pairs = _load_point_in_time_market_pairs(str(pairs_path), pairs_path.stat().st_mtime_ns)
+    summary = _load_point_in_time_market_summary(str(summary_path), summary_path.stat().st_mtime_ns)
+    return pairs, summary, pairs_origin
 
 
 def _show_freshness(frame: pd.DataFrame, label: str, *, max_age_days: int = 14) -> None:
@@ -1164,6 +1209,155 @@ def vintage_pilot_page() -> None:
     st.caption(
         "Comparison policy: exact same weekly signal observation date. Expanding normalization "
         "is recomputed independently inside every ALFRED information set."
+    )
+
+    st.divider()
+    st.header("Point-in-time OGLI vs subsequent markets")
+    st.caption(
+        "Market outcomes begin only after the selected assumed availability delay. Bitcoin is "
+        "the primary comparison; gold and the broad dollar index are robustness context."
+    )
+    try:
+        market_bundle = _point_in_time_market_data()
+    except DashboardDataError as exc:
+        st.error(str(exc), icon=":material/error:")
+        market_bundle = None
+    if market_bundle is None:
+        st.info(
+            "Point-in-time market outputs have not been generated in this environment. The "
+            "existing FRED key is sufficient; Bitcoin, gold, and dollar data require no new key.",
+            icon=":material/query_stats:",
+        )
+        st.code("uv run ogli-point-in-time --publish-dashboard-snapshot", language="zsh")
+        return
+
+    pairs, summaries, market_origin = market_bundle
+    market_labels = {
+        "bitcoin": "Bitcoin",
+        "gold": "Gold (World Bank monthly average)",
+        "broad_usd_index": "Broad U.S. dollar index",
+    }
+    available_markets = [item for item in market_labels if item in set(pairs["market_id"])]
+    controls = st.columns(4)
+    market_id = controls[0].selectbox(
+        "Market outcome",
+        available_markets,
+        format_func=lambda value: market_labels[value],
+        key="pit_market",
+    )
+    horizon = controls[1].selectbox(
+        "Forward horizon",
+        sorted(pairs["horizon_months"].unique()),
+        index=1,
+        format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
+        key="pit_horizon",
+    )
+    sample_policy = controls[2].selectbox(
+        "Sample",
+        ["non_overlapping", "overlapping"],
+        format_func=lambda value: value.replace("_", " ").title(),
+        key="pit_sample",
+    )
+    lag = controls[3].selectbox(
+        "Assumed availability delay",
+        sorted(pairs["publication_lag_weeks"].unique()),
+        index=1,
+        format_func=lambda value: f"{value} week{'s' if value != 1 else ''}",
+        key="pit_lag",
+    )
+
+    model_id = model_options[selected_name]
+    summary_selection = summaries.loc[
+        (summaries["model_id"] == model_id)
+        & (summaries["market_id"] == market_id)
+        & (summaries["horizon_months"] == horizon)
+        & (summaries["sample_policy"] == sample_policy)
+    ].copy()
+    current_summary = summary_selection.loc[summary_selection["publication_lag_weeks"] == lag]
+    if current_summary.empty:
+        st.warning("The selected point-in-time market summary is unavailable.")
+        return
+    metric_row = current_summary.iloc[0]
+    correlation = metric_row["correlation"]
+    with st.container(horizontal=True):
+        st.metric(
+            "Pearson correlation",
+            "Insufficient sample" if pd.isna(correlation) else f"{correlation:+.2f}",
+            border=True,
+        )
+        st.metric("Paired observations", f"{int(metric_row['observations']):,}", border=True)
+        st.metric("Mean forward return", f"{metric_row['mean_return']:.1%}", border=True)
+        st.metric("Positive outcomes", f"{metric_row['positive_share']:.0%}", border=True)
+
+    lag_figure = px.bar(
+        summary_selection,
+        x="publication_lag_weeks",
+        y="correlation",
+        text_auto="+.2f",
+        title=(
+            f"{selected_name} vs {market_labels[market_id]} · "
+            f"{horizon}-month correlation sensitivity"
+        ),
+        labels={
+            "publication_lag_weeks": "Assumed OGLI availability delay (weeks)",
+            "correlation": "Pearson correlation",
+        },
+    )
+    lag_figure.add_hline(y=0, line_color="#6B7280", line_width=1)
+    lag_figure.update_traces(marker_color="#D97706")
+    st.plotly_chart(lag_figure, width="stretch", config={"displaylogo": False})
+
+    selected_pairs = pairs.loc[
+        (pairs["model_id"] == model_id)
+        & (pairs["market_id"] == market_id)
+        & (pairs["horizon_months"] == horizon)
+        & (pairs["publication_lag_weeks"] == lag)
+    ].copy()
+    if sample_policy == "non_overlapping":
+        selected_pairs = selected_pairs.loc[selected_pairs["is_non_overlapping"]]
+    market_name = market_labels[market_id]
+    scatter = px.scatter(
+        selected_pairs,
+        x="vintage_momentum_score",
+        y="market_return",
+        hover_data={
+            "information_date": "|%Y-%m-%d",
+            "signal_available_date": "|%Y-%m-%d",
+            "vintage_ogli": ":.1f",
+        },
+        title=f"Point-in-time OGLI momentum vs {horizon}-month {market_name} return",
+        labels={
+            "vintage_momentum_score": "Point-in-time OGLI momentum score",
+            "market_return": f"{market_name} return",
+        },
+    )
+    scatter.update_traces(marker={"size": 8, "opacity": 0.7, "color": "#2563EB"})
+    scatter.update_yaxes(tickformat=".0%", zeroline=True)
+    st.plotly_chart(scatter, width="stretch", config={"displaylogo": False})
+
+    if market_id == "gold":
+        st.info(
+            "Gold is the World Bank Pink Sheet monthly average in USD per troy ounce. Monthly "
+            "averages are coarser than Bitcoin/dollar closes, so week-level delay sensitivity "
+            "changes only when the assumed start crosses a month end.",
+            icon=":material/info:",
+        )
+    elif market_id == "broad_usd_index":
+        st.info(
+            "A positive return means the broad U.S. dollar index strengthened. Its sign is not "
+            "inverted or optimized to improve the relationship with OGLI.",
+            icon=":material/info:",
+        )
+    st.warning(
+        "These are retrospective, univariate associations. Overlapping outcomes are dependent; "
+        "non-overlapping samples are much smaller. Publication delays are sensitivity assumptions, "
+        "not reconstructed trade timestamps, and correlation does not establish causation or an "
+        "investable signal.",
+        icon=":material/warning:",
+    )
+    st.caption(
+        f"Data mode: {market_origin}. Bitcoin: Coin Metrics Community Data (CC BY-NC 4.0); "
+        "gold: World Bank Pink Sheet monthly data; dollar: Federal Reserve H.10 via FRED."
     )
 
 

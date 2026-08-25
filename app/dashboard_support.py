@@ -167,6 +167,49 @@ POINT_IN_TIME_COMPARISON_COLUMNS = [
     "comparison_policy",
 ]
 
+POINT_IN_TIME_MARKET_PAIR_COLUMNS = [
+    "information_date",
+    "signal_observation_date",
+    "signal_available_date",
+    "model_id",
+    "model_name",
+    "vintage_ogli",
+    "vintage_momentum_score",
+    "vintage_regime",
+    "market_id",
+    "series_id",
+    "provider",
+    "unit",
+    "source_frequency",
+    "publication_lag_weeks",
+    "horizon_months",
+    "start_target_date",
+    "start_observation_date",
+    "start_value",
+    "end_target_date",
+    "end_observation_date",
+    "end_value",
+    "market_return",
+    "is_non_overlapping",
+    "classification",
+]
+
+POINT_IN_TIME_MARKET_SUMMARY_COLUMNS = [
+    "model_id",
+    "model_name",
+    "market_id",
+    "series_id",
+    "publication_lag_weeks",
+    "horizon_months",
+    "sample_policy",
+    "observations",
+    "correlation",
+    "mean_return",
+    "median_return",
+    "positive_share",
+    "classification",
+]
+
 COMPONENT_LABELS = {
     "fed_assets": "Fed total assets",
     "treasury_general_account": "Treasury General Account",
@@ -590,3 +633,46 @@ def load_point_in_time_comparison(path: Path) -> pd.DataFrame:
     if set(result["comparison_policy"].dropna()) != {"same_observation_date"}:
         raise DashboardDataError("Point-in-time comparison has an unsupported date policy")
     return result.sort_values(["information_date", "model_id"]).reset_index(drop=True)
+
+
+def load_point_in_time_market_pairs(path: Path) -> pd.DataFrame:
+    """Load package-calculated vintage-signal and forward-market outcome pairs."""
+    frame = _read_parquet(path, "Point-in-time market pairs")
+    missing = sorted(set(POINT_IN_TIME_MARKET_PAIR_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Point-in-time market pairs are missing: " + ", ".join(missing))
+    result = frame[POINT_IN_TIME_MARKET_PAIR_COLUMNS].copy()
+    date_columns = [
+        "information_date",
+        "signal_observation_date",
+        "signal_available_date",
+        "start_target_date",
+        "start_observation_date",
+        "end_target_date",
+        "end_observation_date",
+    ]
+    for column in date_columns:
+        result[column] = pd.to_datetime(result[column], errors="coerce")
+    if result.empty or result[date_columns].isna().any().any():
+        raise DashboardDataError("Point-in-time market pairs contain invalid dates")
+    if set(result["classification"]) != {"statistical_transformation"}:
+        raise DashboardDataError("Point-in-time market pairs have an unsupported classification")
+    return result.sort_values(
+        ["market_id", "model_id", "publication_lag_weeks", "horizon_months", "information_date"]
+    ).reset_index(drop=True)
+
+
+def load_point_in_time_market_summary(path: Path) -> pd.DataFrame:
+    """Load descriptive point-in-time market summaries calculated by the package."""
+    frame = _read_parquet(path, "Point-in-time market summary")
+    missing = sorted(set(POINT_IN_TIME_MARKET_SUMMARY_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Point-in-time market summary is missing: " + ", ".join(missing))
+    result = frame[POINT_IN_TIME_MARKET_SUMMARY_COLUMNS].copy()
+    if result.empty or not set(result["sample_policy"]).issubset(
+        {"overlapping", "non_overlapping"}
+    ):
+        raise DashboardDataError("Point-in-time market summary has an unsupported sample policy")
+    return result.sort_values(
+        ["market_id", "model_id", "sample_policy", "publication_lag_weeks", "horizon_months"]
+    ).reset_index(drop=True)

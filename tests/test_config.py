@@ -8,7 +8,7 @@ from open_global_liquidity.config import ConfigurationError, load_model_config, 
 def test_load_walcl_config() -> None:
     definitions = load_series_config(Path("config/series.yaml"))
 
-    assert len(definitions) == 8
+    assert len(definitions) == 9
     by_id = {definition.series_id: definition for definition in definitions}
     assert set(by_id) == {
         "WALCL",
@@ -19,6 +19,7 @@ def test_load_walcl_config() -> None:
         "DGS10",
         "DGS2",
         "DTWEXBGS",
+        "CMO-GOLD-MONTHLY",
     }
     walcl = by_id["WALCL"]
     assert walcl.series_id == "WALCL"
@@ -30,6 +31,7 @@ def test_load_walcl_config() -> None:
     assert by_id["btc.PriceUSD"].group == "markets"
     assert by_id["btc.PriceUSD"].provider == "coinmetrics"
     assert by_id["btc.PriceUSD"].unit == "U.S. Dollars per Bitcoin"
+    assert by_id["CMO-GOLD-MONTHLY"].group == "point_in_time_markets"
 
 
 def test_config_rejects_missing_fields(tmp_path: Path) -> None:
@@ -82,6 +84,8 @@ def test_load_model_config() -> None:
     assert config.point_in_time_pilot.frequency == "month_end"
     assert config.point_in_time_pilot.start.isoformat() == "2021-01-31"
     assert config.point_in_time_pilot.current_comparison_policy == "same_observation_date"
+    assert config.point_in_time_pilot.market_publication_lag_weeks == (0, 1, 2, 4)
+    assert config.point_in_time_pilot.market_forward_horizons_months == (1, 3, 6, 12)
 
 
 def test_model_config_rejects_ogli_weights_that_do_not_sum_to_one(tmp_path: Path) -> None:

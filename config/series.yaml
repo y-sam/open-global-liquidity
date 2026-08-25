@@ -84,6 +84,24 @@ US:
       source: "Coin Metrics Community Data"
       source_url: "https://community-api.coinmetrics.io/v4/"
 
+  point_in_time_markets:
+    gold:
+      classification: measured_data
+      provider: world_bank
+      series_id: CMO-GOLD-MONTHLY
+      component: gold
+      title: "World Bank Gold Price, Monthly Average"
+      description: >-
+        Monthly average gold price in nominal U.S. dollars per troy ounce from the World Bank
+        Commodity Price Data (Pink Sheet). It is an outcome series, not an OGLI input; its monthly
+        average is not a daily spot or month-end fixing.
+      unit: "U.S. Dollars per Troy Ounce"
+      frequency: "Monthly Average"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "1960-01-31"
+      source: "World Bank Prospects Group, Commodity Price Data (The Pink Sheet)"
+      source_url: "https://thedocs.worldbank.org/en/doc/18675f1d1639c7a34d463f59263ba0a2-0050012025/worldbank-commodities-price-data-the-pink-sheet"
+
   context:
     treasury_yield_10y:
       classification: measured_data

@@ -31,6 +31,14 @@ The primary market-validation series is:
   published as Community Data under CC BY-NC 4.0. It is used for independent,
   non-commercial research and can therefore support the complete hosted comparison workspace.
 
+Additional point-in-time outcome series are:
+
+- [World Bank Commodity Price Data (Pink Sheet)](https://thedocs.worldbank.org/en/doc/18675f1d1639c7a34d463f59263ba0a2-0050012025/worldbank-commodities-price-data-the-pink-sheet):
+  monthly-average gold price in nominal USD per troy ounce, redistributed with attribution under
+  the World Bank dataset terms (default CC BY 4.0 for World Bank-produced open datasets);
+- [`DTWEXBGS`](https://fred.stlouisfed.org/series/DTWEXBGS): daily nominal broad U.S. dollar index
+  from Federal Reserve H.10 via FRED (public domain; citation requested).
+
 Measured macro context, kept separate from OGLI inputs, now includes:
 
 - [`DGS10`](https://fred.stlouisfed.org/series/DGS10): 10-year Treasury constant-maturity yield;
@@ -180,19 +188,20 @@ The configured pilot begins on 2021-01-31. `RRPONTSYD` has usable history only f
 and the index then needs 52 weeks for year-over-year growth plus 104 valid observations for its
 expanding normalization. Starting earlier would require weakening the declared history rule.
 
-The command writes three ignored local files under `data/vintages/fred/monthly_pilot/`: the long
-ALFRED input archive, one monthly reading per model and information date, and exact-date
-current-vintage comparisons. Raw multi-vintage responses are cached under
+The command writes six ignored local files under `data/vintages/fred/monthly_pilot/`: the long
+ALFRED input archive, one monthly reading per model and information date, exact-date
+current-vintage comparisons, standardized Bitcoin/gold/dollar levels, point-in-time outcome pairs,
+and descriptive summaries. Raw multi-vintage responses are cached under
 `data/raw/fred/vintage_batches/`. These files are reproducible but intentionally not committed.
-The explicit publication option writes only the small derived comparison to
-`data/reference/us_point_in_time_comparison_snapshot.parquet`; it does not publish the raw ALFRED
-archive. The pilot does not reconstruct intraday release timestamps, market-close availability,
-or every provider publication lag, so it is not yet a strict tradable-signal backtest.
+The explicit publication option writes the small derived comparison and market-research files to
+`data/reference/`; it does not publish the raw ALFRED archive. The pilot does not reconstruct
+intraday release timestamps or exact trade availability. Instead, it reports predeclared 0-, 1-,
+2-, and 4-week availability-delay assumptions, so it is not a strict tradable-signal backtest.
 
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
 
-The publication commands together write fifteen Git-versioned Parquet
+The publication commands together write eighteen Git-versioned Parquet
 artifacts plus a JSON provenance manifest:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
@@ -216,6 +225,12 @@ artifacts plus a JSON provenance manifest:
   dollar index for dashboard presentation.
 - `data/reference/us_point_in_time_comparison_snapshot.parquet` — derived monthly vintage/current
   OGLI comparisons; raw ALFRED observations remain excluded.
+- `data/reference/us_point_in_time_market_series_snapshot.parquet` — standardized public Bitcoin,
+  World Bank monthly-average gold, and broad-dollar outcome levels.
+- `data/reference/us_point_in_time_market_pairs_snapshot.parquet` — vintage OGLI signals paired
+  with subsequent 1-, 3-, 6-, and 12-month returns under four availability-delay assumptions.
+- `data/reference/us_point_in_time_market_summary_snapshot.parquet` — correlations, sample sizes,
+  mean/median returns, and positive-return shares for overlapping and non-overlapping samples.
 - `data/reference/dashboard_snapshot_manifest.json` — generation time, pipeline version, source
   commit, row/date coverage, and SHA-256 digest for every published Parquet file.
 
@@ -228,7 +243,7 @@ mode and source retrieval time.
 
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
-environment, downloads fresh FRED, ALFRED, and Coin Metrics observations, regenerates the fifteen
+environment, downloads fresh FRED, ALFRED, Coin Metrics, and World Bank observations, regenerates the eighteen
 public Parquet snapshots and provenance manifest, and runs formatting, linting, and offline tests. Only
 successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
@@ -361,9 +376,14 @@ calibrate OGLI weights or regimes.
 
 The monthly ALFRED pilot now implements a scheduled month-end grid and calculates every model
 separately inside each sealed information set. It compares historical and current-vintage results
-only at the same weekly signal date. A stricter investable backtest still requires source-specific
-publication timestamps and availability rules; the published index therefore remains clearly
-labeled current-vintage.
+only at the same weekly signal date. It also compares the vintage momentum score with subsequent
+Bitcoin, gold, and broad-dollar returns over 1, 3, 6, and 12 months. The predeclared 0-, 1-, 2-, and
+4-week delays test sensitivity to assumed signal usability; they do not claim to reconstruct exact
+release timestamps. Gold is the World Bank Pink Sheet monthly average, not a spot or month-end
+fixing. A positive dollar return means dollar strength and is never sign-inverted to improve fit.
+Both overlapping and mechanically non-overlapping samples are retained. A stricter investable
+backtest still requires source-specific publication timestamps and availability rules; the
+published index therefore remains clearly labeled current-vintage.
 
 Published snapshots are auditable at the bundle level through
 `data/reference/dashboard_snapshot_manifest.json`. Its generation timestamp is distinct from each
@@ -377,10 +397,11 @@ causes, predicts, or has been fitted to the other.
 
 ## Roadmap
 
-The next market additions may include gold after its source and redistribution terms are verified.
-Treasury yields, the 10-year-minus-2-year slope, and the broad dollar index are now available as
-measured context but are not OGLI inputs. S&P 500 may return after appropriate public-display rights
-are secured. Later versions may add global
+Bitcoin is the primary market comparison. Gold now uses the World Bank Pink Sheet monthly dataset,
+and the Federal Reserve broad dollar index is included without changing its sign. Both remain
+outcome/context variables rather than OGLI inputs. Treasury yields and the 10-year-minus-2-year
+slope remain measured context. S&P 500 may return after appropriate public-display rights are
+secured. Later versions may add global
 central banks, FX conversion, collateral and repo proxies, shadow monetary base concepts, BIS
 cross-border credit, and explicitly labeled public benchmark calibration.
 

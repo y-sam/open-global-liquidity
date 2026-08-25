@@ -89,6 +89,9 @@ jobs:
             data/reference/us_macro_context_weekly_snapshot.parquet \
             data/reference/us_macro_context_indicators_snapshot.parquet \
             data/reference/us_point_in_time_comparison_snapshot.parquet \
+            data/reference/us_point_in_time_market_series_snapshot.parquet \
+            data/reference/us_point_in_time_market_pairs_snapshot.parquet \
+            data/reference/us_point_in_time_market_summary_snapshot.parquet \
             data/reference/dashboard_snapshot_manifest.json
 
           if git diff --cached --quiet; then

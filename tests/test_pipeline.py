@@ -133,6 +133,11 @@ point_in_time_pilot:
   frequency: month_end
   start: '2021-01-31'
   current_comparison_policy: same_observation_date
+  market_analysis:
+    classification: model_assumption
+    publication_lag_weeks: [0, 1, 2, 4]
+    forward_horizons_months: [1, 3, 6, 12]
+    correlation_min_periods: 12
 """.strip(),
         encoding="utf-8",
     )

@@ -151,6 +151,9 @@ class PointInTimePilotConfig:
     frequency: str
     start: date
     current_comparison_policy: str
+    market_publication_lag_weeks: tuple[int, ...]
+    market_forward_horizons_months: tuple[int, ...]
+    market_correlation_min_periods: int
 
 
 @dataclass(frozen=True, slots=True)
@@ -316,7 +319,13 @@ def load_model_config(path: Path) -> ModelConfig:
 def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
     if not isinstance(raw, dict):
         raise ConfigurationError("point_in_time_pilot must be a mapping")
-    required = {"classification", "frequency", "start", "current_comparison_policy"}
+    required = {
+        "classification",
+        "frequency",
+        "start",
+        "current_comparison_policy",
+        "market_analysis",
+    }
     missing = sorted(required - raw.keys())
     if missing:
         raise ConfigurationError(f"point_in_time_pilot is missing fields: {', '.join(missing)}")
@@ -332,11 +341,52 @@ def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
         pilot_start = date.fromisoformat(str(raw["start"]))
     except ValueError as exc:
         raise ConfigurationError("point_in_time_pilot.start must be an ISO date") from exc
+    market = raw["market_analysis"]
+    if not isinstance(market, dict):
+        raise ConfigurationError("point_in_time_pilot.market_analysis must be a mapping")
+    market_required = {
+        "classification",
+        "publication_lag_weeks",
+        "forward_horizons_months",
+        "correlation_min_periods",
+    }
+    market_missing = sorted(market_required - market.keys())
+    if market_missing:
+        raise ConfigurationError(
+            "point_in_time_pilot.market_analysis is missing fields: " + ", ".join(market_missing)
+        )
+    if market["classification"] != "model_assumption":
+        raise ConfigurationError(
+            "point_in_time_pilot.market_analysis must be classified as model_assumption"
+        )
+    try:
+        lags = tuple(int(item) for item in market["publication_lag_weeks"])
+        horizons = tuple(int(item) for item in market["forward_horizons_months"])
+        min_periods = int(market["correlation_min_periods"])
+    except (TypeError, ValueError) as exc:
+        raise ConfigurationError("point-in-time market periods must be integers") from exc
+    if not lags or lags != tuple(sorted(set(lags))) or any(item < 0 for item in lags):
+        raise ConfigurationError(
+            "point-in-time publication lags must be unique, increasing, and non-negative"
+        )
+    if (
+        not horizons
+        or horizons != tuple(sorted(set(horizons)))
+        or any(item < 1 for item in horizons)
+    ):
+        raise ConfigurationError(
+            "point-in-time forward horizons must be unique, increasing, and positive"
+        )
+    if min_periods < 3:
+        raise ConfigurationError("point-in-time correlation_min_periods must be at least 3")
     return PointInTimePilotConfig(
         classification=str(raw["classification"]),
         frequency=str(raw["frequency"]),
         start=pilot_start,
         current_comparison_policy=str(raw["current_comparison_policy"]),
+        market_publication_lag_weeks=lags,
+        market_forward_horizons_months=horizons,
+        market_correlation_min_periods=min_periods,
     )
 
 

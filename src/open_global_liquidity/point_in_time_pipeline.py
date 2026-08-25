@@ -11,8 +11,14 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
+from open_global_liquidity.analysis.point_in_time_markets import (
+    PointInTimeMarketError,
+    build_point_in_time_market_pairs,
+    summarize_point_in_time_market_pairs,
+)
 from open_global_liquidity.config import ConfigurationError, load_model_config, load_series_config
 from open_global_liquidity.data.fred import FredError, FredProvider
+from open_global_liquidity.data.world_bank import WorldBankError, WorldBankProvider
 from open_global_liquidity.point_in_time import (
     PointInTimeError,
     build_month_end_grid,
@@ -36,9 +42,10 @@ def run_point_in_time_pipeline(
     """Fetch monthly ALFRED information sets and write local vintage OGLI research files."""
     load_dotenv(project_root / ".env")
     config = load_model_config(project_root / "config" / "model.yaml")
+    all_definitions = load_series_config(project_root / "config" / "series.yaml")
     definitions = [
         definition
-        for definition in load_series_config(project_root / "config" / "series.yaml")
+        for definition in all_definitions
         if definition.country == "US"
         and definition.group == "liquidity"
         and definition.provider.lower() == "fred"
@@ -93,8 +100,43 @@ def run_point_in_time_pipeline(
     comparison_path = output_dir / "us_point_in_time_comparison.parquet"
     comparison.to_parquet(comparison_path, index=False)
     LOGGER.info("Wrote %d current-vintage comparisons to %s", len(comparison), comparison_path)
+
+    market_levels = _load_point_in_time_market_levels(
+        all_definitions,
+        project_root=project_root,
+        start=start or config.point_in_time_pilot.start,
+        end=requested_end,
+        force_refresh=force_refresh,
+    )
+    market_levels_path = output_dir / "us_point_in_time_market_series.parquet"
+    market_levels.to_parquet(market_levels_path, index=False)
+    market_pairs = build_point_in_time_market_pairs(
+        point_in_time,
+        market_levels,
+        publication_lag_weeks=config.point_in_time_pilot.market_publication_lag_weeks,
+        forward_horizons_months=config.point_in_time_pilot.market_forward_horizons_months,
+    )
+    market_pairs_path = output_dir / "us_point_in_time_market_pairs.parquet"
+    market_pairs.to_parquet(market_pairs_path, index=False)
+    market_summary = summarize_point_in_time_market_pairs(
+        market_pairs,
+        min_periods=config.point_in_time_pilot.market_correlation_min_periods,
+    )
+    market_summary_path = output_dir / "us_point_in_time_market_summary.parquet"
+    market_summary.to_parquet(market_summary_path, index=False)
+    LOGGER.info(
+        "Wrote %d point-in-time market pairs and %d summaries",
+        len(market_pairs),
+        len(market_summary),
+    )
     if publish_dashboard_snapshot:
-        _publish_dashboard_snapshot(comparison, project_root=project_root)
+        _publish_dashboard_snapshot(
+            comparison,
+            market_levels=market_levels,
+            market_pairs=market_pairs,
+            market_summary=market_summary,
+            project_root=project_root,
+        )
 
     print(
         f"Point-in-time pilot complete: {len(information_dates)} month ends, "
@@ -103,12 +145,74 @@ def run_point_in_time_pipeline(
     return output_path
 
 
-def _publish_dashboard_snapshot(comparison: pd.DataFrame, *, project_root: Path) -> Path:
+def _load_point_in_time_market_levels(
+    definitions: list,
+    *,
+    project_root: Path,
+    start: str | date,
+    end: str | date,
+    force_refresh: bool,
+) -> pd.DataFrame:
+    """Load pipeline-produced Bitcoin/USD levels and fetch World Bank monthly gold."""
+    processed = project_root / "data" / "processed"
+    bitcoin_path = processed / "us_market_series.parquet"
+    context_path = processed / "us_macro_context_series.parquet"
+    missing = [path for path in (bitcoin_path, context_path) if not path.is_file()]
+    if missing:
+        raise PointInTimeError(
+            "Current market/context files are missing. Run `uv run ogli-pipeline` before the "
+            "point-in-time pilot."
+        )
+    bitcoin = pd.read_parquet(bitcoin_path).loc[lambda frame: frame["component"] == "bitcoin"]
+    dollar = pd.read_parquet(context_path).loc[
+        lambda frame: frame["component"] == "broad_usd_index"
+    ]
+    gold_definitions = [
+        item
+        for item in definitions
+        if item.country == "US"
+        and item.group == "point_in_time_markets"
+        and item.provider.lower() == "world_bank"
+    ]
+    if len(gold_definitions) != 1:
+        raise PointInTimeError(
+            "Exactly one World Bank point-in-time gold series must be configured"
+        )
+    gold = WorldBankProvider(
+        cache_dir=project_root / "data" / "raw" / "world_bank"
+    ).fetch_definition(
+        gold_definitions[0],
+        start=start,
+        end=end,
+        force_refresh=force_refresh,
+    )
+    result = pd.concat([bitcoin, dollar, gold], ignore_index=True)
+    if result.empty or set(result["component"]) != {"bitcoin", "broad_usd_index", "gold"}:
+        raise PointInTimeError("Bitcoin, broad-dollar, and gold market levels are all required")
+    return result.sort_values(["component", "date"]).reset_index(drop=True)
+
+
+def _publish_dashboard_snapshot(
+    comparison: pd.DataFrame,
+    *,
+    project_root: Path,
+    market_levels: pd.DataFrame | None = None,
+    market_pairs: pd.DataFrame | None = None,
+    market_summary: pd.DataFrame | None = None,
+) -> Path:
     """Publish the small derived comparison and refresh whole-bundle provenance."""
     snapshot_dir = project_root / "data" / "reference"
     snapshot_dir.mkdir(parents=True, exist_ok=True)
     snapshot_path = snapshot_dir / "us_point_in_time_comparison_snapshot.parquet"
     comparison.to_parquet(snapshot_path, index=False)
+    additions = {
+        "us_point_in_time_market_series_snapshot.parquet": market_levels,
+        "us_point_in_time_market_pairs_snapshot.parquet": market_pairs,
+        "us_point_in_time_market_summary_snapshot.parquet": market_summary,
+    }
+    for filename, frame in additions.items():
+        if frame is not None:
+            frame.to_parquet(snapshot_dir / filename, index=False)
     snapshots = {
         path.name: pd.read_parquet(path) for path in sorted(snapshot_dir.glob("*_snapshot.parquet"))
     }
@@ -156,8 +260,10 @@ def main() -> None:
         FredError,
         OSError,
         PointInTimeError,
+        PointInTimeMarketError,
         ProvenanceError,
         ValueError,
+        WorldBankError,
     ) as exc:
         raise SystemExit(f"Point-in-time pilot failed: {exc}") from exc
 

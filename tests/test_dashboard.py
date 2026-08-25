@@ -194,6 +194,71 @@ def test_load_point_in_time_comparison_validates_exact_date_policy(tmp_path: Pat
     assert result.loc[0, "signal_observation_date"] == pd.Timestamp("2024-01-24")
 
 
+def test_load_point_in_time_market_outputs(tmp_path: Path) -> None:
+    support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
+    spec = importlib.util.spec_from_file_location("dashboard_support_pit_market_test", support_path)
+    assert spec is not None and spec.loader is not None
+    support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(support)
+    pair_path = tmp_path / "pairs.parquet"
+    summary_path = tmp_path / "summary.parquet"
+    pair = {column: None for column in support.POINT_IN_TIME_MARKET_PAIR_COLUMNS}
+    pair.update(
+        {
+            "information_date": pd.Timestamp("2024-01-31"),
+            "signal_observation_date": pd.Timestamp("2024-01-24"),
+            "signal_available_date": pd.Timestamp("2024-02-07"),
+            "model_id": "model_b",
+            "model_name": "Model B",
+            "vintage_ogli": 55.0,
+            "vintage_momentum_score": 0.1,
+            "vintage_regime": "Neutral",
+            "market_id": "bitcoin",
+            "series_id": "btc.PriceUSD",
+            "provider": "Coin Metrics",
+            "unit": "U.S. Dollars per Bitcoin",
+            "source_frequency": "Daily",
+            "publication_lag_weeks": 1,
+            "horizon_months": 3,
+            "start_target_date": pd.Timestamp("2024-02-07"),
+            "start_observation_date": pd.Timestamp("2024-02-07"),
+            "start_value": 43_000.0,
+            "end_target_date": pd.Timestamp("2024-05-07"),
+            "end_observation_date": pd.Timestamp("2024-05-07"),
+            "end_value": 63_000.0,
+            "market_return": 63_000 / 43_000 - 1,
+            "is_non_overlapping": True,
+            "classification": "statistical_transformation",
+        }
+    )
+    pd.DataFrame([pair]).to_parquet(pair_path, index=False)
+    summary = {column: None for column in support.POINT_IN_TIME_MARKET_SUMMARY_COLUMNS}
+    summary.update(
+        {
+            "model_id": "model_b",
+            "model_name": "Model B",
+            "market_id": "bitcoin",
+            "series_id": "btc.PriceUSD",
+            "publication_lag_weeks": 1,
+            "horizon_months": 3,
+            "sample_policy": "overlapping",
+            "observations": 12,
+            "correlation": 0.2,
+            "mean_return": 0.1,
+            "median_return": 0.08,
+            "positive_share": 0.6,
+            "classification": "descriptive_statistic",
+        }
+    )
+    pd.DataFrame([summary]).to_parquet(summary_path, index=False)
+
+    loaded_pairs = support.load_point_in_time_market_pairs(pair_path)
+    loaded_summary = support.load_point_in_time_market_summary(summary_path)
+
+    assert loaded_pairs.loc[0, "market_return"] == pytest.approx(63_000 / 43_000 - 1)
+    assert loaded_summary.loc[0, "correlation"] == 0.2
+
+
 def test_freshness_status_flags_old_observations() -> None:
     support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
     spec = importlib.util.spec_from_file_location("dashboard_support_freshness_test", support_path)
