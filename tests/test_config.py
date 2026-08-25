@@ -79,6 +79,9 @@ def test_load_model_config() -> None:
         "recent_cycle",
     ]
     assert config.market_analysis.research_subperiods[-1].end is None
+    assert config.point_in_time_pilot.frequency == "month_end"
+    assert config.point_in_time_pilot.start.isoformat() == "2021-01-31"
+    assert config.point_in_time_pilot.current_comparison_policy == "same_observation_date"
 
 
 def test_model_config_rejects_ogli_weights_that_do_not_sum_to_one(tmp_path: Path) -> None:

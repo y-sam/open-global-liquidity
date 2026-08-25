@@ -57,8 +57,9 @@ The project will keep three categories separate:
 3. **Calibrated parameters** — parameters fitted to an explicitly identified target, if introduced.
 
 This milestone contains measured data plus explicitly classified model assumptions. No parameters
-have been empirically calibrated. FRED observations are current-vintage data and may contain
-revisions; the cache is not a vintage-data archive.
+have been empirically calibrated. The main weekly pipeline uses current-vintage FRED observations.
+A separate local monthly pilot reconstructs OGLI from ALFRED information sets and never silently
+replaces the published current-vintage index.
 
 ## macOS setup
 
@@ -163,6 +164,28 @@ silently mixed with revised current data. The optional comparison writes
 revised, unchanged, or missing from the current vintage. A difference identifies a revision but
 does not infer its economic or methodological cause.
 
+### Run the monthly point-in-time OGLI pilot
+
+The point-in-time pilot fetches all configured US liquidity inputs in batched ALFRED requests,
+recalculates weekly alignment, Models A/B/C, growth, and expanding OGLI independently inside every
+month-end information set, and compares the result with today's calculation at the exact same
+weekly signal observation date:
+
+```zsh
+uv run ogli-point-in-time
+```
+
+The configured pilot begins on 2021-01-31. `RRPONTSYD` has usable history only from December 2017,
+and the index then needs 52 weeks for year-over-year growth plus 104 valid observations for its
+expanding normalization. Starting earlier would require weakening the declared history rule.
+
+The command writes three ignored local files under `data/vintages/fred/monthly_pilot/`: the long
+ALFRED input archive, one monthly reading per model and information date, and exact-date
+current-vintage comparisons. Raw multi-vintage responses are cached under
+`data/raw/fred/vintage_batches/`. These files are reproducible but intentionally not committed.
+The pilot does not reconstruct intraday release timestamps, market-close availability, or every
+provider publication lag, so it is not yet a strict tradable-signal backtest.
+
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
 
@@ -222,11 +245,13 @@ Run the pipeline first, then launch Streamlit:
 
 ```zsh
 uv run python -m open_global_liquidity.pipeline --start 2020-01-01
+uv run ogli-point-in-time
 uv run streamlit run app/streamlit_app.py
 ```
 
 Streamlit opens the dashboard at `http://localhost:8501`. The app shows latest measured balances,
-the three model levels, an OGLI page, a Liquidity vs markets workspace, a log-scale Bitcoin/OGLI
+the three model levels, an OGLI page, a local point-in-time pilot, a Liquidity vs markets workspace,
+a log-scale Bitcoin/OGLI
 timeline, Bitcoin-focused landing metrics, history, a component explorer, recent source
 observations, and methodology notes. Top navigation separates a
 plain-language landing page, the OGLI index, market validation, the data dashboard, and a research
@@ -275,6 +300,8 @@ directory, and verifies that the public snapshots still render the landing-page 
 - `src/open_global_liquidity/analysis/subperiods.py` — predeclared Bitcoin stability diagnostics.
 - `src/open_global_liquidity/provenance.py` — snapshot hashes and point-in-time manifest metadata.
 - `src/open_global_liquidity/vintage_pipeline.py` — explicit local ALFRED as-of capture.
+- `src/open_global_liquidity/point_in_time.py` — sealed-vintage OGLI and exact-date comparison.
+- `src/open_global_liquidity/point_in_time_pipeline.py` — monthly ALFRED pilot orchestration.
 - `src/open_global_liquidity/dashboard.py` — tested dashboard data loading and unit conversion.
 - `src/open_global_liquidity/pipeline.py` — executable orchestration and Parquet output.
 - `app/streamlit_app.py` — presentation-only Streamlit application.
@@ -327,10 +354,11 @@ one-week availability assumption nor current-vintage FRED observations fully rep
 investor knew historically. Correlation does not establish causation, and the results do not
 calibrate OGLI weights or regimes.
 
-The ALFRED capture CLI is the first vintage-aware building block. A genuine point-in-time OGLI
-backtest still requires a scheduled vintage grid, explicit release-availability rules for every
-input, and model calculation separately inside each information set. Until that work is complete,
-the published index remains clearly labeled current-vintage.
+The monthly ALFRED pilot now implements a scheduled month-end grid and calculates every model
+separately inside each sealed information set. It compares historical and current-vintage results
+only at the same weekly signal date. A stricter investable backtest still requires source-specific
+publication timestamps and availability rules; the published index therefore remains clearly
+labeled current-vintage.
 
 Published snapshots are auditable at the bundle level through
 `data/reference/dashboard_snapshot_manifest.json`. Its generation timestamp is distinct from each

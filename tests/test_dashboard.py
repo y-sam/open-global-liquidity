@@ -163,6 +163,37 @@ def test_loads_calculated_ogli_and_selects_latest_available_reading(tmp_path: Pa
     assert latest["date"] == pd.Timestamp("2024-01-10")
 
 
+def test_load_point_in_time_comparison_validates_exact_date_policy(tmp_path: Path) -> None:
+    support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
+    spec = importlib.util.spec_from_file_location("dashboard_support_vintage_test", support_path)
+    assert spec is not None and spec.loader is not None
+    support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(support)
+    path = tmp_path / "point_in_time.parquet"
+    pd.DataFrame(
+        {
+            "information_date": pd.to_datetime(["2024-01-31"]),
+            "signal_observation_date": pd.to_datetime(["2024-01-24"]),
+            "model_id": ["model_a"],
+            "model_name": ["Model A"],
+            "vintage_ogli": [40.0],
+            "vintage_momentum_score": [-0.2],
+            "vintage_regime": ["Below normal"],
+            "current_ogli": [44.0],
+            "current_momentum_score": [-0.1],
+            "current_regime": ["Below normal"],
+            "ogli_revision": [4.0],
+            "momentum_revision": [0.1],
+            "comparison_policy": ["same_observation_date"],
+        }
+    ).to_parquet(path, index=False)
+
+    result = support.load_point_in_time_comparison(path)
+
+    assert result.loc[0, "ogli_revision"] == 4.0
+    assert result.loc[0, "signal_observation_date"] == pd.Timestamp("2024-01-24")
+
+
 def test_freshness_status_flags_old_observations() -> None:
     support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
     spec = importlib.util.spec_from_file_location("dashboard_support_freshness_test", support_path)

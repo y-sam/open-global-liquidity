@@ -128,6 +128,11 @@ market_analysis:
   rolling_window_weeks: 2
   rolling_min_periods: 2
   description: Test market analysis
+point_in_time_pilot:
+  classification: model_assumption
+  frequency: month_end
+  start: '2021-01-31'
+  current_comparison_policy: same_observation_date
 """.strip(),
         encoding="utf-8",
     )

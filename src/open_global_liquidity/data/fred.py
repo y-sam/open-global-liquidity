@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import logging
 import os
+from collections.abc import Sequence
 from datetime import UTC, date, datetime, timedelta
+from hashlib import sha256
 from pathlib import Path
 from typing import Any
 
@@ -278,6 +280,137 @@ class FredProvider:
         )
         return frame
 
+    def fetch_vintage_batch_definition(
+        self,
+        definition: SeriesDefinition,
+        *,
+        vintage_dates: Sequence[str | date],
+        start: str | date | None = None,
+        end: str | date | None = None,
+        force_refresh: bool = False,
+    ) -> pd.DataFrame:
+        """Fetch multiple ALFRED information sets in one output-type-2 request.
+
+        ALFRED returns a cross-tab with observation dates as rows and requested vintage dates as
+        columns. This method converts it to the same explicit long vintage contract used by the
+        single-date capture. Output type 2 does not provide real-time interval bounds for each
+        cell, so those fields remain missing rather than being inferred.
+        """
+        as_of_dates = tuple(sorted({_coerce_date(item, "vintage_date") for item in vintage_dates}))
+        if not as_of_dates:
+            raise ValueError("vintage_dates cannot be empty")
+        if len(as_of_dates) > 2_000:
+            raise ValueError("vintage_dates cannot exceed the documented JSON limit of 2000")
+        start_date = _coerce_date(start or definition.start, "start")
+        end_date = _coerce_date(end, "end") if end is not None else as_of_dates[-1]
+        if end_date < start_date:
+            raise ValueError("end must be on or after start")
+        if as_of_dates[0] < start_date:
+            raise ValueError("vintage dates cannot precede the requested observation start")
+
+        signature = sha256(",".join(item.isoformat() for item in as_of_dates).encode()).hexdigest()[
+            :12
+        ]
+        cache_path = (
+            self.cache_dir
+            / "vintage_batches"
+            / definition.series_id
+            / f"{as_of_dates[0]}_{as_of_dates[-1]}_{len(as_of_dates)}_{signature}.parquet"
+        )
+        if cache_path.is_file() and not force_refresh:
+            frame = pd.read_parquet(cache_path)
+            frame[["realtime_start", "realtime_end"]] = frame[
+                ["realtime_start", "realtime_end"]
+            ].astype("string")
+            _validate_vintage_batch(frame, definition.series_id, as_of_dates)
+            LOGGER.info(
+                "Vintage batch cache hit for %s (%d dates)",
+                definition.series_id,
+                len(as_of_dates),
+            )
+            return frame
+
+        params: dict[str, str] = {
+            "series_id": definition.series_id,
+            "api_key": self.api_key,
+            "file_type": "json",
+            "observation_start": start_date.isoformat(),
+            "observation_end": end_date.isoformat(),
+            "vintage_dates": ",".join(item.isoformat() for item in as_of_dates),
+            "output_type": "2",
+            "sort_order": "asc",
+        }
+        payload = self._request_json(
+            FRED_OBSERVATIONS_URL,
+            params=params,
+            request_label=(
+                f"ALFRED batch request for {definition.series_id} across {len(as_of_dates)} dates"
+            ),
+        )
+        observations = payload.get("observations") if isinstance(payload, dict) else None
+        if not isinstance(observations, list) or not observations:
+            raise FredResponseError(
+                f"ALFRED batch response for {definition.series_id} has no observations"
+            )
+        raw = pd.DataFrame(observations)
+        if "date" not in raw.columns:
+            raise FredResponseError(
+                f"ALFRED batch response for {definition.series_id} is missing observation dates"
+            )
+        observation_dates = pd.to_datetime(raw["date"], errors="coerce")
+        if observation_dates.isna().any():
+            raise FredResponseError(
+                f"ALFRED batch response for {definition.series_id} has invalid dates"
+            )
+        retrieved_at = pd.Timestamp.now(tz=UTC)
+        frames: list[pd.DataFrame] = []
+        for as_of in as_of_dates:
+            value_column = f"{definition.series_id}_{as_of:%Y%m%d}"
+            if value_column not in raw.columns:
+                raise FredResponseError(
+                    f"ALFRED batch response for {definition.series_id} is missing {value_column}"
+                )
+            available = observation_dates <= pd.Timestamp(as_of)
+            values = pd.to_numeric(
+                raw.loc[available, value_column].replace(".", pd.NA), errors="coerce"
+            )
+            frames.append(
+                pd.DataFrame(
+                    {
+                        "observation_date": observation_dates.loc[available].to_numpy(),
+                        "vintage_date": pd.Timestamp(as_of),
+                        "country": definition.country,
+                        "provider": "ALFRED",
+                        "series_id": definition.series_id,
+                        "component": definition.component,
+                        "value": values.to_numpy(),
+                        "unit": definition.unit,
+                        "frequency": definition.frequency,
+                        "realtime_start": pd.NA,
+                        "realtime_end": pd.NA,
+                        "retrieved_at": retrieved_at,
+                    }
+                )
+            )
+        frame = pd.concat(frames, ignore_index=True)[VINTAGE_COLUMNS]
+        frame["observation_date"] = frame["observation_date"].astype("datetime64[ns]")
+        frame["vintage_date"] = frame["vintage_date"].astype("datetime64[ns]")
+        frame[["realtime_start", "realtime_end"]] = frame[
+            ["realtime_start", "realtime_end"]
+        ].astype("string")
+        frame = frame.sort_values(["vintage_date", "observation_date"]).reset_index(drop=True)
+        _validate_vintage_batch(frame, definition.series_id, as_of_dates)
+        cache_path.parent.mkdir(parents=True, exist_ok=True)
+        frame.to_parquet(cache_path, index=False)
+        LOGGER.info(
+            "Wrote %d %s observations across %d ALFRED vintages to %s",
+            len(frame),
+            definition.series_id,
+            len(as_of_dates),
+            cache_path,
+        )
+        return frame
+
     def _get_raw_observations(
         self,
         *,
@@ -426,6 +559,24 @@ def _validate_vintage_frame(frame: pd.DataFrame, series_id: str, vintage_date: d
         raise FredResponseError(f"Cached ALFRED data for {series_id} has invalid observations")
     if not frame["vintage_date"].eq(pd.Timestamp(vintage_date)).all():
         raise FredResponseError(f"Cached ALFRED data for {series_id} has the wrong vintage date")
+
+
+def _validate_vintage_batch(
+    frame: pd.DataFrame,
+    series_id: str,
+    vintage_dates: Sequence[date],
+) -> None:
+    missing = [column for column in VINTAGE_COLUMNS if column not in frame.columns]
+    if missing:
+        raise FredResponseError(
+            f"Cached ALFRED batch for {series_id} is missing: {', '.join(missing)}"
+        )
+    if frame.empty or frame["value"].notna().sum() == 0:
+        raise FredResponseError(f"Cached ALFRED batch for {series_id} has no numeric values")
+    actual = set(pd.to_datetime(frame["vintage_date"]).dt.date)
+    expected = set(vintage_dates)
+    if actual != expected:
+        raise FredResponseError(f"Cached ALFRED batch for {series_id} has wrong vintage dates")
 
 
 def _fred_error_detail(response: httpx.Response) -> str:

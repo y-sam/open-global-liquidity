@@ -32,6 +32,7 @@ from dashboard_support import (  # noqa: E402
     load_market_regime_statistics,
     load_market_subperiod_statistics,
     load_ogli_data,
+    load_point_in_time_comparison,
     load_snapshot_manifest,
     resolve_dashboard_data_path,
 )
@@ -63,6 +64,9 @@ SNAPSHOT_MANIFEST_PATH = DATA_ROOT / "reference" / "dashboard_snapshot_manifest.
 MACRO_CONTEXT_PATH = DATA_ROOT / "processed" / "us_macro_context_indicators.parquet"
 MACRO_CONTEXT_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_macro_context_indicators_snapshot.parquet"
+)
+POINT_IN_TIME_COMPARISON_PATH = (
+    DATA_ROOT / "vintages" / "fred" / "monthly_pilot" / "us_point_in_time_comparison.parquet"
 )
 COMPONENT_ORDER = list(COMPONENT_LABELS)
 WINDOW_DAYS = {"1 year": 365, "3 years": 3 * 365, "5 years": 5 * 365}
@@ -149,6 +153,13 @@ def _load_macro_context(path: str, modified_ns: int) -> pd.DataFrame:
     return load_macro_context(Path(path))
 
 
+@st.cache_data(show_spinner=False)
+def _load_point_in_time_comparison(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache package-calculated monthly vintage comparisons."""
+    del modified_ns
+    return load_point_in_time_comparison(Path(path))
+
+
 def _source_data() -> tuple[pd.DataFrame, Path, str]:
     data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
     return _load_data(str(data_path), data_path.stat().st_mtime_ns), data_path, data_origin
@@ -224,6 +235,15 @@ def _macro_context_data() -> pd.DataFrame | None:
     except DashboardDataError:
         return None
     return _load_macro_context(str(path), path.stat().st_mtime_ns)
+
+
+def _point_in_time_data() -> pd.DataFrame | None:
+    if not POINT_IN_TIME_COMPARISON_PATH.is_file():
+        return None
+    return _load_point_in_time_comparison(
+        str(POINT_IN_TIME_COMPARISON_PATH),
+        POINT_IN_TIME_COMPARISON_PATH.stat().st_mtime_ns,
+    )
 
 
 def _show_freshness(frame: pd.DataFrame, label: str, *, max_age_days: int = 14) -> None:
@@ -1030,6 +1050,116 @@ def ogli_page() -> None:
         )
 
 
+def vintage_pilot_page() -> None:
+    st.title("Point-in-time OGLI pilot")
+    st.caption(
+        "Monthly reconstruction using ALFRED information sets available on each month end. "
+        "This is a local research pilot, not a revised production index."
+    )
+    try:
+        data = _point_in_time_data()
+    except DashboardDataError as exc:
+        st.error(str(exc), icon=":material/error:")
+        return
+    if data is None:
+        st.info(
+            "The local vintage pilot has not been generated in this environment. Run the "
+            "command below with your FRED API key; no additional account is required.",
+            icon=":material/history:",
+        )
+        st.code("uv run ogli-point-in-time", language="zsh")
+        return
+
+    model_options = dict(data[["model_name", "model_id"]].drop_duplicates().itertuples(index=False))
+    with st.sidebar:
+        st.header("Vintage controls")
+        default_name = "Model B — Net Fed liquidity proxy"
+        selected_name = st.selectbox(
+            "Liquidity definition",
+            list(model_options),
+            index=list(model_options).index(default_name),
+            key="vintage_model",
+        )
+        st.caption("Information frequency: calendar month end")
+
+    selected = data.loc[data["model_id"] == model_options[selected_name]].copy()
+    latest = selected.iloc[-1]
+    absolute_revisions = selected["ogli_revision"].abs()
+    with st.container(horizontal=True):
+        st.metric("Latest vintage OGLI", f"{latest['vintage_ogli']:.1f}", border=True)
+        st.metric("Current-vintage value", f"{latest['current_ogli']:.1f}", border=True)
+        st.metric("Latest revision", f"{latest['ogli_revision']:+.3f}", border=True)
+        st.metric("Largest absolute revision", f"{absolute_revisions.max():.3f}", border=True)
+        st.metric("Month-end information sets", f"{len(selected):,}", border=True)
+
+    levels = selected[["information_date", "vintage_ogli", "current_ogli"]].melt(
+        id_vars="information_date",
+        var_name="calculation",
+        value_name="OGLI",
+    )
+    levels["calculation"] = levels["calculation"].map(
+        {"vintage_ogli": "As known then", "current_ogli": "Recomputed today"}
+    )
+    level_figure = px.line(
+        levels,
+        x="information_date",
+        y="OGLI",
+        color="calculation",
+        title=f"{selected_name} · vintage versus current-vintage OGLI",
+        labels={"information_date": "Information date", "calculation": "Calculation"},
+    )
+    level_figure.update_yaxes(range=[0, 100])
+    level_figure.update_layout(hovermode="x unified", legend_title_text="")
+    st.plotly_chart(level_figure, width="stretch", config={"displaylogo": False})
+
+    revision_figure = px.bar(
+        selected,
+        x="information_date",
+        y="ogli_revision",
+        title="Current-vintage OGLI minus the reading available at month end",
+        labels={"information_date": "Information date", "ogli_revision": "OGLI revision"},
+    )
+    revision_figure.add_hline(y=0, line_color="#6B7280", line_width=1)
+    st.plotly_chart(revision_figure, width="stretch", config={"displaylogo": False})
+
+    st.info(
+        "Small revisions here mean these specific FRED inputs have changed little at matched "
+        "observation dates. The pilot still does not reconstruct intraday release timing, market "
+        "availability, or every historical source revision.",
+        icon=":material/science:",
+    )
+    st.dataframe(
+        selected.tail(12)[
+            [
+                "information_date",
+                "signal_observation_date",
+                "vintage_ogli",
+                "current_ogli",
+                "ogli_revision",
+                "vintage_regime",
+            ]
+        ].sort_values("information_date", ascending=False),
+        width="stretch",
+        hide_index=True,
+        column_config={
+            "information_date": st.column_config.DateColumn(
+                "Information date", format="YYYY-MM-DD"
+            ),
+            "signal_observation_date": st.column_config.DateColumn(
+                "Signal observation", format="YYYY-MM-DD"
+            ),
+            "vintage_ogli": st.column_config.NumberColumn("As known then", format="%.2f"),
+            "current_ogli": st.column_config.NumberColumn("Recomputed today", format="%.2f"),
+            "ogli_revision": st.column_config.NumberColumn("Revision", format="%+.3f"),
+            "vintage_regime": st.column_config.TextColumn("Regime then"),
+        },
+    )
+    st.caption(
+        "Comparison policy: exact same weekly signal observation date. Expanding normalization "
+        "is recomputed independently inside every ALFRED information set."
+    )
+
+
 def markets_page() -> None:
     st.title("Liquidity vs markets")
     st.caption(
@@ -1632,8 +1762,8 @@ def research_guide_page() -> None:
         - No balance-sheet values are interpolated.
         - Monetary inputs are standardized to **millions of US dollars** before model calculation.
         - Source date, source unit, alignment method, and staleness are retained in processed data.
-        - Current-vintage FRED data can be revised; this project does not yet maintain real-time
-          vintages.
+        - The published weekly index uses current-vintage FRED data. A separate local monthly
+          ALFRED pilot recomputes every model inside sealed historical information sets.
         """
     )
 
@@ -1696,25 +1826,25 @@ def research_guide_page() -> None:
         retrieval timestamps are deliberately separate: they answer different audit questions.
 
         Hashes establish byte-level integrity of the published files; they do not turn current-
-        vintage FRED observations into historical release vintages. A future vintage store is
-        still required for strict real-time backtesting.
+        vintage FRED observations into historical release vintages. The separate monthly ALFRED
+        pilot addresses revisions, but strict backtesting still requires source-specific release
+        timestamps and availability rules.
         """
     )
     with st.container(border=True):
-        st.markdown("#### :material/history: ALFRED vintage foundation")
+        st.markdown("#### :material/history: ALFRED point-in-time pilot")
         st.write(
-            "A separate local command can now capture every configured US liquidity input as "
-            "ALFRED reported it on one historical date. The capture preserves observation, "
-            "vintage, real-time, and retrieval fields and never enters published OGLI silently."
+            "A separate local command now fetches monthly ALFRED information sets and recalculates "
+            "alignment, all three liquidity models, momentum, and expanding OGLI independently "
+            "inside each one. It never enters the published current-vintage index silently."
         )
         st.code(
-            "uv run python -m open_global_liquidity.vintage_pipeline "
-            "--as-of 2020-03-20 --compare-current",
+            "uv run ogli-point-in-time",
             language="zsh",
         )
         st.caption(
-            "The existing FRED_API_KEY is sufficient. A complete vintage OGLI backtest remains "
-            "future work and requires multiple declared information dates."
+            "The existing FRED_API_KEY is sufficient. The pilot uses month-end information dates "
+            "from January 2021 and compares revisions at the same weekly signal date."
         )
     provenance = _snapshot_provenance()
     if provenance is None:
@@ -1814,7 +1944,21 @@ guide_page = st.Page(
     icon=":material/menu_book:",
     url_path="research-guide",
 )
+vintage_page = st.Page(
+    vintage_pilot_page,
+    title="Vintage pilot",
+    icon=":material/history:",
+    url_path="vintage-pilot",
+)
 navigation = st.navigation(
-    [home_page, ogli_index_page, markets_index_page, data_page, guide_page], position="top"
+    [
+        home_page,
+        ogli_index_page,
+        vintage_page,
+        markets_index_page,
+        data_page,
+        guide_page,
+    ],
+    position="top",
 )
 navigation.run()

@@ -125,4 +125,10 @@ market_analysis:
     than calibrated parameters. For non-overlapping outcome samples, eight retained observations
     can span substantially more than eight calendar weeks.
 
+point_in_time_pilot:
+  classification: model_assumption
+  frequency: month_end
+  start: "2021-01-31"
+  current_comparison_policy: same_observation_date
+
 calibrated_parameters: {}

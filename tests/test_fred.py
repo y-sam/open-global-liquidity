@@ -200,3 +200,53 @@ def test_fetch_vintage_definition_preserves_as_of_lineage_and_cache(tmp_path: Pa
     assert first["value"].item() == 6_794_581
     pd.testing.assert_frame_equal(first, second)
     assert requests == 1
+
+
+def test_fetch_vintage_batch_converts_alfred_crosstab_to_long_contract(tmp_path: Path) -> None:
+    requests = 0
+
+    def response(request: httpx.Request) -> httpx.Response:
+        nonlocal requests
+        requests += 1
+        assert request.url.params["output_type"] == "2"
+        assert request.url.params["vintage_dates"] == "2024-01-05,2024-01-12"
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "observations": [
+                    {
+                        "date": "2024-01-03",
+                        "WALCL_20240105": "100.0",
+                        "WALCL_20240112": "101.0",
+                    },
+                    {
+                        "date": "2024-01-10",
+                        "WALCL_20240105": ".",
+                        "WALCL_20240112": "102.0",
+                    },
+                ]
+            },
+        )
+
+    provider = FredProvider(
+        api_key="test-key",
+        cache_dir=tmp_path,
+        client=httpx.Client(transport=httpx.MockTransport(response)),
+    )
+    first = provider.fetch_vintage_batch_definition(
+        _definition(), vintage_dates=["2024-01-12", "2024-01-05"]
+    )
+    second = provider.fetch_vintage_batch_definition(
+        _definition(), vintage_dates=["2024-01-05", "2024-01-12"]
+    )
+
+    assert first.columns.tolist() == VINTAGE_COLUMNS
+    assert first.groupby("vintage_date").size().to_dict() == {
+        pd.Timestamp("2024-01-05"): 1,
+        pd.Timestamp("2024-01-12"): 2,
+    }
+    assert first["value"].tolist() == [100.0, 101.0, 102.0]
+    assert first["realtime_start"].isna().all()
+    pd.testing.assert_frame_equal(first, second)
+    assert requests == 1

@@ -151,6 +151,22 @@ MACRO_CONTEXT_COLUMNS = [
     "classification",
 ]
 
+POINT_IN_TIME_COMPARISON_COLUMNS = [
+    "information_date",
+    "signal_observation_date",
+    "model_id",
+    "model_name",
+    "vintage_ogli",
+    "vintage_momentum_score",
+    "vintage_regime",
+    "current_ogli",
+    "current_momentum_score",
+    "current_regime",
+    "ogli_revision",
+    "momentum_revision",
+    "comparison_policy",
+]
+
 COMPONENT_LABELS = {
     "fed_assets": "Fed total assets",
     "treasury_general_account": "Treasury General Account",
@@ -550,3 +566,27 @@ def load_macro_context(path: Path) -> pd.DataFrame:
     result = frame[MACRO_CONTEXT_COLUMNS].copy()
     result["date"] = pd.to_datetime(result["date"])
     return result.sort_values("date").reset_index(drop=True)
+
+
+def load_point_in_time_comparison(path: Path) -> pd.DataFrame:
+    """Load the local monthly vintage pilot without recalculating it in Streamlit."""
+    frame = _read_parquet(path, "Point-in-time OGLI comparison")
+    missing = sorted(set(POINT_IN_TIME_COMPARISON_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError(
+            "Point-in-time OGLI comparison is missing columns: " + ", ".join(missing)
+        )
+    result = frame[POINT_IN_TIME_COMPARISON_COLUMNS].copy()
+    result["information_date"] = pd.to_datetime(result["information_date"], errors="coerce")
+    result["signal_observation_date"] = pd.to_datetime(
+        result["signal_observation_date"], errors="coerce"
+    )
+    if result.empty or result[["information_date", "signal_observation_date"]].isna().any().any():
+        raise DashboardDataError("Point-in-time OGLI comparison has no valid dated observations")
+    for column in ["vintage_ogli", "current_ogli"]:
+        invalid = result[column].dropna().loc[lambda values: (values < 0) | (values > 100)]
+        if not invalid.empty:
+            raise DashboardDataError(f"Point-in-time comparison has invalid {column} values")
+    if set(result["comparison_policy"].dropna()) != {"same_observation_date"}:
+        raise DashboardDataError("Point-in-time comparison has an unsupported date policy")
+    return result.sort_values(["information_date", "model_id"]).reset_index(drop=True)

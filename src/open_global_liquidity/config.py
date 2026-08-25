@@ -144,6 +144,16 @@ class MarketResearchSubperiod:
 
 
 @dataclass(frozen=True, slots=True)
+class PointInTimePilotConfig:
+    """Predeclared information-date policy for the monthly vintage pilot."""
+
+    classification: str
+    frequency: str
+    start: date
+    current_comparison_policy: str
+
+
+@dataclass(frozen=True, slots=True)
 class ModelConfig:
     """Weekly alignment policy and competing liquidity definitions."""
 
@@ -152,6 +162,7 @@ class ModelConfig:
     ogli: OGLIConfig
     market_alignment: MarketAlignmentConfig
     market_analysis: MarketAnalysisConfig
+    point_in_time_pilot: PointInTimePilotConfig
 
 
 _REQUIRED_FIELDS = {
@@ -291,12 +302,41 @@ def load_model_config(path: Path) -> ModelConfig:
     ogli = _parse_ogli_config(payload.get("ogli"))
     market_alignment = _parse_market_alignment(payload.get("market_alignment"))
     market_analysis = _parse_market_analysis(payload.get("market_analysis"))
+    point_in_time_pilot = _parse_point_in_time_pilot(payload.get("point_in_time_pilot"))
     return ModelConfig(
         alignment=alignment,
         models=tuple(models),
         ogli=ogli,
         market_alignment=market_alignment,
         market_analysis=market_analysis,
+        point_in_time_pilot=point_in_time_pilot,
+    )
+
+
+def _parse_point_in_time_pilot(raw: Any) -> PointInTimePilotConfig:
+    if not isinstance(raw, dict):
+        raise ConfigurationError("point_in_time_pilot must be a mapping")
+    required = {"classification", "frequency", "start", "current_comparison_policy"}
+    missing = sorted(required - raw.keys())
+    if missing:
+        raise ConfigurationError(f"point_in_time_pilot is missing fields: {', '.join(missing)}")
+    if raw["classification"] != "model_assumption":
+        raise ConfigurationError("point_in_time_pilot must be classified as model_assumption")
+    if raw["frequency"] != "month_end":
+        raise ConfigurationError("point_in_time_pilot.frequency must be month_end")
+    if raw["current_comparison_policy"] != "same_observation_date":
+        raise ConfigurationError(
+            "point_in_time_pilot.current_comparison_policy must be same_observation_date"
+        )
+    try:
+        pilot_start = date.fromisoformat(str(raw["start"]))
+    except ValueError as exc:
+        raise ConfigurationError("point_in_time_pilot.start must be an ISO date") from exc
+    return PointInTimePilotConfig(
+        classification=str(raw["classification"]),
+        frequency=str(raw["frequency"]),
+        start=pilot_start,
+        current_comparison_policy=str(raw["current_comparison_policy"]),
     )
 
 
