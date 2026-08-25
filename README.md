@@ -234,9 +234,9 @@ artifacts plus a JSON provenance manifest:
   mean/median returns, and positive-return shares for overlapping and non-overlapping samples.
 - `data/reference/us_point_in_time_bitcoin_outcomes_snapshot.parquet` — point-in-time signals,
   forward Bitcoin returns, maximum upside/downside, peak-to-trough drawdown, and revision labels.
-- `data/reference/us_point_in_time_bitcoin_regimes_snapshot.parquet` — return and path-risk
-  summaries and descriptive Student-t mean-return intervals by point-in-time OGLI regime and
-  expansionary/contractionary transition direction.
+- `data/reference/us_point_in_time_bitcoin_regimes_snapshot.parquet` — cross-horizon return and
+  path-risk summaries plus descriptive Student-t mean-return intervals overall, by point-in-time
+  OGLI regime, and by expansionary/contractionary transition direction.
 - `data/reference/us_point_in_time_bitcoin_revisions_snapshot.parquet` — real-time-vintage versus
   recomputed-today signal correlations, regime agreement, and revision magnitudes.
 - `data/reference/dashboard_snapshot_manifest.json` — generation time, pipeline version, source
@@ -278,7 +278,8 @@ uv run streamlit run app/streamlit_app.py
 ```
 
 Streamlit opens the dashboard at `http://localhost:8501`. The app shows latest measured balances,
-the three model levels, an OGLI page, a point-in-time pilot, a dedicated Bitcoin research page, a
+the three model levels, an OGLI page, a point-in-time pilot, a dedicated Bitcoin research page with
+cross-horizon comparison, a
 Liquidity vs markets workspace, a log-scale Bitcoin/OGLI timeline, Bitcoin-focused landing metrics,
 history, a component explorer, recent source
 observations, and methodology notes. Top navigation separates a

@@ -774,7 +774,7 @@ def load_bitcoin_regime_summary(path: Path) -> pd.DataFrame:
         raise DashboardDataError("Bitcoin regime summary is missing: " + ", ".join(missing))
     result = frame[BITCOIN_REGIME_SUMMARY_COLUMNS].copy()
     if result.empty or not set(result["analysis_dimension"]).issubset(
-        {"vintage_regime", "transition_direction"}
+        {"overall", "vintage_regime", "transition_direction"}
     ):
         raise DashboardDataError("Bitcoin regime summary has an unsupported dimension")
     if not set(result["sample_policy"]).issubset({"overlapping", "non_overlapping"}):

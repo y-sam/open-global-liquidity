@@ -205,7 +205,7 @@ def summarize_bitcoin_regimes(
     *,
     confidence_level: float = 0.95,
 ) -> pd.DataFrame:
-    """Summarize returns and path risk by vintage regime and transition direction.
+    """Summarize returns and path risk overall, by vintage regime, and by transition.
 
     The mean-return interval is the classical Student-t interval. It is a descriptive uncertainty
     diagnostic, not a forecast interval; overlapping-window dependence can make it too narrow.
@@ -223,14 +223,17 @@ def summarize_bitcoin_regimes(
             if sample_policy == "overlapping"
             else outcomes.loc[outcomes["is_non_overlapping"]]
         )
+        overall = sample.assign(_summary_group="All outcomes")
         dimensions = {
-            "vintage_regime": sample,
-            "transition_direction": sample.loc[
-                sample["transition_direction"] != "Initial observation"
-            ],
+            "overall": (overall, "_summary_group"),
+            "vintage_regime": (sample, "vintage_regime"),
+            "transition_direction": (
+                sample.loc[sample["transition_direction"] != "Initial observation"],
+                "transition_direction",
+            ),
         }
-        for dimension, dimension_sample in dimensions.items():
-            for keys, group in dimension_sample.groupby([*base_groups, dimension], sort=True):
+        for dimension, (dimension_sample, group_column) in dimensions.items():
+            for keys, group in dimension_sample.groupby([*base_groups, group_column], sort=True):
                 values = group.dropna(subset=["market_return", "maximum_drawdown_from_peak"])
                 observations = len(values)
                 mean_return = values["market_return"].mean()

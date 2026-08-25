@@ -1221,7 +1221,13 @@ def bitcoin_research_page() -> None:
 
     view = st.segmented_control(
         "Research view",
-        ["Regimes", "Transitions", "Path outcomes", "Signal revisions"],
+        [
+            "Across horizons",
+            "Regimes",
+            "Transitions",
+            "Path outcomes",
+            "Signal revisions",
+        ],
         default="Regimes",
         key="bitcoin_view",
     )
@@ -1253,7 +1259,83 @@ def bitcoin_research_page() -> None:
             border=True,
         )
 
-    if view in {"Regimes", "Transitions"}:
+    if view == "Across horizons":
+        horizon_summary = regime_summaries.loc[
+            (regime_summaries["model_id"] == model_id)
+            & (regime_summaries["publication_lag_weeks"] == publication_lag)
+            & (regime_summaries["sample_policy"] == sample_key)
+            & (regime_summaries["analysis_dimension"] == "overall")
+        ].copy()
+        horizon_summary["ci_error_plus"] = (
+            horizon_summary["mean_return_ci_upper"] - horizon_summary["mean_return"]
+        )
+        horizon_summary["ci_error_minus"] = (
+            horizon_summary["mean_return"] - horizon_summary["mean_return_ci_lower"]
+        )
+        horizon_figure = px.line(
+            horizon_summary,
+            x="horizon_months",
+            y="mean_return",
+            markers=True,
+            text="observations",
+            error_y="ci_error_plus",
+            error_y_minus="ci_error_minus",
+            title="Bitcoin outcomes across forward horizons",
+            labels={
+                "horizon_months": "Forward horizon (months)",
+                "mean_return": "Mean Bitcoin return",
+                "observations": "Observations",
+            },
+        )
+        horizon_figure.update_traces(
+            texttemplate="n=%{text}",
+            textposition="top center",
+            hovertemplate=(
+                "%{x} months<br>Mean return: %{y:.1%}<br>Observations: %{text}<extra></extra>"
+            ),
+        )
+        horizon_figure.update_xaxes(dtick=1)
+        horizon_figure.update_yaxes(tickformat=".0%", zeroline=True)
+        st.plotly_chart(horizon_figure, width="stretch", config={"displaylogo": False})
+        st.dataframe(
+            horizon_summary[
+                [
+                    "horizon_months",
+                    "observations",
+                    "mean_return",
+                    "median_return",
+                    "positive_share",
+                    "mean_return_ci_lower",
+                    "mean_return_ci_upper",
+                    "mean_maximum_drawdown",
+                ]
+            ],
+            width="stretch",
+            hide_index=True,
+            column_config={
+                "horizon_months": st.column_config.NumberColumn("Horizon (months)", format="%d"),
+                "observations": st.column_config.NumberColumn("n", format="%d"),
+                "mean_return": st.column_config.NumberColumn("Mean return", format="percent"),
+                "median_return": st.column_config.NumberColumn("Median return", format="percent"),
+                "positive_share": st.column_config.NumberColumn("Positive share", format="percent"),
+                "mean_return_ci_lower": st.column_config.NumberColumn(
+                    "95% CI lower", format="percent"
+                ),
+                "mean_return_ci_upper": st.column_config.NumberColumn(
+                    "95% CI upper", format="percent"
+                ),
+                "mean_maximum_drawdown": st.column_config.NumberColumn(
+                    "Avg. max drawdown", format="percent"
+                ),
+            },
+        )
+        st.caption(
+            "Each point uses the same model, availability delay, and sample policy. Longer "
+            "non-overlapping horizons naturally contain fewer independent observations. Error "
+            "bars are descriptive Student-t intervals, not forecasts."
+        )
+
+    elif view in {"Regimes", "Transitions"}:
         dimension = "vintage_regime" if view == "Regimes" else "transition_direction"
         summary = regime_summaries.loc[
             (regime_summaries["model_id"] == model_id)

@@ -102,7 +102,14 @@ def test_bitcoin_summaries_keep_regimes_transitions_and_revision_labels() -> Non
         non_overlapping_min_periods=3,
     )
 
-    assert set(regimes["analysis_dimension"]) == {"vintage_regime", "transition_direction"}
+    assert set(regimes["analysis_dimension"]) == {
+        "overall",
+        "vintage_regime",
+        "transition_direction",
+    }
+    overall = regimes.loc[regimes["analysis_dimension"] == "overall"]
+    assert set(overall["group_label"]) == {"All outcomes"}
+    assert overall["observations"].eq(4).all()
     assert "Expansionary transition" in set(regimes["group_label"])
     assert set(regimes["confidence_level"]) == {0.95}
     assert regimes.loc[regimes["observations"] >= 2, "mean_return_ci_lower"].notna().all()
