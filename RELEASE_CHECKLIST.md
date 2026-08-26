@@ -6,6 +6,7 @@
 - [x] `ruff format --check .` passes in GitHub Actions.
 - [x] `ruff check .` passes in GitHub Actions.
 - [x] The complete offline test suite passes in GitHub Actions.
+- [x] Push and pull-request verification is defined in `.github/workflows/ci.yml`.
 - [x] The production refresh regenerates all public dashboard snapshots.
 - [x] The snapshot manifest records code commit, generation time, row coverage, and SHA-256 hashes.
 - [x] The hosted Streamlit landing page and Bitcoin research workspace have been manually checked.
