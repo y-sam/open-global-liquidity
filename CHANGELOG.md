@@ -3,7 +3,7 @@
 All notable project changes are documented here. The project follows semantic versioning once a
 release is tagged.
 
-## [0.1.0] — Unreleased
+## [0.1.1] — 2026-08-26
 
 ### Added
 
@@ -39,4 +39,14 @@ release is tagged.
   interpretation.
 - The project does not reproduce or claim access to CrossBorder Capital's proprietary methodology.
 
+## [0.1.0] — 2026-08-25
+
+### Added
+
+- Initial tagged research snapshot, ending at commit `8c4bc5b`.
+
+The historical `v0.1.0` tag predates the finalized code license, citation metadata, and release
+audit. It is retained unchanged for reproducibility and is superseded by v0.1.1.
+
+[0.1.1]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.1.1
 [0.1.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.1.0

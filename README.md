@@ -1,8 +1,9 @@
 # Open Global Liquidity
 
-**Release status:** v0.1.0 is release-candidate research software. See the
-[changelog](CHANGELOG.md) and [release checklist](RELEASE_CHECKLIST.md). Project code is licensed
-under Apache-2.0; bundled and downloaded third-party data remain subject to their respective terms.
+**Current release:** v0.1.1. See the [changelog](CHANGELOG.md),
+[citation metadata](CITATION.cff), and [release checklist](RELEASE_CHECKLIST.md). Project code is
+licensed under Apache-2.0; bundled and downloaded third-party data remain subject to their
+respective terms.
 
 **Live Streamlit dashboard:** [https://open-global-liquidity.streamlit.app/](https://open-global-liquidity.streamlit.app/)
 

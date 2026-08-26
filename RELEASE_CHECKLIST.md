@@ -1,4 +1,4 @@
-# v0.1.0 release checklist
+# v0.1.1 release checklist
 
 ## Automated verification
 
@@ -25,8 +25,9 @@
 - [x] Choose and add the repository's open-source **code license** (Apache-2.0).
 - [x] Review and document the separate redistribution terms for every bundled data snapshot in
       `THIRD_PARTY_DATA.md`.
-- [ ] Decide whether to add `CITATION.cff` with the maintainer's preferred public name and contact.
-- [ ] Approve creation of the `v0.1.0` Git tag and GitHub release.
+- [x] Add `CITATION.cff` with the maintainer-approved public name and contact.
+- [x] Approve creation of the `v0.1.1` Git tag and GitHub release.
 
-The code license must not imply that third-party data is relicensed under the same terms. Until the
-items above are resolved, `0.1.0` remains an unreleased project version.
+The code license does not imply that third-party data are relicensed under the same terms. The
+completed items above constitute maintainer approval to tag and publish `v0.1.1` after automated
+verification passes.

@@ -6,7 +6,10 @@ from datetime import UTC
 from pathlib import Path
 
 import pandas as pd
+import yaml
 from streamlit.testing.v1 import AppTest
+
+from open_global_liquidity import __version__
 
 PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
@@ -16,11 +19,27 @@ def test_release_metadata_separates_code_and_data_licenses() -> None:
         metadata = tomllib.load(file)
 
     assert metadata["project"]["license"] == "Apache-2.0"
+    assert metadata["project"]["version"] == __version__
     assert PROJECT_ROOT.joinpath("LICENSE").is_file()
     data_terms = PROJECT_ROOT.joinpath("THIRD_PARTY_DATA.md").read_text(encoding="utf-8")
     assert "does not grant rights in third-party observations" in data_terms
     assert "Attribution-NonCommercial 4.0 International" in data_terms
     assert "RRPONTSYD" in data_terms
+
+
+def test_citation_metadata_matches_release() -> None:
+    citation = yaml.safe_load(PROJECT_ROOT.joinpath("CITATION.cff").read_text(encoding="utf-8"))
+
+    assert citation["cff-version"] == "1.2.0"
+    assert citation["version"] == "0.1.1"
+    assert citation["license"] == "Apache-2.0"
+    assert citation["authors"] == [
+        {
+            "family-names": "Sampaio",
+            "given-names": "Yuri",
+            "email": "ysmp@proton.me",
+        }
+    ]
 
 
 def _write_public_snapshots(data_root: Path) -> None:
