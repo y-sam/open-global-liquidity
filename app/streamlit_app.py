@@ -2957,3 +2957,12 @@ navigation = st.navigation(
     position="top",
 )
 navigation.run()
+
+st.divider()
+st.caption(
+    "This product uses the FRED® API but is not endorsed or certified by the Federal Reserve "
+    "Bank of St. Louis. [FRED API Terms of Use]"
+    "(https://fred.stlouisfed.org/docs/api/terms_of_use.html) · Original project code: "
+    "[Apache-2.0](https://github.com/y-sam/open-global-liquidity/blob/main/LICENSE) · "
+    "Third-party data retain their own terms."
+)

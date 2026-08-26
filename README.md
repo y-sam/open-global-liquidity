@@ -1,8 +1,8 @@
 # Open Global Liquidity
 
 **Release status:** v0.1.0 is release-candidate research software. See the
-[changelog](CHANGELOG.md) and [release checklist](RELEASE_CHECKLIST.md). An open-source code license
-and explicit third-party data notices must be finalized before the first formal release.
+[changelog](CHANGELOG.md) and [release checklist](RELEASE_CHECKLIST.md). Project code is licensed
+under Apache-2.0; bundled and downloaded third-party data remain subject to their respective terms.
 
 **Live Streamlit dashboard:** [https://open-global-liquidity.streamlit.app/](https://open-global-liquidity.streamlit.app/)
 
@@ -11,6 +11,12 @@ and explicit third-party data notices must be finalized before the first formal 
 There is no endorsement by or affiliation with Michael Howell or CrossBorder Capital. The future
 project index will be named **OGLI — Open Global Liquidity Index**, never the official CrossBorder
 Capital GLI.
+
+## License
+
+Original project code is licensed under the [Apache License 2.0](LICENSE). This code license does
+not relicense third-party observations, derived snapshots, source metadata, names, or trademarks.
+See [Third-party data terms](THIRD_PARTY_DATA.md) before redistributing bundled data artifacts.
 
 ## Current scope: v0.1 US liquidity models
 

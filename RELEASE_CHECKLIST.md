@@ -22,8 +22,9 @@
 
 ## Maintainer decisions required before tagging
 
-- [ ] Choose and add the repository's open-source **code license**.
-- [ ] Review and document the separate redistribution terms for every bundled data snapshot.
+- [x] Choose and add the repository's open-source **code license** (Apache-2.0).
+- [x] Review and document the separate redistribution terms for every bundled data snapshot in
+      `THIRD_PARTY_DATA.md`.
 - [ ] Decide whether to add `CITATION.cff` with the maintainer's preferred public name and contact.
 - [ ] Approve creation of the `v0.1.0` Git tag and GitHub release.
 

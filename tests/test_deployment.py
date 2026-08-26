@@ -1,11 +1,26 @@
 import os
 import subprocess
 import sys
+import tomllib
 from datetime import UTC
 from pathlib import Path
 
 import pandas as pd
 from streamlit.testing.v1 import AppTest
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
+
+
+def test_release_metadata_separates_code_and_data_licenses() -> None:
+    with PROJECT_ROOT.joinpath("pyproject.toml").open("rb") as file:
+        metadata = tomllib.load(file)
+
+    assert metadata["project"]["license"] == "Apache-2.0"
+    assert PROJECT_ROOT.joinpath("LICENSE").is_file()
+    data_terms = PROJECT_ROOT.joinpath("THIRD_PARTY_DATA.md").read_text(encoding="utf-8")
+    assert "does not grant rights in third-party observations" in data_terms
+    assert "Attribution-NonCommercial 4.0 International" in data_terms
+    assert "RRPONTSYD" in data_terms
 
 
 def _write_public_snapshots(data_root: Path) -> None:
@@ -110,6 +125,10 @@ def test_streamlit_deployment_mode_needs_no_local_data_or_fred_secret(
     ]
     assert len(app.metric) == 4
     assert app.metric[0].label == "Net Fed liquidity proxy"
+    assert any(
+        "not endorsed or certified by the Federal Reserve Bank of St. Louis" in caption.value
+        for caption in app.caption
+    )
 
 
 def test_streamlit_is_independent_of_broken_installed_package(tmp_path: Path) -> None:
@@ -123,7 +142,7 @@ def test_streamlit_is_independent_of_broken_installed_package(tmp_path: Path) ->
         'raise ImportError("simulated broken installed package")\n', encoding="utf-8"
     )
 
-    project_root = Path(__file__).resolve().parents[1]
+    project_root = PROJECT_ROOT
     app_path = project_root / "app" / "streamlit_app.py"
     script = f"""
 from streamlit.testing.v1 import AppTest

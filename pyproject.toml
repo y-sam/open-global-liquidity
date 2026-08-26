@@ -3,6 +3,8 @@ name = "open-global-liquidity"
 version = "0.1.0"
 description = "Transparent public-data research infrastructure for the Open Global Liquidity Index."
 readme = "README.md"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 authors = [
     { name = "Yuri Sampaio", email = "ysmp@proton.me" },
 ]

@@ -20,6 +20,8 @@ release is tagged.
   deterministic evidence-status labels.
 - Streamlit dashboard with public bundled snapshots, provenance manifest, freshness checks, and
   automated GitHub Actions refreshes.
+- Apache-2.0 licensing for original project code, with separate third-party data terms and
+  source-specific attribution.
 
 ### Research interpretation
 
