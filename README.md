@@ -1,5 +1,9 @@
 # Open Global Liquidity
 
+**Release status:** v0.1.0 is release-candidate research software. See the
+[changelog](CHANGELOG.md) and [release checklist](RELEASE_CHECKLIST.md). An open-source code license
+and explicit third-party data notices must be finalized before the first formal release.
+
 **Live Streamlit dashboard:** [https://open-global-liquidity.streamlit.app/](https://open-global-liquidity.streamlit.app/)
 
 > Open Global Liquidity is an independent research project using public data. It is inspired by publicly discussed concepts in global liquidity research, including work by Michael Howell and CrossBorder Capital, but it does not reproduce or claim access to CrossBorder Capital's proprietary methodology, data, or models.
