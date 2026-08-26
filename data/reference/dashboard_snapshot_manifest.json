@@ -479,7 +479,7 @@
       "sha256": "672f184816eade2bda059695e6ce0100c51b62c79e02219163d64facc8785bf8"
     },
     "us_point_in_time_bitcoin_contrasts_snapshot.parquet": {
-      "bytes": 22047,
+      "bytes": 23526,
       "columns": [
         "model_id",
         "model_name",
@@ -499,6 +499,8 @@
         "confidence_level",
         "spread_ci_lower",
         "spread_ci_upper",
+        "interval_status",
+        "interval_status_classification",
         "interval_method",
         "regime_group_classification",
         "specification_role",
@@ -511,7 +513,7 @@
         "model_c"
       ],
       "rows": 96,
-      "sha256": "e3507210576a8da61d6f29ce17a6d1077c54323eb7ede61cf3ef7b21445809a9"
+      "sha256": "1adb1946ac3f490c23f261f56c07b7537db613413466bdca9e757aac3357077f"
     },
     "us_point_in_time_bitcoin_outcomes_snapshot.parquet": {
       "bytes": 96268,
@@ -569,7 +571,7 @@
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "a5d5cd8a2f2a2c95c79818a7489cc61bb5de7720ad645db243f44132d075ce0a"
+      "sha256": "fbc01513d2c38cc28109ea083b22b6ebb1730b183e140d043a8274fcf10bc804"
     },
     "us_point_in_time_bitcoin_regimes_snapshot.parquet": {
       "bytes": 56943,
@@ -602,7 +604,7 @@
         "model_c"
       ],
       "rows": 816,
-      "sha256": "8c2dc72aff2c8b5f162b51b3cb1b44d864ca5007857e52c46e80bdf94177797d"
+      "sha256": "4e91fcc8c13cbe223b33c273057201839ad2fe77e099351d45b3db0a9d4ebf77"
     },
     "us_point_in_time_bitcoin_revisions_snapshot.parquet": {
       "bytes": 11831,
@@ -628,7 +630,7 @@
         "model_c"
       ],
       "rows": 96,
-      "sha256": "6e7e109cc10b37c7f3dd498c3f713976daf07a9ce135ba0025063800b4a849c4"
+      "sha256": "45a59556ecc0a109b0cb1f174cd4b0cb619641a56738507811ffa69d1ad3e53b"
     },
     "us_point_in_time_comparison_snapshot.parquet": {
       "bytes": 26454,
@@ -653,17 +655,17 @@
         "momentum_revision",
         "comparison_policy"
       ],
-      "latest_retrieval": "2026-08-25T15:33:17.599667+00:00",
+      "latest_retrieval": "2026-08-25T13:03:03.793914+00:00",
       "model_ids": [
         "model_a",
         "model_b",
         "model_c"
       ],
       "rows": 201,
-      "sha256": "30c304d9a3e2a78aa563d87d67a0da8dbcd963ccd346ce9dcbdcb2387a745cc6"
+      "sha256": "355d08312e0a6464492abc36b146f5f2ec9bbeb141f56a7aed23fdb88af8844c"
     },
     "us_point_in_time_market_pairs_snapshot.parquet": {
-      "bytes": 96239,
+      "bytes": 94624,
       "columns": [
         "information_date",
         "signal_observation_date",
@@ -705,16 +707,16 @@
         "FRED",
         "World Bank"
       ],
-      "rows": 8544,
+      "rows": 8520,
       "series_ids": [
         "CMO-GOLD-MONTHLY",
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "37014332640a1acf797c3b74569952c8263b41b13711ad2b273ccd5618eee2cf"
+      "sha256": "1e622c86958b825ad758acb77fad0f3305dc6990b288bd549857e7157e70c8b1"
     },
     "us_point_in_time_market_series_snapshot.parquet": {
-      "bytes": 179314,
+      "bytes": 184327,
       "columns": [
         "date",
         "country",
@@ -732,23 +734,23 @@
         "gold"
       ],
       "earliest_observation": "2006-01-02",
-      "latest_observation": "2026-08-24",
-      "latest_retrieval": "2026-08-25T15:33:28.044749+00:00",
+      "latest_observation": "2026-08-23",
+      "latest_retrieval": "2026-08-25T13:03:06.284310+00:00",
       "providers": [
         "Coin Metrics",
         "FRED",
         "World Bank"
       ],
-      "rows": 11327,
+      "rows": 11321,
       "series_ids": [
         "CMO-GOLD-MONTHLY",
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "4c1ada7a12a2dcb6bbed6b4b034f78f37aa6262e4178133c36f51d6492ea1fb8"
+      "sha256": "5da5faaa876cf33420538d6ba053aabff604c318342d52fee7bbaec933fac99f"
     },
     "us_point_in_time_market_summary_snapshot.parquet": {
-      "bytes": 12715,
+      "bytes": 12679,
       "columns": [
         "model_id",
         "model_name",
@@ -780,13 +782,13 @@
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "c5d6a78c22e597920f4c8060e030357d3b8823b49779f30aa42964434da814c6"
+      "sha256": "bc35f16d678c9d2143dcbae9291173523701fc6c9098f0e11ad9d4e725ecbf29"
     }
   },
-  "generated_at": "2026-08-25T15:33:31.724391+00:00",
+  "generated_at": "2026-08-26T12:03:57.851883+00:00",
   "pipeline_version": "0.1.0",
   "schema_version": 1,
   "snapshot_count": 22,
-  "source_commit": "3dba16fbd00b494beacf0485b42d6eafe7ac7ca8",
-  "working_tree_dirty": false
+  "source_commit": "b9bef1e9609f939650be628b724bc47f7fcf6464",
+  "working_tree_dirty": true
 }

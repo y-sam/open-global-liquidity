@@ -186,13 +186,16 @@ uv run ogli-point-in-time --publish-dashboard-snapshot
 
 The configured pilot begins on 2021-01-31. `RRPONTSYD` has usable history only from December 2017,
 and the index then needs 52 weeks for year-over-year growth plus 104 valid observations for its
-expanding normalization. Starting earlier would require weakening the declared history rule.
+expanding normalization. A bounded ALFRED probe found December 2020 to be the earliest month-end
+with valid OGLI under the existing rules, so moving the production start earlier would add only one
+month. A material extension would require weakening the declared history rule, which this project
+does not do.
 
-The command writes nine ignored local files under `data/vintages/fred/monthly_pilot/`: the long
+The command writes ten ignored local files under `data/vintages/fred/monthly_pilot/`: the long
 ALFRED input archive, one monthly reading per model and information date, exact-date
 current-vintage comparisons, standardized Bitcoin/gold/dollar levels, point-in-time outcome pairs,
-descriptive market summaries, Bitcoin path outcomes, regime/transition summaries, and
-vintage-versus-revised signal diagnostics. Raw multi-vintage responses are cached under
+descriptive market summaries, Bitcoin path outcomes, regime/transition summaries, directional
+regime contrasts, and vintage-versus-revised signal diagnostics. Raw multi-vintage responses are cached under
 `data/raw/fred/vintage_batches/`. These files are reproducible but intentionally not committed.
 The explicit publication option writes the small derived comparison and market-research files to
 `data/reference/`; it does not publish the raw ALFRED archive. The pilot does not reconstruct
@@ -202,7 +205,7 @@ intraday release timestamps or exact trade availability. Instead, it reports pre
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
 
-The publication commands together write twenty-one Git-versioned Parquet
+The publication commands together write twenty-two Git-versioned Parquet
 artifacts plus a JSON provenance manifest:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
@@ -255,7 +258,7 @@ mode and source retrieval time.
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
 environment, downloads fresh FRED, ALFRED, Coin Metrics, and World Bank observations, regenerates
-the twenty-one public Parquet snapshots and provenance manifest, and runs formatting, linting, and
+the twenty-two public Parquet snapshots and provenance manifest, and runs formatting, linting, and
 offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 
@@ -421,6 +424,10 @@ grouping is a declared `model_assumption`. The spread's classical Welch interval
 group variances but does not correct for serial dependence, multiple comparisons, revisions, or
 small-sample selection. An interval crossing zero is not evidence of a stable directional
 relationship, and no contrast is used to calculate or calibrate OGLI.
+The package assigns a deterministic interval status: `positive_interval` when the full interval is
+above zero, `negative_interval` when it is below zero, `inconclusive` when it crosses zero, and
+`insufficient_sample` when either group cannot support an interval. This status is a statistical
+transformation of the reported interval, not a new hypothesis test or calibrated threshold.
 
 Published snapshots are auditable at the bundle level through
 `data/reference/dashboard_snapshot_manifest.json`. Its generation timestamp is distinct from each

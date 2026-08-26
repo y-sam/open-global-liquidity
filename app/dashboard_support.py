@@ -287,6 +287,8 @@ BITCOIN_CONTRAST_SUMMARY_COLUMNS = [
     "confidence_level",
     "spread_ci_lower",
     "spread_ci_upper",
+    "interval_status",
+    "interval_status_classification",
     "interval_method",
     "regime_group_classification",
     "specification_role",
@@ -899,6 +901,16 @@ def load_bitcoin_contrast_summary(path: Path) -> pd.DataFrame:
         raise DashboardDataError("Bitcoin contrast summary has an unsupported classification")
     if set(result["regime_group_classification"]) != {"model_assumption"}:
         raise DashboardDataError("Bitcoin contrast summary misclassifies its regime groups")
+    if set(result["interval_status_classification"]) != {"statistical_transformation"}:
+        raise DashboardDataError("Bitcoin contrast summary misclassifies its interval status")
+    allowed_statuses = {
+        "insufficient_sample",
+        "inconclusive",
+        "positive_interval",
+        "negative_interval",
+    }
+    if not set(result["interval_status"]).issubset(allowed_statuses):
+        raise DashboardDataError("Bitcoin contrast summary has an unsupported interval status")
     if set(result["specification_classification"]) != {"model_assumption"}:
         raise DashboardDataError("Bitcoin contrast summary misclassifies its specification role")
     if not set(result["specification_role"]).issubset({"primary", "robustness_check"}):

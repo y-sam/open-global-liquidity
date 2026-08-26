@@ -126,6 +126,12 @@ MODEL_COLORS = {
     "Model B — Net Fed liquidity proxy": "#D97706",
     "Model C — Reserve-based liquidity": "#059669",
 }
+CONTRAST_STATUS_LABELS = {
+    "insufficient_sample": "Insufficient sample",
+    "inconclusive": "Inconclusive",
+    "positive_interval": "Positive interval",
+    "negative_interval": "Negative interval",
+}
 
 st.set_page_config(
     page_title="Open Global Liquidity",
@@ -897,6 +903,14 @@ def landing_page() -> None:
                     "regimes. Neutral observations are excluded. This is descriptive association, "
                     "not evidence of causation or a forecast."
                 )
+                primary_statuses = set(primary_contrasts["interval_status"])
+                if primary_statuses.issubset({"inconclusive", "insufficient_sample"}):
+                    st.info(
+                        "Current evidence status: inconclusive at every estimable horizon; "
+                        "the 12-month contrast has insufficient group observations for an "
+                        "interval.",
+                        icon=":material/info:",
+                    )
                 with st.expander("Unconditional Bitcoin outcome baseline"):
                     st.caption(
                         "These figures describe all completed Bitcoin outcomes in the primary "
@@ -1432,6 +1446,11 @@ def bitcoin_research_page() -> None:
                 else "Unavailable"
             )
             st.metric("Welch 95% interval", interval_value, border=True)
+            st.metric(
+                "Interval reading",
+                CONTRAST_STATUS_LABELS[str(contrast_row["interval_status"])],
+                border=True,
+            )
     else:
         with st.container(horizontal=True):
             st.metric("Observations", f"{len(selected):,}", border=True)
@@ -1462,6 +1481,9 @@ def bitcoin_research_page() -> None:
         contrast_history["ci_error_minus"] = (
             contrast_history["mean_return_spread"] - contrast_history["spread_ci_lower"]
         )
+        contrast_history["interval_reading"] = contrast_history["interval_status"].map(
+            CONTRAST_STATUS_LABELS
+        )
         contrast_figure = px.line(
             contrast_history,
             x="horizon_months",
@@ -1490,6 +1512,7 @@ def bitcoin_research_page() -> None:
                     "mean_return_spread",
                     "spread_ci_lower",
                     "spread_ci_upper",
+                    "interval_reading",
                 ]
             ],
             width="stretch",
@@ -1513,6 +1536,7 @@ def bitcoin_research_page() -> None:
                 ),
                 "spread_ci_lower": st.column_config.NumberColumn("95% CI lower", format="percent"),
                 "spread_ci_upper": st.column_config.NumberColumn("95% CI upper", format="percent"),
+                "interval_reading": st.column_config.TextColumn("Interval reading"),
             },
         )
         st.caption(

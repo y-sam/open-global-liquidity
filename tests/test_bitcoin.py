@@ -152,4 +152,5 @@ def test_directional_contrast_uses_vintage_regimes_and_labels_small_samples() ->
     assert overlapping["contractionary_observations"] == 1
     assert overlapping["mean_return_spread"] == pytest.approx(-0.045)
     assert pd.isna(overlapping["spread_ci_lower"])
+    assert overlapping["interval_status"] == "insufficient_sample"
     assert overlapping["regime_group_classification"] == "model_assumption"

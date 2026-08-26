@@ -102,6 +102,8 @@ CONTRAST_SUMMARY_COLUMNS = [
     "confidence_level",
     "spread_ci_lower",
     "spread_ci_upper",
+    "interval_status",
+    "interval_status_classification",
     "interval_method",
     "regime_group_classification",
     "specification_role",
@@ -414,6 +416,7 @@ def summarize_bitcoin_directional_contrasts(
                 contractionary_returns,
                 confidence_level=confidence_level,
             )
+            interval_status = _classify_contrast_interval(ci_lower, ci_upper)
             rows.append(
                 {
                     **dict(zip(group_columns, keys, strict=True)),
@@ -431,6 +434,8 @@ def summarize_bitcoin_directional_contrasts(
                     "confidence_level": confidence_level,
                     "spread_ci_lower": ci_lower,
                     "spread_ci_upper": ci_upper,
+                    "interval_status": interval_status,
+                    "interval_status_classification": "statistical_transformation",
                     "interval_method": "welch_mean_difference_t_interval",
                     "regime_group_classification": "model_assumption",
                     "specification_role": None,
@@ -467,6 +472,16 @@ def _welch_mean_difference_interval(
     critical = stats.t.ppf((1 + confidence_level) / 2, df=degrees_of_freedom)
     margin = critical * standard_error
     return standard_error, spread - margin, spread + margin
+
+
+def _classify_contrast_interval(lower: float, upper: float) -> str:
+    if not np.isfinite(lower) or not np.isfinite(upper):
+        return "insufficient_sample"
+    if lower > 0:
+        return "positive_interval"
+    if upper < 0:
+        return "negative_interval"
+    return "inconclusive"
 
 
 def label_bitcoin_specification_role(
