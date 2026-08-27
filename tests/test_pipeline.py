@@ -46,7 +46,23 @@ def _write_test_config(project_root: Path) -> None:
     liquidity_blocks = [block for block in blocks if "    bitcoin:" not in block]
     market_block = next(block for block in blocks if "    bitcoin:" in block)
     config_dir.joinpath("series.yaml").write_text(
-        "US:\n  liquidity:\n" + "\n".join(liquidity_blocks) + "\n  markets:\n" + market_block,
+        "US:\n  liquidity:\n"
+        + "\n".join(liquidity_blocks)
+        + "\n  markets:\n"
+        + market_block
+        + "\nEA:\n  liquidity:\n    eurosystem_total_assets:\n"
+        + "      classification: measured_data\n"
+        + "      provider: ecb\n"
+        + "      series_id: BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E\n"
+        + "      component: eurosystem_total_assets\n"
+        + "      title: Eurosystem assets\n"
+        + "      description: Measured ECB test data\n"
+        + "      unit: Millions of Euro\n"
+        + "      frequency: Monthly, End of Period\n"
+        + "      seasonal_adjustment: Neither seasonally nor working day adjusted\n"
+        + "      start: '2024-01-01'\n"
+        + "      source: ECB\n"
+        + "      source_url: https://data.ecb.europa.eu/",
         encoding="utf-8",
     )
     config_dir.joinpath("model.yaml").write_text(
@@ -168,11 +184,11 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     }
 
     def fake_fetch(_provider, definition, **_kwargs):
-        value, unit = values[definition.series_id]
+        value, unit = values.get(definition.series_id, (9_000_000.0, "Millions of Euro"))
         return pd.DataFrame(
             {
                 "date": pd.to_datetime(["2024-01-03"]),
-                "country": ["US"],
+                "country": [definition.country],
                 "provider": [definition.provider],
                 "series_id": [definition.series_id],
                 "component": [definition.component],
@@ -188,9 +204,11 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     monkeypatch.setattr(
         "open_global_liquidity.pipeline.CoinMetricsProvider.fetch_definition", fake_fetch
     )
+    monkeypatch.setattr("open_global_liquidity.pipeline.EcbProvider.fetch_definition", fake_fetch)
 
     output_path = run_pipeline(project_root=tmp_path, publish_dashboard_snapshot=True)
     source = pd.read_parquet(output_path)
+    ecb_source = pd.read_parquet(tmp_path / "data" / "processed" / "euro_area_ecb_series.parquet")
     weekly = pd.read_parquet(tmp_path / "data" / "processed" / "us_liquidity_weekly.parquet")
     models = pd.read_parquet(tmp_path / "data" / "processed" / "us_liquidity_models.parquet")
     ogli = pd.read_parquet(tmp_path / "data" / "processed" / "us_ogli.parquet")
@@ -208,6 +226,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     )
     snapshot_dir = tmp_path / "data" / "reference"
     source_snapshot = pd.read_parquet(snapshot_dir / "us_fred_series_snapshot.parquet")
+    ecb_snapshot = pd.read_parquet(snapshot_dir / "euro_area_ecb_series_snapshot.parquet")
     weekly_snapshot = pd.read_parquet(snapshot_dir / "us_liquidity_weekly_snapshot.parquet")
     model_snapshot = pd.read_parquet(snapshot_dir / "us_liquidity_models_snapshot.parquet")
     ogli_snapshot = pd.read_parquet(snapshot_dir / "us_ogli_snapshot.parquet")
@@ -227,6 +246,8 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     assert output_path == tmp_path / "data" / "processed" / "us_fred_series.parquet"
     assert source.columns.tolist() == STANDARD_COLUMNS
     assert len(source) == 4
+    assert ecb_source["component"].tolist() == ["eurosystem_total_assets"]
+    pd.testing.assert_frame_equal(ecb_snapshot, ecb_source)
     assert len(weekly) == 4
     assert weekly.loc[weekly["component"] == "overnight_reverse_repo", "value"].item() == 1_000_000
     model_values = models.set_index("model_id")["value"]
@@ -252,7 +273,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     pd.testing.assert_frame_equal(correlation_snapshot, correlations)
     pd.testing.assert_frame_equal(comparison_snapshot, comparisons)
     pd.testing.assert_frame_equal(subperiod_snapshot, subperiods)
-    assert manifest["snapshot_count"] == 11
+    assert manifest["snapshot_count"] == 12
     assert set(manifest["files"]) == {path.name for path in snapshot_dir.glob("*.parquet")}
     assert manifest["files"]["us_liquidity_market_subperiods_snapshot.parquet"]["rows"] == 18
     assert snapshot_dir.joinpath("us_market_series_snapshot.parquet").is_file()

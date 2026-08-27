@@ -8,6 +8,22 @@ replace its original terms.
 This file records the sources used by v0.1 and is not legal advice. Users and redistributors remain
 responsible for checking the current source terms for their intended use.
 
+## European Central Bank
+
+The v0.2a pilot obtains `BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E`, total assets of the
+Eurosystem, from the public ECB Data Portal API. The
+[ESCB statistics reuse policy](https://www.ecb.europa.eu/stats/ecb_statistics/governance_and_quality_framework/html/usage_policy.en.html)
+permits free reuse of publicly released ESCB statistics when the source is quoted, applicable
+disclaimers are respected, and third-party data are excluded unless separately permitted. The
+[ECB disclaimer and copyright page](https://www.ecb.europa.eu/services/using-our-site/disclaimer/html/index.en.html)
+also requires accurate reproduction, ECB attribution, and an explicit statement when information
+has been modified.
+
+Attribution: Source: ECB statistics, ECB Data Portal, total assets of the Eurosystem, series
+`BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E`. Open Global Liquidity changes the monthly period label to a
+calendar month-end timestamp and divides reported EUR millions by 1,000 for dashboard display in
+EUR billions; source values remain available in the standardized Parquet artifact.
+
 ## FRED and ALFRED
 
 The pipeline accesses FRED and ALFRED through the Federal Reserve Bank of St. Louis API. The

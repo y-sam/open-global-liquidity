@@ -14,6 +14,7 @@ COMPONENT_LABELS = {
     "overnight_reverse_repo": "ON reverse repo",
     "reserve_balances": "Reserve balances",
 }
+ECB_COMPONENT_LABELS = {"eurosystem_total_assets": "Eurosystem total assets"}
 
 _UNIT_TO_BILLIONS = {
     "Millions of U.S. Dollars": 0.001,
@@ -111,6 +112,66 @@ def latest_readings(frame: pd.DataFrame) -> pd.DataFrame:
         )
     if not rows:
         raise DashboardDataError("Dashboard data contains no numeric observations")
+    return pd.DataFrame(rows)
+
+
+def load_ecb_data(path: Path) -> pd.DataFrame:
+    """Load the separate euro-area measured-data pilot in nominal EUR billions."""
+    if not path.is_file():
+        raise DashboardDataError(f"ECB data not found at {path}. Run the ingestion pipeline first.")
+    try:
+        frame = pd.read_parquet(path)
+    except (OSError, ValueError) as exc:
+        raise DashboardDataError(f"Could not read ECB data at {path}: {exc}") from exc
+    validate_standardized_frame(frame)
+    expected = {"country": {"EA"}, "provider": {"ECB"}, "unit": {"Millions of Euro"}}
+    for column, allowed in expected.items():
+        actual = set(frame[column].dropna())
+        if actual != allowed:
+            raise DashboardDataError(f"ECB data has unexpected {column} values: {sorted(actual)}")
+    result = frame[STANDARD_COLUMNS].copy()
+    result["date"] = pd.to_datetime(result["date"])
+    result["value_eur_billions"] = result["value"] * 0.001
+    result["label"] = result["component"].map(ECB_COMPONENT_LABELS).fillna(result["component"])
+    return result.sort_values(["component", "date"]).reset_index(drop=True)
+
+
+def latest_ecb_readings(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return latest EUR level, prior-month change, and year-over-year change."""
+    required = {"component", "label", "date", "value_eur_billions", "retrieved_at"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError(f"ECB data is missing columns: {', '.join(missing)}")
+    rows: list[dict[str, object]] = []
+    for _component, group in frame.sort_values("date").groupby("component", sort=False):
+        valid = group.dropna(subset=["value_eur_billions"])
+        if valid.empty:
+            continue
+        latest = valid.iloc[-1]
+        previous = valid.iloc[-2] if len(valid) > 1 else None
+        prior_year = valid.loc[valid["date"] <= latest["date"] - pd.DateOffset(years=1)]
+        year_ago = prior_year.iloc[-1] if not prior_year.empty else None
+        rows.append(
+            {
+                "component": latest["component"],
+                "label": latest["label"],
+                "date": latest["date"],
+                "value_eur_billions": latest["value_eur_billions"],
+                "change_eur_billions": (
+                    latest["value_eur_billions"] - previous["value_eur_billions"]
+                    if previous is not None
+                    else pd.NA
+                ),
+                "growth_yoy": (
+                    latest["value_eur_billions"] / year_ago["value_eur_billions"] - 1
+                    if year_ago is not None and year_ago["value_eur_billions"] != 0
+                    else pd.NA
+                ),
+                "retrieved_at": latest["retrieved_at"],
+            }
+        )
+    if not rows:
+        raise DashboardDataError("ECB data contains no numeric observations")
     return pd.DataFrame(rows)
 
 

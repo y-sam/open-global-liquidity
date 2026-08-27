@@ -1,8 +1,36 @@
 {
   "classification": "snapshot_provenance",
   "files": {
+    "euro_area_ecb_series_snapshot.parquet": {
+      "bytes": 11974,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "retrieved_at"
+      ],
+      "components": [
+        "eurosystem_total_assets"
+      ],
+      "earliest_observation": "1997-09-30",
+      "latest_observation": "2026-06-30",
+      "latest_retrieval": "2026-08-27T07:29:12.367890+00:00",
+      "providers": [
+        "ECB"
+      ],
+      "rows": 346,
+      "series_ids": [
+        "BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E"
+      ],
+      "sha256": "7607e516d17f4946bd8ad985764f8631e6f491a04d6a690ac8144d64c487fd1b"
+    },
     "us_fred_series_snapshot.parquet": {
-      "bytes": 89561,
+      "bytes": 89580,
       "columns": [
         "date",
         "country",
@@ -21,22 +49,22 @@
         "treasury_general_account"
       ],
       "earliest_observation": "2002-12-18",
-      "latest_observation": "2026-08-25",
-      "latest_retrieval": "2026-08-26T12:05:44.315730+00:00",
+      "latest_observation": "2026-08-26",
+      "latest_retrieval": "2026-08-27T07:29:11.800304+00:00",
       "providers": [
         "FRED"
       ],
-      "rows": 7008,
+      "rows": 7009,
       "series_ids": [
         "RRPONTSYD",
         "WALCL",
         "WDTGAL",
         "WRBWFRBL"
       ],
-      "sha256": "1db893f3cbf799c3410b9b1cd8aa5f150a00a10808a90a92ffa5cb8179482138"
+      "sha256": "1021b28c6410b9ccc4e1beefffd5f989b6598fd8852242dd743a57c262a003b2"
     },
     "us_liquidity_market_comparisons_snapshot.parquet": {
-      "bytes": 599326,
+      "bytes": 477935,
       "columns": [
         "signal_observation_date",
         "model_id",
@@ -68,7 +96,7 @@
         "is_non_overlapping"
       ],
       "earliest_observation": "2014-01-08",
-      "latest_observation": "2026-08-19",
+      "latest_observation": "2026-08-26",
       "market_ids": [
         "bitcoin"
       ],
@@ -77,14 +105,14 @@
         "model_b",
         "model_c"
       ],
-      "rows": 23706,
+      "rows": 23724,
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "4b02c314cc0327752c598f80f1f2231cfd4dae6906d234d3be3b50383d0e61fa"
+      "sha256": "22bac3a71a91278916b9eddef7bd78e6803d64d42555b7db5a9bac44e1e8cc23"
     },
     "us_liquidity_market_correlations_snapshot.parquet": {
-      "bytes": 17914,
+      "bytes": 17908,
       "columns": [
         "model_id",
         "model_name",
@@ -121,10 +149,10 @@
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "78b7050ab401127871e0c577be9bac1eb0a94284dc4ed83672f28b4a4b57f4ac"
+      "sha256": "6e5ac259a91b77a5aac88f29c8e3463e53f91f1781658299ae2005e5c54181d0"
     },
     "us_liquidity_market_regimes_snapshot.parquet": {
-      "bytes": 34876,
+      "bytes": 34823,
       "columns": [
         "model_id",
         "model_name",
@@ -157,10 +185,10 @@
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "f97cef0d22daae99ac7c48b8e1cdf21a9eb11454f9229eb1eb623db2abd718b2"
+      "sha256": "bb6876efc5ad9d3d263ecd7ce9ef0aa663dd4c27739682c30eea77e2c40999bd"
     },
     "us_liquidity_market_subperiods_snapshot.parquet": {
-      "bytes": 26714,
+      "bytes": 26711,
       "columns": [
         "model_id",
         "model_name",
@@ -203,7 +231,7 @@
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "5efa2a73365e3bab49de7609dfd67eb987de04763e0491d1174f1c87dc8a620c"
+      "sha256": "9f9de0a58b4d6021ee26dba002e108a5a7ef9d3d56450188c480352563be5338"
     },
     "us_liquidity_models_snapshot.parquet": {
       "bytes": 29298,
@@ -255,7 +283,7 @@
       ],
       "earliest_observation": "2014-01-08",
       "latest_observation": "2026-08-19",
-      "latest_retrieval": "2026-08-26T12:05:44.315730+00:00",
+      "latest_retrieval": "2026-08-27T07:29:11.800304+00:00",
       "providers": [
         "FRED"
       ],
@@ -266,7 +294,7 @@
         "WDTGAL",
         "WRBWFRBL"
       ],
-      "sha256": "bc17d5c13004974afde329b05c91152331ea763dc3eb197bbee985c3db2e952f"
+      "sha256": "78aec327173e84072e9ec9d60c6df2de6c88f8405d7f30d874b4d334c7cb28fc"
     },
     "us_macro_context_indicators_snapshot.parquet": {
       "bytes": 32350,
@@ -284,7 +312,7 @@
       "sha256": "911e78ecd476161fdbc6fb494335c55c70994560bcf7d7ab67b1313038f0f4ac"
     },
     "us_macro_context_series_snapshot.parquet": {
-      "bytes": 127253,
+      "bytes": 127263,
       "columns": [
         "date",
         "country",
@@ -302,18 +330,18 @@
         "treasury_yield_2y"
       ],
       "earliest_observation": "2006-01-02",
-      "latest_observation": "2026-08-24",
-      "latest_retrieval": "2026-08-26T12:05:49.583743+00:00",
+      "latest_observation": "2026-08-25",
+      "latest_retrieval": "2026-08-27T07:29:16.159839+00:00",
       "providers": [
         "FRED"
       ],
-      "rows": 16157,
+      "rows": 16159,
       "series_ids": [
         "DGS10",
         "DGS2",
         "DTWEXBGS"
       ],
-      "sha256": "03c04b0c234c2832c84fa2bd93186fb496baeaaa11914efef9765afe2b36b608"
+      "sha256": "92f82ff0037d5fe99beb29b7cd601581416993590f98d35eb7007d97d8e96198"
     },
     "us_macro_context_weekly_snapshot.parquet": {
       "bytes": 47382,
@@ -340,7 +368,7 @@
       ],
       "earliest_observation": "2006-01-04",
       "latest_observation": "2026-08-19",
-      "latest_retrieval": "2026-08-26T12:05:49.583743+00:00",
+      "latest_retrieval": "2026-08-27T07:29:16.159839+00:00",
       "providers": [
         "FRED"
       ],
@@ -350,10 +378,10 @@
         "DGS2",
         "DTWEXBGS"
       ],
-      "sha256": "f5c7c1f6c12ea9c837c04773f669811b6341b3f3beeaa6a74bad0d4ab13444c7"
+      "sha256": "9f79f08a7c24159b57bb92ad7847b634da67693b1189ad4a3536ef62bb65de83"
     },
     "us_market_returns_snapshot.parquet": {
-      "bytes": 92057,
+      "bytes": 101706,
       "columns": [
         "date",
         "market_id",
@@ -367,18 +395,18 @@
         "return_end_date"
       ],
       "earliest_observation": "2010-07-21",
-      "latest_observation": "2026-08-19",
+      "latest_observation": "2026-08-26",
       "market_ids": [
         "bitcoin"
       ],
-      "rows": 5040,
+      "rows": 5046,
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "9efe1ae55b4604c58a42e7e7bd032cb3372917f3dbe5ecec951f859a594e35de"
+      "sha256": "1af40bcbb4b24d15870839314753de98bc3d95b867968d0c99ef90013ef8528d"
     },
     "us_market_series_snapshot.parquet": {
-      "bytes": 114764,
+      "bytes": 114779,
       "columns": [
         "date",
         "country",
@@ -394,19 +422,19 @@
         "bitcoin"
       ],
       "earliest_observation": "2010-07-18",
-      "latest_observation": "2026-08-25",
-      "latest_retrieval": "2026-08-26T12:05:44.754674+00:00",
+      "latest_observation": "2026-08-26",
+      "latest_retrieval": "2026-08-27T07:29:13.305072+00:00",
       "providers": [
         "Coin Metrics"
       ],
-      "rows": 5883,
+      "rows": 5884,
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "4f34d881973c010e6c714acdc9e788c6cb685d1f1f8fa9bca8b15131157b7b58"
+      "sha256": "559465d22acb4f0c580bc9f79e66d00bcf249167133569a42de2f577d907975c"
     },
     "us_market_weekly_snapshot.parquet": {
-      "bytes": 32261,
+      "bytes": 32315,
       "columns": [
         "date",
         "country",
@@ -427,16 +455,16 @@
         "bitcoin"
       ],
       "earliest_observation": "2010-07-21",
-      "latest_observation": "2026-08-19",
-      "latest_retrieval": "2026-08-26T12:05:44.754674+00:00",
+      "latest_observation": "2026-08-26",
+      "latest_retrieval": "2026-08-27T07:29:13.305072+00:00",
       "providers": [
         "Coin Metrics"
       ],
-      "rows": 840,
+      "rows": 841,
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "1cbdafdc73d13e5bf021e7b3cfdc8050ba51348475ab75b34eb711eec1182eaf"
+      "sha256": "84398fd18de46695e4f6844990f92ba80f957e5f5191820385d3111e90e2bf0d"
     },
     "us_ogli_snapshot.parquet": {
       "bytes": 183231,
@@ -476,7 +504,7 @@
         "model_c"
       ],
       "rows": 1977,
-      "sha256": "672f184816eade2bda059695e6ce0100c51b62c79e02219163d64facc8785bf8"
+      "sha256": "7c79169800df187c003adab1448302443094d0c1f0a9380551c437cf54265772"
     },
     "us_point_in_time_bitcoin_contrasts_snapshot.parquet": {
       "bytes": 23464,
@@ -513,7 +541,7 @@
         "model_c"
       ],
       "rows": 96,
-      "sha256": "dc7a185d63a75173003983f011ab0a77f2b92631c4a8a9410cd2e866800100db"
+      "sha256": "a2a6ee0b738de50fbd15dc485d7c10d6926c0d3f8716e11b8c9d25321c71c9a7"
     },
     "us_point_in_time_bitcoin_outcomes_snapshot.parquet": {
       "bytes": 104714,
@@ -571,10 +599,10 @@
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "53112d46748027618e018b781d41afd50dbade4d88c5a8ff5ecb180c13e139cb"
+      "sha256": "66ab2d940d7983f29f42ce6cb6ef6adef4b197887017eadc77d46653372daa8d"
     },
     "us_point_in_time_bitcoin_regimes_snapshot.parquet": {
-      "bytes": 56785,
+      "bytes": 56777,
       "columns": [
         "model_id",
         "model_name",
@@ -604,7 +632,7 @@
         "model_c"
       ],
       "rows": 816,
-      "sha256": "a72828ab20e07ee2ad2184aac73d4561b73aa5d4b2b371230bf82ff211113dc0"
+      "sha256": "ae3bed08f0b9837c9ba0a49ec3787467a07ab7bbaa8549d0fb368cf0cb208132"
     },
     "us_point_in_time_bitcoin_revisions_snapshot.parquet": {
       "bytes": 11763,
@@ -630,7 +658,7 @@
         "model_c"
       ],
       "rows": 96,
-      "sha256": "6acc0231cc7bd32089c61749e68fd328b8cd615ead150b73f5297adc4fe47a1d"
+      "sha256": "dafc8bf9a2f4d0645849c106e3626d07277d960acb846122a3c5d2ef614f887c"
     },
     "us_point_in_time_comparison_snapshot.parquet": {
       "bytes": 26454,
@@ -655,14 +683,14 @@
         "momentum_revision",
         "comparison_policy"
       ],
-      "latest_retrieval": "2026-08-26T12:05:56.168680+00:00",
+      "latest_retrieval": "2026-08-27T07:29:50.779733+00:00",
       "model_ids": [
         "model_a",
         "model_b",
         "model_c"
       ],
       "rows": 201,
-      "sha256": "c13bde8223ededd5dee1a25e77bce5de26343715775fd65a52464acb4b958c44"
+      "sha256": "e1b249bff918311a710c008dd197a3d28283c03434db5a578866af5cf5440e3f"
     },
     "us_point_in_time_market_pairs_snapshot.parquet": {
       "bytes": 98737,
@@ -713,10 +741,10 @@
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "19d29fec63d9b686e24aed1a0b91214e951454480b11e0c1b5ee0e5b9c27bd82"
+      "sha256": "5b87dfd448adbbcfa62a1cca6ad2f4ce3d61a065cbf93be1e580ad27dd59e64f"
     },
     "us_point_in_time_market_series_snapshot.parquet": {
-      "bytes": 178455,
+      "bytes": 184121,
       "columns": [
         "date",
         "country",
@@ -734,20 +762,20 @@
         "gold"
       ],
       "earliest_observation": "2006-01-02",
-      "latest_observation": "2026-08-25",
-      "latest_retrieval": "2026-08-26T12:06:04.756237+00:00",
+      "latest_observation": "2026-08-26",
+      "latest_retrieval": "2026-08-27T07:29:53.244883+00:00",
       "providers": [
         "Coin Metrics",
         "FRED",
         "World Bank"
       ],
-      "rows": 11328,
+      "rows": 11329,
       "series_ids": [
         "CMO-GOLD-MONTHLY",
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "02c8e2a1e76a70550a0b93b7e40549aeecf01d708e3b51176a3b6101e2ea719f"
+      "sha256": "e52ed834c571cd322a13f579c1d3d32d753c61570c4ded15c35293ec6a73cc51"
     },
     "us_point_in_time_market_summary_snapshot.parquet": {
       "bytes": 12693,
@@ -782,13 +810,13 @@
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "48773c7cebbf68db742a6eb9dea194ccbc6a90b5e9f6d0bfbfb89af9ad02d22c"
+      "sha256": "1deec35cb404df605676ee98ff5e574dac801b1c74f0718f28738ec277f7f13d"
     }
   },
-  "generated_at": "2026-08-26T12:06:08.468950+00:00",
-  "pipeline_version": "0.1.0",
+  "generated_at": "2026-08-27T07:29:54.181480+00:00",
+  "pipeline_version": "0.1.1",
   "schema_version": 1,
-  "snapshot_count": 22,
-  "source_commit": "62ab45f25b272fd5a0e93e45a0ca077cbbfe13cd",
-  "working_tree_dirty": false
+  "snapshot_count": 23,
+  "source_commit": "6b89fad9533d1f35451238a4d26830fb2ad6d1d9",
+  "working_tree_dirty": true
 }

@@ -8,12 +8,50 @@ import pytest
 
 from open_global_liquidity.dashboard import (
     DashboardDataError,
+    latest_ecb_readings,
     latest_model_readings,
     latest_readings,
     load_dashboard_data,
+    load_ecb_data,
     load_liquidity_model_data,
     resolve_dashboard_data_path,
 )
+
+
+def test_load_ecb_data_and_latest_changes(tmp_path: Path) -> None:
+    path = tmp_path / "ecb.parquet"
+    pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-01-31", "2025-01-31", "2025-02-28"]),
+            "country": ["EA"] * 3,
+            "provider": ["ECB"] * 3,
+            "series_id": ["BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E"] * 3,
+            "component": ["eurosystem_total_assets"] * 3,
+            "value": [9_000_000.0, 9_900_000.0, 10_098_000.0],
+            "unit": ["Millions of Euro"] * 3,
+            "frequency": ["Monthly, End of Period"] * 3,
+            "retrieved_at": [pd.Timestamp("2025-03-20", tz=UTC)] * 3,
+        }
+    ).to_parquet(path, index=False)
+
+    result = load_ecb_data(path)
+    latest = latest_ecb_readings(result).iloc[0]
+
+    assert result["value_eur_billions"].tolist() == [9_000.0, 9_900.0, 10_098.0]
+    assert latest["change_eur_billions"] == 198.0
+    assert latest["growth_yoy"] == pytest.approx(0.122)
+
+
+def test_load_ecb_data_rejects_mixed_currency(tmp_path: Path) -> None:
+    path = tmp_path / "ecb.parquet"
+    frame = _processed_frame().iloc[:1].copy()
+    frame["country"] = "EA"
+    frame["provider"] = "ECB"
+    frame["unit"] = "Millions of U.S. Dollars"
+    frame.to_parquet(path, index=False)
+
+    with pytest.raises(DashboardDataError, match="unexpected unit"):
+        load_ecb_data(path)
 
 
 def _processed_frame() -> pd.DataFrame:

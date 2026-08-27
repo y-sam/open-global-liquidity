@@ -3,6 +3,21 @@
 All notable project changes are documented here. The project follows semantic versioning once a
 release is tagged.
 
+## [0.2.0] — Unreleased
+
+### Added
+
+- Keyless, cache-aware ECB Data Portal provider with exact-key, schema, and unit validation.
+- Monthly total assets of the Eurosystem as the first non-US measured-data series.
+- Separate euro-area Streamlit page with EUR levels, monthly and yearly changes, provenance, and
+  explicit period-label and publication-timing limitations.
+- Versioned ECB dashboard snapshot in the scheduled refresh and provenance manifest.
+
+### Research boundary
+
+- The US OGLI is unchanged. ECB data are not frequency-aligned, currency-converted, weighted,
+  aggregated, or interpreted as a euro-area liquidity model in this milestone.
+
 ## [0.1.1] — 2026-08-26
 
 ### Added

@@ -33,6 +33,7 @@ from open_global_liquidity.config import (
 )
 from open_global_liquidity.data.base import DataValidationError
 from open_global_liquidity.data.coinmetrics import CoinMetricsError, CoinMetricsProvider
+from open_global_liquidity.data.ecb import EcbError, EcbProvider
 from open_global_liquidity.data.fred import FredError, FredProvider
 from open_global_liquidity.models.ogli import OGLICalculationError, calculate_ogli
 from open_global_liquidity.models.us_liquidity import (
@@ -74,6 +75,9 @@ def run_pipeline(
     ]
     market_definitions = [item for item in definitions if item.group == "markets"]
     context_definitions = [item for item in definitions if item.group == "context"]
+    ecb_definitions = [
+        item for item in definitions if item.provider.lower() == "ecb" and item.group == "liquidity"
+    ]
     if not liquidity_definitions:
         raise RuntimeError("No FRED liquidity series are configured")
     if not market_definitions:
@@ -98,6 +102,25 @@ def run_pipeline(
     output_path = output_dir / "us_fred_series.parquet"
     output.to_parquet(output_path, index=False)
     LOGGER.info("Wrote %d standardized observations to %s", len(output), output_path)
+
+    ecb_output: pd.DataFrame | None = None
+    if ecb_definitions:
+        ecb_provider = EcbProvider(cache_dir=project_root / "data" / "raw" / "ecb")
+        ecb_output = pd.concat(
+            [
+                ecb_provider.fetch_definition(
+                    definition,
+                    start=start,
+                    end=end,
+                    force_refresh=force_refresh,
+                )
+                for definition in ecb_definitions
+            ],
+            ignore_index=True,
+        ).sort_values(["country", "series_id", "date"])
+        ecb_path = output_dir / "euro_area_ecb_series.parquet"
+        ecb_output.to_parquet(ecb_path, index=False)
+        LOGGER.info("Wrote %d standardized ECB observations to %s", len(ecb_output), ecb_path)
 
     weekly = align_to_weekly_wednesday(
         convert_to_usd_millions(output),
@@ -318,6 +341,8 @@ def run_pipeline(
             "us_liquidity_market_regimes_snapshot.parquet": regime_statistics,
             "us_liquidity_market_subperiods_snapshot.parquet": subperiod_correlations,
         }
+        if ecb_output is not None:
+            snapshots["euro_area_ecb_series_snapshot.parquet"] = ecb_output
         snapshots.update(
             {
                 filename.replace(".parquet", "_snapshot.parquet"): frame
@@ -348,6 +373,7 @@ def run_pipeline(
         f"{len(weekly):,} weekly aligned observations, {len(models):,} model observations, "
         f"{ogli['ogli'].notna().sum():,} available OGLI readings, and "
         f"{len(correlations):,} market-correlation estimates "
+        f"and {0 if ecb_output is None else len(ecb_output):,} ECB observations "
         f"-> {output_dir}"
     )
     return output_path
@@ -385,6 +411,7 @@ def main() -> None:
     except (
         ConfigurationError,
         CoinMetricsError,
+        EcbError,
         DataValidationError,
         FredError,
         FrequencyAlignmentError,

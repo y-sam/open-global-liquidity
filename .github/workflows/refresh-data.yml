@@ -74,6 +74,7 @@ jobs:
       - name: Commit refreshed public snapshots
         run: |
           git add \
+            data/reference/euro_area_ecb_series_snapshot.parquet \
             data/reference/us_fred_series_snapshot.parquet \
             data/reference/us_liquidity_weekly_snapshot.parquet \
             data/reference/us_liquidity_models_snapshot.parquet \

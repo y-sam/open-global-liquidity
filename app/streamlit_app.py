@@ -21,6 +21,7 @@ from dashboard_support import (  # noqa: E402
     COMPONENT_LABELS,
     DashboardDataError,
     assess_freshness,
+    latest_ecb_readings,
     latest_model_readings,
     latest_ogli_readings,
     latest_readings,
@@ -29,6 +30,7 @@ from dashboard_support import (  # noqa: E402
     load_bitcoin_regime_summary,
     load_bitcoin_revision_summary,
     load_dashboard_data,
+    load_ecb_data,
     load_liquidity_model_data,
     load_macro_context,
     load_market_comparisons,
@@ -46,6 +48,8 @@ from dashboard_support import (  # noqa: E402
 DATA_ROOT = Path(os.environ.get("OGLI_DATA_ROOT", PROJECT_ROOT / "data"))
 PROCESSED_DATA_PATH = DATA_ROOT / "processed" / "us_fred_series.parquet"
 SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_fred_series_snapshot.parquet"
+ECB_DATA_PATH = DATA_ROOT / "processed" / "euro_area_ecb_series.parquet"
+ECB_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "euro_area_ecb_series_snapshot.parquet"
 MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
 MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
 OGLI_DATA_PATH = DATA_ROOT / "processed" / "us_ogli.parquet"
@@ -146,6 +150,13 @@ def _load_data(path: str, modified_ns: int) -> pd.DataFrame:
     """Cache processed data until its file modification timestamp changes."""
     del modified_ns
     return load_dashboard_data(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_ecb(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache measured ECB data until its file modification timestamp changes."""
+    del modified_ns
+    return load_ecb_data(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -256,6 +267,11 @@ def _load_bitcoin_contrasts(path: str, modified_ns: int) -> pd.DataFrame:
 def _source_data() -> tuple[pd.DataFrame, Path, str]:
     data_path, data_origin = resolve_dashboard_data_path(PROCESSED_DATA_PATH, SNAPSHOT_DATA_PATH)
     return _load_data(str(data_path), data_path.stat().st_mtime_ns), data_path, data_origin
+
+
+def _ecb_data() -> tuple[pd.DataFrame, Path, str]:
+    path, origin = resolve_dashboard_data_path(ECB_DATA_PATH, ECB_SNAPSHOT_DATA_PATH)
+    return _load_ecb(str(path), path.stat().st_mtime_ns), path, origin
 
 
 def _model_data() -> tuple[pd.DataFrame, str] | None:
@@ -726,7 +742,7 @@ def _load_or_explain() -> tuple[pd.DataFrame, Path, str] | None:
 
 
 def landing_page() -> None:
-    st.badge("Independent public-data research · v0.1", icon=":material/science:")
+    st.badge("Independent public-data research · v0.2a pilot", icon=":material/science:")
     st.title("See the financial system through a liquidity lens")
     st.markdown(
         """
@@ -735,8 +751,8 @@ def landing_page() -> None:
         sheets, credit creation, collateral, funding markets, and cross-border finance all matter.
 
         Open Global Liquidity turns public data into transparent, reproducible indicators. The
-        current release is deliberately narrow—**United States only**—so the engineering and
-        research assumptions can be tested before building a global aggregate.
+        current OGLI remains deliberately **United States only**. A separate euro-area measured-
+        data pilot begins the international expansion without currency conversion or aggregation.
         """
     )
 
@@ -2637,6 +2653,102 @@ def markets_page() -> None:
     st.caption("Source: Coin Metrics Community Data (`btc.PriceUSD`), licensed CC BY-NC 4.0.")
 
 
+def euro_area_page() -> None:
+    """Present the first non-US measured series without implying a global index."""
+    st.title("Euro area measured data")
+    st.caption(
+        "v0.2a expansion pilot · measured ECB data only · no EUR/USD conversion, weekly "
+        "interpolation, euro-area liquidity model, or global aggregation"
+    )
+    try:
+        data, _path, origin = _ecb_data()
+    except DashboardDataError as exc:
+        st.info(str(exc), icon=":material/public:")
+        st.code(
+            "uv run python -m open_global_liquidity.pipeline --publish-dashboard-snapshot",
+            language="zsh",
+        )
+        st.markdown(
+            "The ECB Data Portal endpoint is public and requires **no account or API key**."
+        )
+        return
+
+    latest = latest_ecb_readings(data).iloc[0]
+    level = float(latest["value_eur_billions"])
+    monthly_change = latest["change_eur_billions"]
+    growth_yoy = latest["growth_yoy"]
+    retrieved_at = pd.to_datetime(latest["retrieved_at"], utc=True)
+    with st.container(horizontal=True):
+        st.metric(
+            "Eurosystem total assets",
+            f"€{level:,.0f}bn",
+            None if pd.isna(monthly_change) else f"€{float(monthly_change):+,.0f}bn vs prior month",
+            border=True,
+        )
+        st.metric(
+            "12-month change",
+            "Unavailable" if pd.isna(growth_yoy) else f"{float(growth_yoy):+.1%}",
+            border=True,
+        )
+        st.metric("Latest period", f"{latest['date']:%b %Y}", border=True)
+        st.metric("Data mode", origin, border=True)
+
+    max_date = data["date"].max()
+    history = st.segmented_control("History", ["5 years", "10 years", "All"], default="10 years")
+    if history == "All":
+        visible = data
+    else:
+        years = 5 if history == "5 years" else 10
+        visible = data.loc[data["date"] >= max_date - pd.DateOffset(years=years)]
+    figure = px.line(
+        visible,
+        x="date",
+        y="value_eur_billions",
+        title=f"Eurosystem total assets · {history}",
+        labels={"date": "Date", "value_eur_billions": "EUR billions"},
+    )
+    figure.update_traces(
+        line={"width": 2.5}, hovertemplate="%{x|%b %Y}<br>€%{y:,.0f}bn<extra></extra>"
+    )
+    figure.update_layout(
+        hovermode="x unified",
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(figure, width="stretch", config={"displaylogo": False})
+
+    st.info(
+        "Monthly dates are calendar month-end period labels. They are not modeled publication "
+        "timestamps. Values remain nominal EUR stocks and are not inputs to the US OGLI.",
+        icon=":material/info:",
+    )
+    st.subheader("Recent observations")
+    recent = data.tail(12).assign(
+        date=lambda frame: frame["date"].dt.strftime("%Y-%m-%d"),
+        value_eur_billions=lambda frame: frame["value_eur_billions"].round(1),
+    )
+    st.dataframe(
+        recent[["date", "value_eur_billions", "series_id"]].rename(
+            columns={
+                "date": "Period end",
+                "value_eur_billions": "EUR billions",
+                "series_id": "ECB series",
+            }
+        ),
+        width="stretch",
+        hide_index=True,
+    )
+    st.caption(
+        f"Retrieved {retrieved_at:%Y-%m-%d %H:%M UTC} · Provider: ECB Data Portal · "
+        "Euro area changing composition"
+    )
+    st.link_button(
+        "Review official ECB metadata",
+        "https://data.ecb.europa.eu/data/concepts/statistical-balance-sheet",
+        icon=":material/open_in_new:",
+    )
+
+
 def research_guide_page() -> None:
     st.title("Research guide")
     st.markdown(
@@ -2872,7 +2984,7 @@ def research_guide_page() -> None:
     st.subheader("Data sources and further reading")
     st.markdown(
         """
-        **Series used by v0.1**
+        **Series used by the US v0.1 research pipeline**
 
         - [WALCL — Federal Reserve total assets](https://fred.stlouisfed.org/series/WALCL)
         - [WDTGAL — Treasury General Account](https://fred.stlouisfed.org/series/WDTGAL)
@@ -2882,6 +2994,11 @@ def research_guide_page() -> None:
         - [DGS10 — 10-year Treasury yield](https://fred.stlouisfed.org/series/DGS10)
         - [DGS2 — 2-year Treasury yield](https://fred.stlouisfed.org/series/DGS2)
         - [DTWEXBGS — Nominal broad U.S. dollar index](https://fred.stlouisfed.org/series/DTWEXBGS)
+
+        **Euro-area v0.2a measured-data pilot**
+
+        - [ECB BSI total assets of the Eurosystem](https://data.ecb.europa.eu/data/concepts/statistical-balance-sheet)
+          — monthly nominal EUR stock; not an OGLI input or global aggregate
 
         **Primary documentation and broader context**
 
@@ -2913,6 +3030,12 @@ data_page = st.Page(
     title="Data dashboard",
     icon=":material/monitoring:",
     url_path="dashboard",
+)
+euro_area_data_page = st.Page(
+    euro_area_page,
+    title="Euro area data",
+    icon=":material/public:",
+    url_path="euro-area",
 )
 markets_index_page = st.Page(
     markets_page,
@@ -2952,6 +3075,7 @@ navigation = st.navigation(
         bitcoin_page,
         markets_index_page,
         data_page,
+        euro_area_data_page,
         guide_page,
     ],
     position="top",

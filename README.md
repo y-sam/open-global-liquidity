@@ -1,6 +1,7 @@
 # Open Global Liquidity
 
-**Current release:** v0.1.1. See the [changelog](CHANGELOG.md),
+**Current tagged release:** v0.1.1. The main branch includes the v0.2a euro-area measured-data
+pilot described below. See the [changelog](CHANGELOG.md),
 [citation metadata](CITATION.cff), and [release checklist](RELEASE_CHECKLIST.md). Project code is
 licensed under Apache-2.0; bundled and downloaded third-party data remain subject to their
 respective terms.
@@ -19,7 +20,7 @@ Original project code is licensed under the [Apache License 2.0](LICENSE). This 
 not relicense third-party observations, derived snapshots, source metadata, names, or trademarks.
 See [Third-party data terms](THIRD_PARTY_DATA.md) before redistributing bundled data artifacts.
 
-## Current scope: v0.1 US liquidity models
+## Current scope: US OGLI plus a euro-area measured-data pilot
 
 The repository provides an auditable US data-ingestion path, experimental OGLI momentum index, and
 Streamlit dashboard. It
@@ -66,6 +67,12 @@ Model B is a common public-market proxy, not a Michael Howell or CrossBorder Cap
 Model C uses reserve balances directly; TGA and RRP are not subtracted again because their effects
 are already reflected in reserves and another subtraction could double count those drains.
 The default OGLI uses expanding, non-look-ahead z-scores with a 104-observation minimum history.
+
+The v0.2a expansion pilot also downloads the ECB series
+[`BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E`](https://data.ecb.europa.eu/data/concepts/statistical-balance-sheet),
+**Total assets of the Eurosystem, Stocks**. It remains a separate monthly nominal-EUR measured
+series. It is not resampled to weekly frequency, converted to USD, combined with US observations,
+or used to calculate OGLI. The ECB endpoint is public and requires no additional account or key.
 
 ## Research boundaries
 
@@ -134,8 +141,10 @@ The provider fails clearly when `FRED_API_KEY` is absent, FRED returns an error,
 is invalid, or no observations are returned. A successful run writes:
 
 - `data/raw/fred/<SERIES_ID>.parquet`: FRED observations plus retrieval metadata;
+- `data/raw/ecb/bsi_m_u2_n_c_t00_a_1_z5_0000_z01_e.parquet`: cached ECB values and metadata;
 - `data/raw/coinmetrics/btc_priceusd.parquet`: cached Bitcoin USD prices;
 - `data/processed/us_fred_series.parquet`: standardized long-format source observations;
+- `data/processed/euro_area_ecb_series.parquet`: separate monthly Eurosystem assets in nominal EUR;
 - `data/processed/us_liquidity_weekly.parquet`: USD-million Wednesday inputs with source-date and
   staleness lineage;
 - `data/processed/us_liquidity_models.parquet`: the three weekly model levels and formulas.
@@ -335,6 +344,8 @@ directory, and verifies that the public snapshots still render the landing-page 
 - `src/open_global_liquidity/data/fred.py` — FRED network, error handling, cache, and standardization.
 - `src/open_global_liquidity/data/coinmetrics.py` — no-key Coin Metrics community ingestion and
   caching.
+- `src/open_global_liquidity/data/ecb.py` — keyless ECB Data Portal ingestion, validation, and
+  monthly cache.
 - `src/open_global_liquidity/transforms/` — unit conversion, alignment, growth, and z-scores.
 - `src/open_global_liquidity/models/us_liquidity.py` — configurable Model A/B/C calculations.
 - `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
@@ -456,9 +467,10 @@ Bitcoin is the primary market comparison. Gold now uses the World Bank Pink Shee
 and the Federal Reserve broad dollar index is included without changing its sign. Both remain
 outcome/context variables rather than OGLI inputs. Treasury yields and the 10-year-minus-2-year
 slope remain measured context. S&P 500 may return after appropriate public-display rights are
-secured. Later versions may add global
-central banks, FX conversion, collateral and repo proxies, shadow monetary base concepts, BIS
-cross-border credit, and explicitly labeled public benchmark calibration.
+secured. The v0.2a pilot begins the global-central-bank roadmap with one separate ECB measured
+series. Later increments may add ECB counterparts, other central banks, FX conversion, global
+aggregation, collateral and repo proxies, shadow monetary base concepts, BIS cross-border credit,
+and explicitly labeled public benchmark calibration.
 
 ## Limitations and disclaimer
 
