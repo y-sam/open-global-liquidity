@@ -169,3 +169,22 @@ EA:
       start: "1997-09-30"
       source: "European Central Bank, ECB Data Portal, Balance Sheet Items"
       source_url: "https://data.ecb.europa.eu/data/concepts/statistical-balance-sheet"
+
+JP:
+  liquidity:
+    boj_total_assets:
+      classification: measured_data
+      provider: boj
+      series_id: BS01.MABJMTA
+      component: boj_total_assets
+      title: "Bank of Japan Accounts: Assets: Total"
+      description: >-
+        Monthly total assets reported in the Bank of Japan Accounts. This is a separate
+        measured-data pilot in native yen: it is not converted to U.S. dollars, combined with
+        US or euro-area data, or used in OGLI.
+      unit: "100 Million Yen"
+      frequency: "Monthly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "1998-04-30"
+      source: "Bank of Japan, BOJ Time-Series Data Search, Bank of Japan Accounts"
+      source_url: "https://www.boj.or.jp/en/statistics/boj/other/ac/index.htm"

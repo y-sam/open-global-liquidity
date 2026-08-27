@@ -62,7 +62,20 @@ def _write_test_config(project_root: Path) -> None:
         + "      seasonal_adjustment: Neither seasonally nor working day adjusted\n"
         + "      start: '2024-01-01'\n"
         + "      source: ECB\n"
-        + "      source_url: https://data.ecb.europa.eu/",
+        + "      source_url: https://data.ecb.europa.eu/\n"
+        + "JP:\n  liquidity:\n    boj_total_assets:\n"
+        + "      classification: measured_data\n"
+        + "      provider: boj\n"
+        + "      series_id: BS01.MABJMTA\n"
+        + "      component: boj_total_assets\n"
+        + "      title: BOJ total assets\n"
+        + "      description: Measured BOJ test data\n"
+        + "      unit: 100 Million Yen\n"
+        + "      frequency: Monthly, End of Period\n"
+        + "      seasonal_adjustment: Not Seasonally Adjusted\n"
+        + "      start: '2024-01-01'\n"
+        + "      source: Bank of Japan\n"
+        + "      source_url: https://www.boj.or.jp/",
         encoding="utf-8",
     )
     config_dir.joinpath("model.yaml").write_text(
@@ -181,10 +194,12 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
         "RRPONTSYD": (1_000.0, "Billions of U.S. Dollars"),
         "WRBWFRBL": (3_000_000.0, "Millions of U.S. Dollars"),
         "btc.PriceUSD": (60_000.0, "U.S. Dollars per Bitcoin"),
+        "BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E": (9_000_000.0, "Millions of Euro"),
+        "BS01.MABJMTA": (6_800_000.0, "100 Million Yen"),
     }
 
     def fake_fetch(_provider, definition, **_kwargs):
-        value, unit = values.get(definition.series_id, (9_000_000.0, "Millions of Euro"))
+        value, unit = values[definition.series_id]
         return pd.DataFrame(
             {
                 "date": pd.to_datetime(["2024-01-03"]),
@@ -205,10 +220,12 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
         "open_global_liquidity.pipeline.CoinMetricsProvider.fetch_definition", fake_fetch
     )
     monkeypatch.setattr("open_global_liquidity.pipeline.EcbProvider.fetch_definition", fake_fetch)
+    monkeypatch.setattr("open_global_liquidity.pipeline.BojProvider.fetch_definition", fake_fetch)
 
     output_path = run_pipeline(project_root=tmp_path, publish_dashboard_snapshot=True)
     source = pd.read_parquet(output_path)
     ecb_source = pd.read_parquet(tmp_path / "data" / "processed" / "euro_area_ecb_series.parquet")
+    boj_source = pd.read_parquet(tmp_path / "data" / "processed" / "japan_boj_series.parquet")
     weekly = pd.read_parquet(tmp_path / "data" / "processed" / "us_liquidity_weekly.parquet")
     models = pd.read_parquet(tmp_path / "data" / "processed" / "us_liquidity_models.parquet")
     ogli = pd.read_parquet(tmp_path / "data" / "processed" / "us_ogli.parquet")
@@ -227,6 +244,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     snapshot_dir = tmp_path / "data" / "reference"
     source_snapshot = pd.read_parquet(snapshot_dir / "us_fred_series_snapshot.parquet")
     ecb_snapshot = pd.read_parquet(snapshot_dir / "euro_area_ecb_series_snapshot.parquet")
+    boj_snapshot = pd.read_parquet(snapshot_dir / "japan_boj_series_snapshot.parquet")
     weekly_snapshot = pd.read_parquet(snapshot_dir / "us_liquidity_weekly_snapshot.parquet")
     model_snapshot = pd.read_parquet(snapshot_dir / "us_liquidity_models_snapshot.parquet")
     ogli_snapshot = pd.read_parquet(snapshot_dir / "us_ogli_snapshot.parquet")
@@ -248,6 +266,8 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     assert len(source) == 4
     assert ecb_source["component"].tolist() == ["eurosystem_total_assets"]
     pd.testing.assert_frame_equal(ecb_snapshot, ecb_source)
+    assert boj_source["component"].tolist() == ["boj_total_assets"]
+    pd.testing.assert_frame_equal(boj_snapshot, boj_source)
     assert len(weekly) == 4
     assert weekly.loc[weekly["component"] == "overnight_reverse_repo", "value"].item() == 1_000_000
     model_values = models.set_index("model_id")["value"]
@@ -273,7 +293,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     pd.testing.assert_frame_equal(correlation_snapshot, correlations)
     pd.testing.assert_frame_equal(comparison_snapshot, comparisons)
     pd.testing.assert_frame_equal(subperiod_snapshot, subperiods)
-    assert manifest["snapshot_count"] == 12
+    assert manifest["snapshot_count"] == 13
     assert set(manifest["files"]) == {path.name for path in snapshot_dir.glob("*.parquet")}
     assert manifest["files"]["us_liquidity_market_subperiods_snapshot.parquet"]["rows"] == 18
     assert snapshot_dir.joinpath("us_market_series_snapshot.parquet").is_file()

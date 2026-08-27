@@ -29,6 +29,34 @@
       ],
       "sha256": "7607e516d17f4946bd8ad985764f8631e6f491a04d6a690ac8144d64c487fd1b"
     },
+    "japan_boj_series_snapshot.parquet": {
+      "bytes": 11024,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "retrieved_at"
+      ],
+      "components": [
+        "boj_total_assets"
+      ],
+      "earliest_observation": "1998-04-30",
+      "latest_observation": "2026-07-31",
+      "latest_retrieval": "2026-08-27T08:11:25.110700+00:00",
+      "providers": [
+        "BOJ"
+      ],
+      "rows": 340,
+      "series_ids": [
+        "BS01.MABJMTA"
+      ],
+      "sha256": "dfb81a11b82aa5fdf222de068e74e25e7a08192ca5e7e35445610032e3696247"
+    },
     "us_fred_series_snapshot.parquet": {
       "bytes": 89580,
       "columns": [
@@ -813,10 +841,10 @@
       "sha256": "1deec35cb404df605676ee98ff5e574dac801b1c74f0718f28738ec277f7f13d"
     }
   },
-  "generated_at": "2026-08-27T07:29:54.181480+00:00",
+  "generated_at": "2026-08-27T08:11:38.678735+00:00",
   "pipeline_version": "0.1.1",
   "schema_version": 1,
-  "snapshot_count": 23,
-  "source_commit": "6b89fad9533d1f35451238a4d26830fb2ad6d1d9",
+  "snapshot_count": 24,
+  "source_commit": "f5d77e4f3c59c084151d2b46e1a8a9bc325598be",
   "working_tree_dirty": true
 }

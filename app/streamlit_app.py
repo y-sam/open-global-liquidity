@@ -21,6 +21,7 @@ from dashboard_support import (  # noqa: E402
     COMPONENT_LABELS,
     DashboardDataError,
     assess_freshness,
+    latest_boj_readings,
     latest_ecb_readings,
     latest_model_readings,
     latest_ogli_readings,
@@ -29,6 +30,7 @@ from dashboard_support import (  # noqa: E402
     load_bitcoin_outcomes,
     load_bitcoin_regime_summary,
     load_bitcoin_revision_summary,
+    load_boj_data,
     load_dashboard_data,
     load_ecb_data,
     load_liquidity_model_data,
@@ -50,6 +52,8 @@ PROCESSED_DATA_PATH = DATA_ROOT / "processed" / "us_fred_series.parquet"
 SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_fred_series_snapshot.parquet"
 ECB_DATA_PATH = DATA_ROOT / "processed" / "euro_area_ecb_series.parquet"
 ECB_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "euro_area_ecb_series_snapshot.parquet"
+BOJ_DATA_PATH = DATA_ROOT / "processed" / "japan_boj_series.parquet"
+BOJ_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "japan_boj_series_snapshot.parquet"
 MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
 MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
 OGLI_DATA_PATH = DATA_ROOT / "processed" / "us_ogli.parquet"
@@ -157,6 +161,13 @@ def _load_ecb(path: str, modified_ns: int) -> pd.DataFrame:
     """Cache measured ECB data until its file modification timestamp changes."""
     del modified_ns
     return load_ecb_data(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_boj(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache measured BOJ data until its file modification timestamp changes."""
+    del modified_ns
+    return load_boj_data(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -272,6 +283,11 @@ def _source_data() -> tuple[pd.DataFrame, Path, str]:
 def _ecb_data() -> tuple[pd.DataFrame, Path, str]:
     path, origin = resolve_dashboard_data_path(ECB_DATA_PATH, ECB_SNAPSHOT_DATA_PATH)
     return _load_ecb(str(path), path.stat().st_mtime_ns), path, origin
+
+
+def _boj_data() -> tuple[pd.DataFrame, Path, str]:
+    path, origin = resolve_dashboard_data_path(BOJ_DATA_PATH, BOJ_SNAPSHOT_DATA_PATH)
+    return _load_boj(str(path), path.stat().st_mtime_ns), path, origin
 
 
 def _model_data() -> tuple[pd.DataFrame, str] | None:
@@ -2749,6 +2765,100 @@ def euro_area_page() -> None:
     )
 
 
+def japan_page() -> None:
+    """Present official BOJ total assets without implying a global aggregate."""
+    st.title("Japan measured data")
+    st.caption(
+        "v0.2b expansion pilot · official BOJ data in native yen · no FX conversion, weekly "
+        "interpolation, Japan liquidity model, or global aggregation"
+    )
+    try:
+        data, _path, origin = _boj_data()
+    except DashboardDataError as exc:
+        st.info(str(exc), icon=":material/account_balance:")
+        st.code(
+            "uv run python -m open_global_liquidity.pipeline --publish-dashboard-snapshot",
+            language="zsh",
+        )
+        st.markdown("The BOJ Time-Series Data Search API is public and requires **no API key**.")
+        return
+
+    latest = latest_boj_readings(data).iloc[0]
+    level = float(latest["value_jpy_billions"])
+    monthly_change = latest["change_jpy_billions"]
+    growth_yoy = latest["growth_yoy"]
+    retrieved_at = pd.to_datetime(latest["retrieved_at"], utc=True)
+    with st.container(horizontal=True):
+        st.metric(
+            "Bank of Japan total assets",
+            f"¥{level / 1_000:,.1f}tn",
+            (
+                None
+                if pd.isna(monthly_change)
+                else f"¥{float(monthly_change) / 1_000:+,.1f}tn vs prior month"
+            ),
+            border=True,
+        )
+        st.metric(
+            "12-month change",
+            "Unavailable" if pd.isna(growth_yoy) else f"{float(growth_yoy):+.1%}",
+            border=True,
+        )
+        st.metric("Latest period", f"{latest['date']:%b %Y}", border=True)
+        st.metric("Data mode", origin, border=True)
+
+    max_date = data["date"].max()
+    history = st.segmented_control(
+        "History", ["5 years", "10 years", "All"], default="10 years", key="japan_history"
+    )
+    if history == "All":
+        visible = data
+    else:
+        years = 5 if history == "5 years" else 10
+        visible = data.loc[data["date"] >= max_date - pd.DateOffset(years=years)]
+    chart_data = visible.rename(columns={"date": "Date", "value_jpy_billions": "JPY billions"})
+    st.line_chart(
+        chart_data,
+        x="Date",
+        y="JPY billions",
+        x_label="Period end",
+        y_label="JPY billions",
+    )
+    st.info(
+        "Monthly dates are calendar month-end period labels, not modeled publication timestamps. "
+        "Values remain nominal JPY stocks and are not inputs to the US OGLI.",
+        icon=":material/info:",
+    )
+    st.subheader("Recent observations")
+    recent = data.tail(12).assign(
+        date=lambda frame: frame["date"].dt.strftime("%Y-%m-%d"),
+        value_jpy_billions=lambda frame: frame["value_jpy_billions"].round(1),
+    )
+    st.dataframe(
+        recent[["date", "value_jpy_billions", "series_id"]].rename(
+            columns={
+                "date": "Period end",
+                "value_jpy_billions": "JPY billions",
+                "series_id": "BOJ series",
+            }
+        ),
+        column_config={
+            "JPY billions": st.column_config.NumberColumn(format="localized"),
+        },
+        width="stretch",
+        hide_index=True,
+    )
+    st.caption(
+        f"Retrieved {retrieved_at:%Y-%m-%d %H:%M UTC} · Provider: Bank of Japan · "
+        "Database BS01 · series MABJMTA"
+    )
+    st.link_button(
+        "Review official BOJ source",
+        "https://www.boj.or.jp/en/statistics/boj/other/ac/index.htm",
+        icon=":material/open_in_new:",
+    )
+
+
 def research_guide_page() -> None:
     st.title("Research guide")
     st.markdown(
@@ -3000,6 +3110,12 @@ def research_guide_page() -> None:
         - [ECB BSI total assets of the Eurosystem](https://data.ecb.europa.eu/data/concepts/statistical-balance-sheet)
           — monthly nominal EUR stock; not an OGLI input or global aggregate
 
+        **Japan v0.2b measured-data pilot**
+
+        - [BOJ Accounts total assets](https://www.boj.or.jp/en/statistics/boj/other/ac/index.htm)
+          — database `BS01`, series `MABJMTA`, monthly native-yen stock; not an OGLI input or
+          global aggregate
+
         **Primary documentation and broader context**
 
         - [Federal Reserve H.4.1 balance-sheet release](https://www.federalreserve.gov/releases/h41/default.htm)
@@ -3036,6 +3152,12 @@ euro_area_data_page = st.Page(
     title="Euro area data",
     icon=":material/public:",
     url_path="euro-area",
+)
+japan_data_page = st.Page(
+    japan_page,
+    title="Japan data",
+    icon=":material/account_balance:",
+    url_path="japan",
 )
 markets_index_page = st.Page(
     markets_page,
@@ -3076,6 +3198,7 @@ navigation = st.navigation(
         markets_index_page,
         data_page,
         euro_area_data_page,
+        japan_data_page,
         guide_page,
     ],
     position="top",
@@ -3089,4 +3212,8 @@ st.caption(
     "(https://fred.stlouisfed.org/docs/api/terms_of_use.html) · Original project code: "
     "[Apache-2.0](https://github.com/y-sam/open-global-liquidity/blob/main/LICENSE) · "
     "Third-party data retain their own terms."
+)
+st.caption(
+    "This service uses the Bank of Japan Time-Series Data Search API. The Bank of Japan does not "
+    "guarantee this service's content."
 )

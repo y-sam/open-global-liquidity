@@ -12,11 +12,13 @@ release is tagged.
 - Separate euro-area Streamlit page with EUR levels, monthly and yearly changes, provenance, and
   explicit period-label and publication-timing limitations.
 - Versioned ECB dashboard snapshot in the scheduled refresh and provenance manifest.
+- Official BOJ Time-Series Data Search provider for `BS01.MABJMTA`, with a separate native-JPY
+  Japan dashboard page and versioned snapshot.
 
 ### Research boundary
 
-- The US OGLI is unchanged. ECB data are not frequency-aligned, currency-converted, weighted,
-  aggregated, or interpreted as a euro-area liquidity model in this milestone.
+- The US OGLI is unchanged. ECB and BOJ data are not frequency-aligned, currency-converted,
+  weighted, aggregated, or interpreted as country liquidity models in this milestone.
 
 ## [0.1.1] — 2026-08-26
 

@@ -303,6 +303,7 @@ COMPONENT_LABELS = {
     "reserve_balances": "Reserve balances",
 }
 ECB_COMPONENT_LABELS = {"eurosystem_total_assets": "Eurosystem total assets"}
+BOJ_COMPONENT_LABELS = {"boj_total_assets": "Bank of Japan total assets"}
 
 _UNIT_TO_BILLIONS = {
     "Millions of U.S. Dollars": 0.001,
@@ -493,6 +494,63 @@ def latest_ecb_readings(frame: pd.DataFrame) -> pd.DataFrame:
         )
     if not rows:
         raise DashboardDataError("ECB data contains no numeric observations")
+    return pd.DataFrame(rows)
+
+
+def load_boj_data(path: Path) -> pd.DataFrame:
+    """Load the separate Japan measured-data pilot in nominal JPY billions."""
+    frame = _read_parquet(path, "BOJ data")
+    missing = sorted(set(SOURCE_COLUMNS) - set(frame.columns))
+    if missing:
+        raise DashboardDataError("BOJ data is missing columns: " + ", ".join(missing))
+    expected = {"country": {"JP"}, "provider": {"BOJ"}, "unit": {"100 Million Yen"}}
+    for column, allowed in expected.items():
+        actual = set(frame[column].dropna())
+        if actual != allowed:
+            raise DashboardDataError(f"BOJ data has unexpected {column} values: {sorted(actual)}")
+    result = frame[SOURCE_COLUMNS].copy()
+    result["date"] = pd.to_datetime(result["date"])
+    result["value_jpy_billions"] = result["value"] * 0.1
+    result["label"] = result["component"].map(BOJ_COMPONENT_LABELS).fillna(result["component"])
+    return result.sort_values(["component", "date"]).reset_index(drop=True)
+
+
+def latest_boj_readings(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return latest JPY level, prior-month change, and year-over-year growth."""
+    required = {"component", "label", "date", "value_jpy_billions", "retrieved_at"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError(f"BOJ data is missing columns: {', '.join(missing)}")
+    rows: list[dict[str, object]] = []
+    for _component, group in frame.sort_values("date").groupby("component", sort=False):
+        valid = group.dropna(subset=["value_jpy_billions"])
+        if valid.empty:
+            continue
+        latest = valid.iloc[-1]
+        previous = valid.iloc[-2] if len(valid) > 1 else None
+        prior_year = valid.loc[valid["date"] <= latest["date"] - pd.DateOffset(years=1)]
+        year_ago = prior_year.iloc[-1] if not prior_year.empty else None
+        rows.append(
+            {
+                "component": latest["component"],
+                "label": latest["label"],
+                "date": latest["date"],
+                "value_jpy_billions": latest["value_jpy_billions"],
+                "change_jpy_billions": (
+                    latest["value_jpy_billions"] - previous["value_jpy_billions"]
+                    if previous is not None
+                    else pd.NA
+                ),
+                "growth_yoy": (
+                    latest["value_jpy_billions"] / year_ago["value_jpy_billions"] - 1
+                    if year_ago is not None and year_ago["value_jpy_billions"] != 0
+                    else pd.NA
+                ),
+                "retrieved_at": latest["retrieved_at"],
+            }
+        )
+    if not rows:
+        raise DashboardDataError("BOJ data contains no numeric observations")
     return pd.DataFrame(rows)
 
 

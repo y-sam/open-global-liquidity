@@ -8,14 +8,52 @@ import pytest
 
 from open_global_liquidity.dashboard import (
     DashboardDataError,
+    latest_boj_readings,
     latest_ecb_readings,
     latest_model_readings,
     latest_readings,
+    load_boj_data,
     load_dashboard_data,
     load_ecb_data,
     load_liquidity_model_data,
     resolve_dashboard_data_path,
 )
+
+
+def test_load_boj_data_and_latest_changes(tmp_path: Path) -> None:
+    path = tmp_path / "boj.parquet"
+    pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-02-29", "2025-02-28", "2025-03-31"]),
+            "country": ["JP"] * 3,
+            "provider": ["BOJ"] * 3,
+            "series_id": ["BS01.MABJMTA"] * 3,
+            "component": ["boj_total_assets"] * 3,
+            "value": [6_000_000.0, 6_600_000.0, 6_732_000.0],
+            "unit": ["100 Million Yen"] * 3,
+            "frequency": ["Monthly, End of Period"] * 3,
+            "retrieved_at": [pd.Timestamp("2025-04-05", tz=UTC)] * 3,
+        }
+    ).to_parquet(path, index=False)
+
+    result = load_boj_data(path)
+    latest = latest_boj_readings(result).iloc[0]
+
+    assert result["value_jpy_billions"].tolist() == [600_000.0, 660_000.0, 673_200.0]
+    assert latest["change_jpy_billions"] == 13_200.0
+    assert latest["growth_yoy"] == pytest.approx(0.122)
+
+
+def test_load_boj_data_rejects_wrong_provider(tmp_path: Path) -> None:
+    path = tmp_path / "boj.parquet"
+    frame = _processed_frame().iloc[:1].copy()
+    frame["country"] = "JP"
+    frame["provider"] = "FRED"
+    frame["unit"] = "100 Million Yen"
+    frame.to_parquet(path, index=False)
+
+    with pytest.raises(DashboardDataError, match="unexpected provider"):
+        load_boj_data(path)
 
 
 def test_load_ecb_data_and_latest_changes(tmp_path: Path) -> None:

@@ -24,6 +24,25 @@ Attribution: Source: ECB statistics, ECB Data Portal, total assets of the Eurosy
 calendar month-end timestamp and divides reported EUR millions by 1,000 for dashboard display in
 EUR billions; source values remain available in the standardized Parquet artifact.
 
+## Bank of Japan
+
+The v0.2b pilot obtains Bank of Japan Accounts total assets from database `BS01`, series
+`MABJMTA`, through the public BOJ Time-Series Data Search API. The
+[BOJ API manual](https://www.stat-search.boj.or.jp/info/api_manual_en.pdf) describes the keyless
+JSON and CSV interfaces. The
+[API use notice](https://www.stat-search.boj.or.jp/info/api_notice_en.pdf) asks a released service
+to acknowledge its use of the BOJ API, disclaim any BOJ guarantee of the service content, and
+notify the BOJ Research and Statistics Department when the service is released.
+
+Application credit: This service uses the Bank of Japan Time-Series Data Search API. The Bank of
+Japan does not guarantee this service's content.
+
+Attribution: Bank of Japan, Bank of Japan Accounts, total assets, database `BS01`, series
+`MABJMTA`. Open Global Liquidity maps monthly survey periods to calendar month-end timestamps and
+converts source values from 100 million yen to JPY billions for display. The original source units
+remain in the standardized Parquet artifact. The Bank of Japan is not affiliated with or
+responsible for Open Global Liquidity.
+
 ## FRED and ALFRED
 
 The pipeline accesses FRED and ALFRED through the Federal Reserve Bank of St. Louis API. The

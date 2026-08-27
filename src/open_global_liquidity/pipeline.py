@@ -32,6 +32,7 @@ from open_global_liquidity.config import (
     load_series_config,
 )
 from open_global_liquidity.data.base import DataValidationError
+from open_global_liquidity.data.boj import BojError, BojProvider
 from open_global_liquidity.data.coinmetrics import CoinMetricsError, CoinMetricsProvider
 from open_global_liquidity.data.ecb import EcbError, EcbProvider
 from open_global_liquidity.data.fred import FredError, FredProvider
@@ -78,6 +79,9 @@ def run_pipeline(
     ecb_definitions = [
         item for item in definitions if item.provider.lower() == "ecb" and item.group == "liquidity"
     ]
+    boj_definitions = [
+        item for item in definitions if item.provider.lower() == "boj" and item.group == "liquidity"
+    ]
     if not liquidity_definitions:
         raise RuntimeError("No FRED liquidity series are configured")
     if not market_definitions:
@@ -121,6 +125,25 @@ def run_pipeline(
         ecb_path = output_dir / "euro_area_ecb_series.parquet"
         ecb_output.to_parquet(ecb_path, index=False)
         LOGGER.info("Wrote %d standardized ECB observations to %s", len(ecb_output), ecb_path)
+
+    boj_output: pd.DataFrame | None = None
+    if boj_definitions:
+        boj_provider = BojProvider(cache_dir=project_root / "data" / "raw" / "boj")
+        boj_output = pd.concat(
+            [
+                boj_provider.fetch_definition(
+                    definition,
+                    start=start,
+                    end=end,
+                    force_refresh=force_refresh,
+                )
+                for definition in boj_definitions
+            ],
+            ignore_index=True,
+        ).sort_values(["country", "series_id", "date"])
+        boj_path = output_dir / "japan_boj_series.parquet"
+        boj_output.to_parquet(boj_path, index=False)
+        LOGGER.info("Wrote %d standardized BOJ observations to %s", len(boj_output), boj_path)
 
     weekly = align_to_weekly_wednesday(
         convert_to_usd_millions(output),
@@ -343,6 +366,8 @@ def run_pipeline(
         }
         if ecb_output is not None:
             snapshots["euro_area_ecb_series_snapshot.parquet"] = ecb_output
+        if boj_output is not None:
+            snapshots["japan_boj_series_snapshot.parquet"] = boj_output
         snapshots.update(
             {
                 filename.replace(".parquet", "_snapshot.parquet"): frame
@@ -374,6 +399,7 @@ def run_pipeline(
         f"{ogli['ogli'].notna().sum():,} available OGLI readings, and "
         f"{len(correlations):,} market-correlation estimates "
         f"and {0 if ecb_output is None else len(ecb_output):,} ECB observations "
+        f"and {0 if boj_output is None else len(boj_output):,} BOJ observations "
         f"-> {output_dir}"
     )
     return output_path
@@ -410,6 +436,7 @@ def main() -> None:
         )
     except (
         ConfigurationError,
+        BojError,
         CoinMetricsError,
         EcbError,
         DataValidationError,
