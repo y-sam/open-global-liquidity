@@ -9,7 +9,8 @@
 - [x] Public snapshot rights are documented source by source.
 - [x] PBoC observations are excluded from public snapshots pending explicit reuse permission.
 - [x] Offline provider, pipeline, dashboard, and configuration tests cover the v0.2 additions.
-- [ ] GitHub Actions and the hosted dashboard are verified at the v0.2.0 release commit.
+- [x] GitHub Actions and the hosted Central banks and China pages are verified at the v0.2.0
+      release commit.
 
 ## v0.1.1 release checklist
 
