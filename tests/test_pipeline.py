@@ -88,7 +88,20 @@ def _write_test_config(project_root: Path) -> None:
         + "      seasonal_adjustment: Not Seasonally Adjusted\n"
         + "      start: '2024-01-01'\n"
         + "      source: Bank of England\n"
-        + "      source_url: https://www.bankofengland.co.uk/",
+        + "      source_url: https://www.bankofengland.co.uk/\n"
+        + "CN:\n  liquidity:\n    pboc_total_assets:\n"
+        + "      classification: measured_data\n"
+        + "      provider: pboc\n"
+        + "      series_id: PBOC.BSMA.TOTAL_ASSETS\n"
+        + "      component: pboc_total_assets\n"
+        + "      title: PBoC total assets\n"
+        + "      description: Measured PBoC test data\n"
+        + "      unit: 100 Million Yuan\n"
+        + "      frequency: Monthly, End of Period\n"
+        + "      seasonal_adjustment: Not Seasonally Adjusted\n"
+        + "      start: '2024-01-01'\n"
+        + "      source: PBoC\n"
+        + "      source_url: https://www.pbc.gov.cn/",
         encoding="utf-8",
     )
     config_dir.joinpath("model.yaml").write_text(
@@ -210,6 +223,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
         "BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E": (9_000_000.0, "Millions of Euro"),
         "BS01.MABJMTA": (6_800_000.0, "100 Million Yen"),
         "RPQB75A": (1_000_000.0, "Millions of Sterling"),
+        "PBOC.BSMA.TOTAL_ASSETS": (450_000.0, "100 Million Yuan"),
     }
 
     def fake_fetch(_provider, definition, **_kwargs):
@@ -236,12 +250,14 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     monkeypatch.setattr("open_global_liquidity.pipeline.EcbProvider.fetch_definition", fake_fetch)
     monkeypatch.setattr("open_global_liquidity.pipeline.BojProvider.fetch_definition", fake_fetch)
     monkeypatch.setattr("open_global_liquidity.pipeline.BoeProvider.fetch_definition", fake_fetch)
+    monkeypatch.setattr("open_global_liquidity.pipeline.PbocProvider.fetch_definition", fake_fetch)
 
     output_path = run_pipeline(project_root=tmp_path, publish_dashboard_snapshot=True)
     source = pd.read_parquet(output_path)
     ecb_source = pd.read_parquet(tmp_path / "data" / "processed" / "euro_area_ecb_series.parquet")
     boj_source = pd.read_parquet(tmp_path / "data" / "processed" / "japan_boj_series.parquet")
     boe_source = pd.read_parquet(tmp_path / "data" / "processed" / "uk_boe_series.parquet")
+    pboc_source = pd.read_parquet(tmp_path / "data" / "processed" / "china_pboc_series.parquet")
     weekly = pd.read_parquet(tmp_path / "data" / "processed" / "us_liquidity_weekly.parquet")
     models = pd.read_parquet(tmp_path / "data" / "processed" / "us_liquidity_models.parquet")
     ogli = pd.read_parquet(tmp_path / "data" / "processed" / "us_ogli.parquet")
@@ -282,6 +298,8 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     assert source.columns.tolist() == STANDARD_COLUMNS
     assert len(source) == 4
     assert ecb_source["component"].tolist() == ["eurosystem_total_assets"]
+    assert pboc_source["component"].tolist() == ["pboc_total_assets"]
+    assert not (snapshot_dir / "china_pboc_series_snapshot.parquet").exists()
     pd.testing.assert_frame_equal(ecb_snapshot, ecb_source)
     assert boj_source["component"].tolist() == ["boj_total_assets"]
     pd.testing.assert_frame_equal(boj_snapshot, boj_source)

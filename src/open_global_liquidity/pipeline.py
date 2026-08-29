@@ -37,6 +37,7 @@ from open_global_liquidity.data.boj import BojError, BojProvider
 from open_global_liquidity.data.coinmetrics import CoinMetricsError, CoinMetricsProvider
 from open_global_liquidity.data.ecb import EcbError, EcbProvider
 from open_global_liquidity.data.fred import FredError, FredProvider
+from open_global_liquidity.data.pboc import PbocError, PbocProvider
 from open_global_liquidity.models.ogli import OGLICalculationError, calculate_ogli
 from open_global_liquidity.models.us_liquidity import (
     LiquidityModelError,
@@ -85,6 +86,11 @@ def run_pipeline(
     ]
     boe_definitions = [
         item for item in definitions if item.provider.lower() == "boe" and item.group == "liquidity"
+    ]
+    pboc_definitions = [
+        item
+        for item in definitions
+        if item.provider.lower() == "pboc" and item.group == "liquidity"
     ]
     if not liquidity_definitions:
         raise RuntimeError("No FRED liquidity series are configured")
@@ -167,6 +173,25 @@ def run_pipeline(
         boe_path = output_dir / "uk_boe_series.parquet"
         boe_output.to_parquet(boe_path, index=False)
         LOGGER.info("Wrote %d standardized BoE observations to %s", len(boe_output), boe_path)
+
+    pboc_output: pd.DataFrame | None = None
+    if pboc_definitions:
+        pboc_provider = PbocProvider(cache_dir=project_root / "data" / "raw" / "pboc")
+        pboc_output = pd.concat(
+            [
+                pboc_provider.fetch_definition(
+                    definition,
+                    start=start,
+                    end=end,
+                    force_refresh=force_refresh,
+                )
+                for definition in pboc_definitions
+            ],
+            ignore_index=True,
+        ).sort_values(["country", "series_id", "date"])
+        pboc_path = output_dir / "china_pboc_series.parquet"
+        pboc_output.to_parquet(pboc_path, index=False)
+        LOGGER.info("Wrote %d standardized PBoC observations to %s", len(pboc_output), pboc_path)
 
     weekly = align_to_weekly_wednesday(
         convert_to_usd_millions(output),
@@ -393,6 +418,11 @@ def run_pipeline(
             snapshots["japan_boj_series_snapshot.parquet"] = boj_output
         if boe_output is not None:
             snapshots["uk_boe_series_snapshot.parquet"] = boe_output
+        if pboc_output is not None:
+            LOGGER.warning(
+                "PBoC observations are excluded from public snapshots pending explicit "
+                "redistribution permission"
+            )
         snapshots.update(
             {
                 filename.replace(".parquet", "_snapshot.parquet"): frame
@@ -426,6 +456,7 @@ def run_pipeline(
         f"and {0 if ecb_output is None else len(ecb_output):,} ECB observations "
         f"and {0 if boj_output is None else len(boj_output):,} BOJ observations "
         f"and {0 if boe_output is None else len(boe_output):,} BoE observations "
+        f"and {0 if pboc_output is None else len(pboc_output):,} PBoC observations "
         f"-> {output_dir}"
     )
     return output_path
@@ -474,6 +505,7 @@ def main() -> None:
         MarketAnalysisError,
         MacroContextError,
         OGLICalculationError,
+        PbocError,
         ProvenanceError,
         UnitConversionError,
         OSError,

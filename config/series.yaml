@@ -209,3 +209,23 @@ GB:
       start: "2013-09-30"
       source: "Bank of England, Statistical Interactive Database, consolidated balance sheet"
       source_url: "https://www.bankofengland.co.uk/boeapps/database/"
+
+CN:
+  liquidity:
+    pboc_total_assets:
+      classification: measured_data
+      provider: pboc
+      series_id: PBOC.BSMA.TOTAL_ASSETS
+      component: pboc_total_assets
+      title: "Balance Sheet of Monetary Authority: Total Assets"
+      description: >-
+        Monthly total assets from the People's Bank of China's official Balance Sheet of
+        Monetary Authority. PBOC.BSMA.TOTAL_ASSETS is a project identifier for the verified table
+        row, not an official PBoC series code. This is a separate measured-data pilot in native
+        renminbi: it is not converted, combined with other countries, or used in OGLI.
+      unit: "100 Million Yuan"
+      frequency: "Monthly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2013-01-31"
+      source: "People's Bank of China, Money and Banking Statistics"
+      source_url: "https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html"

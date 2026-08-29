@@ -8,15 +8,16 @@ authors:
   - family-names: "Sampaio"
     given-names: "Yuri"
     email: "ysmp@proton.me"
-version: 0.1.1
-date-released: 2026-08-26
+version: 0.2.0
+date-released: 2026-08-29
 license: Apache-2.0
 repository-code: "https://github.com/y-sam/open-global-liquidity"
 url: "https://open-global-liquidity.streamlit.app/"
 abstract: >-
   Transparent, reproducible public-data research infrastructure for experimental US liquidity
-  models and the Open Global Liquidity Index (OGLI). The project is independent and does not
-  reproduce or claim access to CrossBorder Capital's proprietary methodology, data, or models.
+  models, the Open Global Liquidity Index (OGLI), and separate measured central-bank balance-sheet
+  pilots. The project is independent and does not reproduce or claim access to CrossBorder
+  Capital's proprietary methodology, data, or models.
 keywords:
   - global liquidity
   - monetary liquidity

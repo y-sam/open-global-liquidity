@@ -31,7 +31,7 @@ def test_citation_metadata_matches_release() -> None:
     citation = yaml.safe_load(PROJECT_ROOT.joinpath("CITATION.cff").read_text(encoding="utf-8"))
 
     assert citation["cff-version"] == "1.2.0"
-    assert citation["version"] == "0.1.1"
+    assert citation["version"] == "0.2.0"
     assert citation["license"] == "Apache-2.0"
     assert citation["authors"] == [
         {

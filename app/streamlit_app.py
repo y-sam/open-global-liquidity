@@ -21,11 +21,13 @@ from dashboard_support import (  # noqa: E402
     COMPONENT_LABELS,
     DashboardDataError,
     assess_freshness,
+    build_central_bank_index_comparison,
     latest_boe_readings,
     latest_boj_readings,
     latest_ecb_readings,
     latest_model_readings,
     latest_ogli_readings,
+    latest_pboc_readings,
     latest_readings,
     load_bitcoin_contrast_summary,
     load_bitcoin_outcomes,
@@ -42,6 +44,7 @@ from dashboard_support import (  # noqa: E402
     load_market_regime_statistics,
     load_market_subperiod_statistics,
     load_ogli_data,
+    load_pboc_data,
     load_point_in_time_comparison,
     load_point_in_time_market_pairs,
     load_point_in_time_market_summary,
@@ -58,6 +61,8 @@ BOJ_DATA_PATH = DATA_ROOT / "processed" / "japan_boj_series.parquet"
 BOJ_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "japan_boj_series_snapshot.parquet"
 BOE_DATA_PATH = DATA_ROOT / "processed" / "uk_boe_series.parquet"
 BOE_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "uk_boe_series_snapshot.parquet"
+PBOC_DATA_PATH = DATA_ROOT / "processed" / "china_pboc_series.parquet"
+PBOC_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "china_pboc_series_snapshot.parquet"
 MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
 MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
 OGLI_DATA_PATH = DATA_ROOT / "processed" / "us_ogli.parquet"
@@ -179,6 +184,13 @@ def _load_boe(path: str, modified_ns: int) -> pd.DataFrame:
     """Cache measured Bank of England data until its file modification timestamp changes."""
     del modified_ns
     return load_boe_data(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_pboc(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache measured PBoC data until its file modification timestamp changes."""
+    del modified_ns
+    return load_pboc_data(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -304,6 +316,11 @@ def _boj_data() -> tuple[pd.DataFrame, Path, str]:
 def _boe_data() -> tuple[pd.DataFrame, Path, str]:
     path, origin = resolve_dashboard_data_path(BOE_DATA_PATH, BOE_SNAPSHOT_DATA_PATH)
     return _load_boe(str(path), path.stat().st_mtime_ns), path, origin
+
+
+def _pboc_data() -> tuple[pd.DataFrame, Path, str]:
+    path, origin = resolve_dashboard_data_path(PBOC_DATA_PATH, PBOC_SNAPSHOT_DATA_PATH)
+    return _load_pboc(str(path), path.stat().st_mtime_ns), path, origin
 
 
 def _model_data() -> tuple[pd.DataFrame, str] | None:
@@ -774,7 +791,7 @@ def _load_or_explain() -> tuple[pd.DataFrame, Path, str] | None:
 
 
 def landing_page() -> None:
-    st.badge("Independent public-data research · v0.2a pilot", icon=":material/science:")
+    st.badge("Independent public-data research · v0.2", icon=":material/science:")
     st.title("See the financial system through a liquidity lens")
     st.markdown(
         """
@@ -2968,6 +2985,226 @@ def united_kingdom_page() -> None:
     )
 
 
+def china_page() -> None:
+    """Present official PBoC total assets locally without unauthorized redistribution."""
+    st.title("China measured data")
+    st.caption(
+        "v0.2d expansion pilot · official monthly PBoC monetary-authority total assets in native "
+        "renminbi · no FX conversion, China liquidity model, or global aggregation"
+    )
+    try:
+        data, _path, origin = _pboc_data()
+    except DashboardDataError:
+        st.info(
+            "The PBoC provider is available, but its observations are not bundled with the public "
+            "dashboard because the PBoC website reserves reuse rights. Generate the table locally "
+            "for research with the command below.",
+            icon=":material/license:",
+        )
+        st.code(
+            "uv run python -m open_global_liquidity.pipeline --force-refresh",
+            language="zsh",
+        )
+        st.markdown(
+            "The official PBoC archive is public and requires **no account or API key**. The local "
+            "provider discovers annual tables, verifies the bilingual title and unit, and extracts "
+            "only the `Total Assets` row."
+        )
+        with st.container(horizontal=True):
+            st.link_button(
+                "Review PBoC statistics",
+                "https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html",
+                icon=":material/open_in_new:",
+            )
+            st.link_button(
+                "Review PBoC legal notice",
+                "https://www.pbc.gov.cn/rmyh/109345/index.html",
+                icon=":material/open_in_new:",
+            )
+        return
+
+    latest = latest_pboc_readings(data).iloc[0]
+    level = float(latest["value_cny_billions"])
+    monthly_change = latest["change_cny_billions"]
+    growth_yoy = latest["growth_yoy"]
+    retrieved_at = pd.to_datetime(latest["retrieved_at"], utc=True)
+    with st.container(horizontal=True):
+        st.metric(
+            "PBoC total assets",
+            f"¥{level / 1_000:,.1f}tn",
+            (
+                None
+                if pd.isna(monthly_change)
+                else f"¥{float(monthly_change) / 1_000:+,.1f}tn vs prior month"
+            ),
+            border=True,
+        )
+        st.metric(
+            "12-month change",
+            "Unavailable" if pd.isna(growth_yoy) else f"{float(growth_yoy):+.1%}",
+            border=True,
+        )
+        st.metric("Latest period", f"{latest['date']:%b %Y}", border=True)
+        st.metric("Data mode", origin, border=True)
+
+    max_date = data["date"].max()
+    history = st.segmented_control(
+        "History", ["5 years", "10 years", "All"], default="10 years", key="china_history"
+    )
+    if history == "All":
+        visible = data
+    else:
+        years = 5 if history == "5 years" else 10
+        visible = data.loc[data["date"] >= max_date - pd.DateOffset(years=years)]
+    chart_data = visible.rename(columns={"date": "Date", "value_cny_billions": "CNY billions"})
+    st.line_chart(
+        chart_data,
+        x="Date",
+        y="CNY billions",
+        x_label="Period end",
+        y_label="CNY billions",
+    )
+    st.info(
+        "Monthly dates are calendar month-end period labels, not modeled publication timestamps. "
+        "PBoC rules state that monthly financial statistics are normally released within 20 days "
+        "after month end. Values remain nominal CNY stocks and are not inputs to the US OGLI.",
+        icon=":material/info:",
+    )
+    st.subheader("Recent observations")
+    recent = data.tail(12).assign(
+        date=lambda frame: frame["date"].dt.strftime("%Y-%m-%d"),
+        value_cny_billions=lambda frame: frame["value_cny_billions"].round(1),
+    )
+    st.dataframe(
+        recent[["date", "value_cny_billions", "series_id"]].rename(
+            columns={
+                "date": "Period end",
+                "value_cny_billions": "CNY billions",
+                "series_id": "Project table identifier",
+            }
+        ),
+        column_config={"CNY billions": st.column_config.NumberColumn(format="localized")},
+        width="stretch",
+        hide_index=True,
+    )
+    st.caption(
+        f"Retrieved {retrieved_at:%Y-%m-%d %H:%M UTC} · Provider: People's Bank of China · "
+        "Balance Sheet of Monetary Authority · Total Assets · 100 million yuan"
+    )
+    st.link_button(
+        "Review official PBoC archive",
+        "https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html",
+        icon=":material/open_in_new:",
+    )
+
+
+def central_banks_page() -> None:
+    """Compare central-bank asset changes without constructing a global aggregate."""
+    st.title("Central-bank balance sheets")
+    st.caption(
+        "v0.2 cross-country comparison · separate native-currency series rebased to 100 · no FX "
+        "conversion, country weights, interpolation, or global OGLI"
+    )
+    choices = {"5 years": 5, "10 years": 10, "Since 2013": 13}
+    history = st.segmented_control(
+        "Comparison window",
+        list(choices),
+        default="5 years",
+        key="central_bank_history",
+    )
+    start = pd.Timestamp.now().normalize() - pd.DateOffset(years=choices[history])
+
+    sources: dict[str, pd.DataFrame] = {}
+    metadata: list[dict[str, object]] = []
+
+    try:
+        us, _path, _origin = _source_data()
+        fed = us.loc[us["component"] == "fed_assets"].copy()
+        sources["Federal Reserve"] = fed[["date", "value_usd_billions"]].rename(
+            columns={"value_usd_billions": "native_value"}
+        )
+        metadata.append(
+            {
+                "Central bank": "Federal Reserve",
+                "Native unit": "USD billions",
+                "Frequency": "Weekly",
+                "Latest period": fed["date"].max(),
+            }
+        )
+    except DashboardDataError:
+        pass
+
+    loaders = [
+        ("Eurosystem", _ecb_data, "value_eur_billions", "EUR billions", "Monthly"),
+        ("Bank of Japan", _boj_data, "value_jpy_billions", "JPY billions", "Monthly"),
+        ("Bank of England", _boe_data, "value_gbp_billions", "GBP billions", "Quarterly"),
+        ("PBoC", _pboc_data, "value_cny_billions", "CNY billions", "Monthly"),
+    ]
+    unavailable: list[str] = []
+    for label, loader, value_column, unit, frequency in loaders:
+        try:
+            frame, _path, _origin = loader()
+        except DashboardDataError:
+            unavailable.append(label)
+            continue
+        sources[label] = frame[["date", value_column]].rename(
+            columns={value_column: "native_value"}
+        )
+        metadata.append(
+            {
+                "Central bank": label,
+                "Native unit": unit,
+                "Frequency": frequency,
+                "Latest period": frame["date"].max(),
+            }
+        )
+
+    comparison = build_central_bank_index_comparison(sources, start=start)
+    latest_index = comparison.sort_values("date").groupby("central_bank", as_index=False).tail(1)
+    with st.container(horizontal=True):
+        st.metric("Series available", str(comparison["central_bank"].nunique()), border=True)
+        st.metric(
+            "Largest cumulative rise",
+            str(latest_index.loc[latest_index["index"].idxmax(), "central_bank"]),
+            f"{latest_index['index'].max() - 100:+.1f}%",
+            border=True,
+        )
+        st.metric("Method", "Native-currency index", "First observation = 100", border=True)
+
+    figure = px.line(
+        comparison,
+        x="date",
+        y="index",
+        color="central_bank",
+        title=f"Central-bank total assets · {history.lower()} · independently rebased",
+        labels={"date": "Date", "index": "Index", "central_bank": "Central bank"},
+    )
+    figure.add_hline(y=100, line_dash="dot", line_color="gray")
+    figure.update_traces(line={"width": 2.3}, hovertemplate="%{x|%b %Y}<br>%{y:.1f}<extra></extra>")
+    figure.update_layout(
+        hovermode="x unified",
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(figure, width="stretch", config={"displaylogo": False})
+    st.warning(
+        "The lines compare percentage changes in separate native-currency balance sheets. They do "
+        "not compare absolute size and must not be added together. Different frequencies, release "
+        "lags, accounting frameworks, and institutional structures remain visible limitations.",
+        icon=":material/warning:",
+    )
+    if unavailable:
+        st.info(
+            "Unavailable in this environment: " + ", ".join(unavailable) + ". PBoC data is "
+            "intentionally local-only pending redistribution permission.",
+            icon=":material/license:",
+        )
+    st.subheader("Source coverage")
+    coverage = pd.DataFrame(metadata)
+    coverage["Latest period"] = pd.to_datetime(coverage["Latest period"]).dt.strftime("%Y-%m-%d")
+    st.dataframe(coverage, width="stretch", hide_index=True)
+
+
 def research_guide_page() -> None:
     st.title("Research guide")
     st.markdown(
@@ -3231,6 +3468,16 @@ def research_guide_page() -> None:
           — series `RPQB75A`, quarterly native-sterling stock published with a five-quarter lag;
           not an OGLI input or global aggregate
 
+        **China v0.2d measured-data pilot**
+
+        - [PBoC Money and Banking Statistics archive](https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html)
+          — monthly monetary-authority Total Assets in 100 million yuan; generated locally and not
+          bundled publicly pending explicit redistribution permission
+        - [PBoC website legal notice](https://www.pbc.gov.cn/rmyh/109345/index.html)
+
+        The Central banks page independently rebases available native-currency series to 100. It
+        does not perform FX conversion or create a global aggregate.
+
         **Primary documentation and broader context**
 
         - [Federal Reserve H.4.1 balance-sheet release](https://www.federalreserve.gov/releases/h41/default.htm)
@@ -3280,6 +3527,18 @@ uk_data_page = st.Page(
     icon=":material/account_balance:",
     url_path="united-kingdom",
 )
+china_data_page = st.Page(
+    china_page,
+    title="China data",
+    icon=":material/account_balance:",
+    url_path="china",
+)
+central_bank_data_page = st.Page(
+    central_banks_page,
+    title="Central banks",
+    icon=":material/public:",
+    url_path="central-banks",
+)
 markets_index_page = st.Page(
     markets_page,
     title="Liquidity vs markets",
@@ -3318,9 +3577,11 @@ navigation = st.navigation(
         bitcoin_page,
         markets_index_page,
         data_page,
+        central_bank_data_page,
         euro_area_data_page,
         japan_data_page,
         uk_data_page,
+        china_data_page,
         guide_page,
     ],
     position="top",

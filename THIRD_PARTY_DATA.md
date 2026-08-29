@@ -58,6 +58,25 @@ with a five-quarter lag. Open Global Liquidity divides source GBP millions by 1,
 display in GBP billions; the standardized Parquet artifact retains the source unit. The Bank of
 England is not affiliated with or responsible for Open Global Liquidity.
 
+## People's Bank of China
+
+The v0.2d pilot reads the `Total Assets` row from the official monthly Balance Sheet of Monetary
+Authority, published in 100 million yuan. The PBoC does not provide a stable series API: the
+provider discovers each annual Money and Banking Statistics page and verifies the exact bilingual
+table title and unit before extraction. `PBOC.BSMA.TOTAL_ASSETS` is a project identifier, not an
+official PBoC series code.
+
+The [PBoC legal notice](https://www.pbc.gov.cn/rmyh/109345/index.html) states that website materials
+are PBoC copyright unless otherwise noted and describes permission and attribution requirements for
+downloaded reuse. It also says the Chinese version controls over the English version. Consequently,
+this repository does **not** bundle or redistribute PBoC observations or a China snapshot. The
+provider and transformations are open-source code; users may generate a local research cache from
+the public archive and remain responsible for obtaining any permission required for their use.
+
+Local attribution: People's Bank of China, Money and Banking Statistics, Balance Sheet of Monetary
+Authority, Total Assets. Open Global Liquidity maps monthly labels to calendar month-end timestamps
+and divides 100 million yuan by 10 for local display in CNY billions. No PBoC data is used in OGLI.
+
 ## FRED and ALFRED
 
 The pipeline accesses FRED and ALFRED through the Federal Reserve Bank of St. Louis API. The

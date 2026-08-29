@@ -17,6 +17,7 @@ COMPONENT_LABELS = {
 ECB_COMPONENT_LABELS = {"eurosystem_total_assets": "Eurosystem total assets"}
 BOJ_COMPONENT_LABELS = {"boj_total_assets": "Bank of Japan total assets"}
 BOE_COMPONENT_LABELS = {"boe_total_assets": "Bank of England total assets"}
+PBOC_COMPONENT_LABELS = {"pboc_total_assets": "PBoC total assets"}
 
 _UNIT_TO_BILLIONS = {
     "Millions of U.S. Dollars": 0.001,
@@ -295,6 +296,103 @@ def latest_boe_readings(frame: pd.DataFrame) -> pd.DataFrame:
     if not rows:
         raise DashboardDataError("BoE data contains no numeric observations")
     return pd.DataFrame(rows)
+
+
+def load_pboc_data(path: Path) -> pd.DataFrame:
+    """Load the separate China measured-data pilot in nominal CNY billions."""
+    if not path.is_file():
+        raise DashboardDataError(
+            f"PBoC data not found at {path}. Run the ingestion pipeline first."
+        )
+    try:
+        frame = pd.read_parquet(path)
+    except (OSError, ValueError) as exc:
+        raise DashboardDataError(f"Could not read PBoC data at {path}: {exc}") from exc
+    validate_standardized_frame(frame)
+    expected = {"country": {"CN"}, "provider": {"PBOC"}, "unit": {"100 Million Yuan"}}
+    for column, allowed in expected.items():
+        actual = set(frame[column].dropna())
+        if actual != allowed:
+            raise DashboardDataError(f"PBoC data has unexpected {column} values: {sorted(actual)}")
+    result = frame[STANDARD_COLUMNS].copy()
+    result["date"] = pd.to_datetime(result["date"])
+    result["value_cny_billions"] = result["value"] * 0.1
+    result["label"] = result["component"].map(PBOC_COMPONENT_LABELS).fillna(result["component"])
+    return result.sort_values(["component", "date"]).reset_index(drop=True)
+
+
+def latest_pboc_readings(frame: pd.DataFrame) -> pd.DataFrame:
+    """Return latest CNY level, prior-month change, and year-over-year growth."""
+    required = {"component", "label", "date", "value_cny_billions", "retrieved_at"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError(f"PBoC data is missing columns: {', '.join(missing)}")
+    rows: list[dict[str, object]] = []
+    for _component, group in frame.sort_values("date").groupby("component", sort=False):
+        valid = group.dropna(subset=["value_cny_billions"])
+        if valid.empty:
+            continue
+        latest = valid.iloc[-1]
+        previous = valid.iloc[-2] if len(valid) > 1 else None
+        prior_year = valid.loc[valid["date"] <= latest["date"] - pd.DateOffset(years=1)]
+        year_ago = prior_year.iloc[-1] if not prior_year.empty else None
+        rows.append(
+            {
+                "component": latest["component"],
+                "label": latest["label"],
+                "date": latest["date"],
+                "value_cny_billions": latest["value_cny_billions"],
+                "change_cny_billions": (
+                    latest["value_cny_billions"] - previous["value_cny_billions"]
+                    if previous is not None
+                    else pd.NA
+                ),
+                "growth_yoy": (
+                    latest["value_cny_billions"] / year_ago["value_cny_billions"] - 1
+                    if year_ago is not None and year_ago["value_cny_billions"] != 0
+                    else pd.NA
+                ),
+                "retrieved_at": latest["retrieved_at"],
+            }
+        )
+    if not rows:
+        raise DashboardDataError("PBoC data contains no numeric observations")
+    return pd.DataFrame(rows)
+
+
+def build_central_bank_index_comparison(
+    series: dict[str, pd.DataFrame], *, start: str | pd.Timestamp
+) -> pd.DataFrame:
+    """Rebase separate native-currency central-bank asset series to 100 after ``start``.
+
+    This display transformation compares cumulative percentage changes without adding nominal
+    balance sheets across currencies. Each country is independently rebased to its first observed
+    value on or after the requested date; no FX rate, weighting, interpolation, or OGLI parameter
+    is applied.
+    """
+    start_date = pd.Timestamp(start)
+    rows: list[pd.DataFrame] = []
+    for label, frame in series.items():
+        required = {"date", "native_value"}
+        missing = sorted(required - set(frame.columns))
+        if missing:
+            raise DashboardDataError(
+                f"Central-bank comparison for {label} is missing columns: {', '.join(missing)}"
+            )
+        selected = frame.loc[pd.to_datetime(frame["date"]) >= start_date, ["date", "native_value"]]
+        selected = selected.dropna(subset=["native_value"]).sort_values("date").copy()
+        if selected.empty:
+            continue
+        base = float(selected.iloc[0]["native_value"])
+        if base <= 0:
+            raise DashboardDataError(f"Central-bank comparison for {label} has an invalid base")
+        selected["central_bank"] = label
+        selected["index"] = selected["native_value"] / base * 100
+        selected["base_date"] = selected.iloc[0]["date"]
+        rows.append(selected[["date", "central_bank", "index", "base_date"]])
+    if not rows:
+        raise DashboardDataError("Central-bank comparison contains no observations")
+    return pd.concat(rows, ignore_index=True).sort_values(["central_bank", "date"])
 
 
 def load_liquidity_model_data(path: Path) -> pd.DataFrame:

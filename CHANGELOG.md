@@ -3,7 +3,7 @@
 All notable project changes are documented here. The project follows semantic versioning once a
 release is tagged.
 
-## [0.2.0] — Unreleased
+## [0.2.0] — 2026-08-29
 
 ### Added
 
@@ -17,11 +17,18 @@ release is tagged.
 - Official Bank of England database provider for quarterly consolidated total-assets series
   `RPQB75A`, with a separate native-GBP UK dashboard page, explicit five-quarter publication lag,
   and versioned snapshot.
+- Keyless PBoC archive provider that discovers the official annual Balance Sheet of Monetary
+  Authority tables, validates the bilingual title and unit, and extracts monthly Total Assets.
+- Separate China dashboard page, with local data access and an explicit public-redistribution
+  boundary based on the PBoC website legal notice.
+- Cross-country central-bank page that independently rebases native-currency total-assets series
+  to 100 without FX conversion, weighting, interpolation, or aggregation.
 
 ### Research boundary
 
-- The US OGLI is unchanged. ECB, BOJ, and BoE data are not frequency-aligned, currency-converted,
-  weighted, aggregated, or interpreted as country liquidity models in this milestone.
+- The US OGLI is unchanged. ECB, BOJ, BoE, and PBoC data are not frequency-aligned,
+  currency-converted, weighted, aggregated, or interpreted as country liquidity models in this
+  milestone. PBoC observations are not bundled publicly pending explicit redistribution permission.
 
 ## [0.1.1] — 2026-08-26
 
@@ -68,5 +75,6 @@ release is tagged.
 The historical `v0.1.0` tag predates the finalized code license, citation metadata, and release
 audit. It is retained unchanged for reproducibility and is superseded by v0.1.1.
 
+[0.2.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.2.0
 [0.1.1]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.1.1
 [0.1.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.1.0

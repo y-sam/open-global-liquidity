@@ -1,7 +1,7 @@
 # Open Global Liquidity
 
-**Current tagged release:** v0.1.1. The main branch includes the v0.2 international measured-data
-pilots described below. See the [changelog](CHANGELOG.md),
+**Current release:** v0.2.0. It adds international measured-data pilots while deliberately stopping
+short of a global aggregate. See the [changelog](CHANGELOG.md),
 [citation metadata](CITATION.cff), and [release checklist](RELEASE_CHECKLIST.md). Project code is
 licensed under Apache-2.0; bundled and downloaded third-party data remain subject to their
 respective terms.
@@ -20,7 +20,7 @@ Original project code is licensed under the [Apache License 2.0](LICENSE). This 
 not relicense third-party observations, derived snapshots, source metadata, names, or trademarks.
 See [Third-party data terms](THIRD_PARTY_DATA.md) before redistributing bundled data artifacts.
 
-## Current scope: US OGLI plus international measured-data pilots
+## Current scope: v0.2 US OGLI plus international measured-data pilots
 
 The repository provides an auditable US data-ingestion path, experimental OGLI momentum index, and
 Streamlit dashboard. It
@@ -85,6 +85,17 @@ series `RPQB75A`, through the keyless Statistical Interactive Database CSV downl
 balance sheet is published with a five-quarter lag. It remains a separate nominal-GBP measured
 series and is not converted, aligned with other countries, aggregated, or used in OGLI. The
 endpoint is public and requires no account or API key.
+
+The v0.2d pilot adds the monthly `Total Assets` row from the PBoC's official Balance Sheet of
+Monetary Authority. `PBOC.BSMA.TOTAL_ASSETS` is this project's stable identifier for the verified
+table row, not an official PBoC series code. The provider discovers annual tables from the official
+archive and requires no account or API key. Values remain in 100 million yuan. Because the PBoC
+website's legal notice reserves reuse rights, China observations are generated locally but are not
+committed as a public dashboard snapshot pending explicit permission.
+
+The **Central banks** dashboard page compares cumulative changes by rebasing each available
+native-currency series independently to 100. This is a display transformation—not currency
+conversion or aggregation—and it does not create a global OGLI.
 
 ## Research boundaries
 
@@ -156,11 +167,14 @@ is invalid, or no observations are returned. A successful run writes:
 - `data/raw/ecb/bsi_m_u2_n_c_t00_a_1_z5_0000_z01_e.parquet`: cached ECB values and metadata;
 - `data/raw/boj/bs01_mabjmta.parquet`: cached BOJ values and source metadata;
 - `data/raw/boe/rpqb75a.parquet`: cached Bank of England values and retrieval metadata;
+- `data/raw/pboc/monetary_authority_total_assets.parquet`: locally cached PBoC Total Assets values,
+  source-table URLs, and retrieval metadata;
 - `data/raw/coinmetrics/btc_priceusd.parquet`: cached Bitcoin USD prices;
 - `data/processed/us_fred_series.parquet`: standardized long-format source observations;
 - `data/processed/euro_area_ecb_series.parquet`: separate monthly Eurosystem assets in nominal EUR;
 - `data/processed/japan_boj_series.parquet`: separate monthly BOJ total assets in nominal JPY;
 - `data/processed/uk_boe_series.parquet`: separate quarterly BoE total assets in nominal GBP;
+- `data/processed/china_pboc_series.parquet`: separate monthly PBoC total assets in nominal CNY;
 - `data/processed/us_liquidity_weekly.parquet`: USD-million Wednesday inputs with source-date and
   staleness lineage;
 - `data/processed/us_liquidity_models.parquet`: the three weekly model levels and formulas.
@@ -366,6 +380,8 @@ directory, and verifies that the public snapshots still render the landing-page 
   and monthly cache.
 - `src/open_global_liquidity/data/boe.py` — keyless BoE CSV ingestion, exact-series validation,
   and quarterly cache.
+- `src/open_global_liquidity/data/pboc.py` — keyless PBoC archive discovery, bilingual table and
+  unit validation, monthly Total Assets extraction, and local cache.
 - `src/open_global_liquidity/transforms/` — unit conversion, alignment, growth, and z-scores.
 - `src/open_global_liquidity/models/us_liquidity.py` — configurable Model A/B/C calculations.
 - `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
@@ -487,9 +503,11 @@ Bitcoin is the primary market comparison. Gold now uses the World Bank Pink Shee
 and the Federal Reserve broad dollar index is included without changing its sign. Both remain
 outcome/context variables rather than OGLI inputs. Treasury yields and the 10-year-minus-2-year
 slope remain measured context. S&P 500 may return after appropriate public-display rights are
-secured. The v0.2 pilots begin the global-central-bank roadmap with separate ECB, BOJ, and BoE
-measured series. Later increments may add balance-sheet counterparts, other central banks, FX conversion,
-global aggregation, collateral and repo proxies, shadow monetary base concepts, BIS cross-border
+secured. v0.2 completes the first global-central-bank measured-data layer with separate Federal
+Reserve, ECB, BOJ, BoE, and local-only PBoC total-assets series plus a non-aggregated indexed
+comparison. v0.3 may add explicit FX normalization and global aggregation only after currency,
+frequency, accounting, publication-lag, and weighting assumptions are configured and tested. Later
+increments may add collateral and repo proxies, shadow monetary base concepts, BIS cross-border
 credit, and explicitly labeled public benchmark calibration.
 
 ## Limitations and disclaimer

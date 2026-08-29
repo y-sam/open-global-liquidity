@@ -8,18 +8,63 @@ import pytest
 
 from open_global_liquidity.dashboard import (
     DashboardDataError,
+    build_central_bank_index_comparison,
     latest_boe_readings,
     latest_boj_readings,
     latest_ecb_readings,
     latest_model_readings,
+    latest_pboc_readings,
     latest_readings,
     load_boe_data,
     load_boj_data,
     load_dashboard_data,
     load_ecb_data,
     load_liquidity_model_data,
+    load_pboc_data,
     resolve_dashboard_data_path,
 )
+
+
+def test_load_pboc_data_and_latest_changes(tmp_path: Path) -> None:
+    path = tmp_path / "pboc.parquet"
+    pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-02-29", "2025-02-28", "2025-03-31"]),
+            "country": ["CN"] * 3,
+            "provider": ["PBOC"] * 3,
+            "series_id": ["PBOC.BSMA.TOTAL_ASSETS"] * 3,
+            "component": ["pboc_total_assets"] * 3,
+            "value": [400_000.0, 440_000.0, 448_800.0],
+            "unit": ["100 Million Yuan"] * 3,
+            "frequency": ["Monthly, End of Period"] * 3,
+            "retrieved_at": [pd.Timestamp("2025-04-15", tz=UTC)] * 3,
+        }
+    ).to_parquet(path, index=False)
+
+    result = load_pboc_data(path)
+    latest = latest_pboc_readings(result).iloc[0]
+
+    assert result["value_cny_billions"].tolist() == [40_000.0, 44_000.0, 44_880.0]
+    assert latest["change_cny_billions"] == 880.0
+    assert latest["growth_yoy"] == pytest.approx(0.122)
+
+
+def test_central_bank_comparison_rebases_each_native_series_independently() -> None:
+    comparison = build_central_bank_index_comparison(
+        {
+            "Bank A": pd.DataFrame(
+                {"date": pd.to_datetime(["2024-01-31", "2024-02-29"]), "native_value": [10, 12]}
+            ),
+            "Bank B": pd.DataFrame(
+                {"date": pd.to_datetime(["2024-02-29", "2024-03-31"]), "native_value": [200, 180]}
+            ),
+        },
+        start="2024-01-01",
+    )
+
+    by_bank = comparison.groupby("central_bank")["index"].apply(list).to_dict()
+    assert by_bank["Bank A"] == [100.0, 120.0]
+    assert by_bank["Bank B"] == [100.0, 90.0]
 
 
 def test_load_boe_data_and_latest_changes(tmp_path: Path) -> None:
