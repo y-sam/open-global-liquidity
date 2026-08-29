@@ -14,10 +14,13 @@ release is tagged.
 - Versioned ECB dashboard snapshot in the scheduled refresh and provenance manifest.
 - Official BOJ Time-Series Data Search provider for `BS01.MABJMTA`, with a separate native-JPY
   Japan dashboard page and versioned snapshot.
+- Official Bank of England database provider for quarterly consolidated total-assets series
+  `RPQB75A`, with a separate native-GBP UK dashboard page, explicit five-quarter publication lag,
+  and versioned snapshot.
 
 ### Research boundary
 
-- The US OGLI is unchanged. ECB and BOJ data are not frequency-aligned, currency-converted,
+- The US OGLI is unchanged. ECB, BOJ, and BoE data are not frequency-aligned, currency-converted,
   weighted, aggregated, or interpreted as country liquidity models in this milestone.
 
 ## [0.1.1] — 2026-08-26

@@ -43,6 +43,21 @@ converts source values from 100 million yen to JPY billions for display. The ori
 remain in the standardized Parquet artifact. The Bank of Japan is not affiliated with or
 responsible for Open Global Liquidity.
 
+## Bank of England
+
+The v0.2c pilot obtains quarterly consolidated central-bank total assets/liabilities, series
+`RPQB75A`, from the public Bank of England Statistical Interactive Database. The Bank's
+[legal terms](https://www.bankofengland.co.uk/legal) state that reproduction of Database data is
+subject to the UK Open Government Licence, except where otherwise stated. The selected total-assets
+series is not one of the exchange-rate datasets identified by the Bank as potentially containing
+third-party rights.
+
+Attribution: Bank of England, Statistical Interactive Database, quarterly amounts outstanding of
+Central Bank assets/liabilities total, series `RPQB75A`. The complete balance sheet is published
+with a five-quarter lag. Open Global Liquidity divides source GBP millions by 1,000 for dashboard
+display in GBP billions; the standardized Parquet artifact retains the source unit. The Bank of
+England is not affiliated with or responsible for Open Global Liquidity.
+
 ## FRED and ALFRED
 
 The pipeline accesses FRED and ALFRED through the Federal Reserve Bank of St. Louis API. The

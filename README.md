@@ -20,7 +20,7 @@ Original project code is licensed under the [Apache License 2.0](LICENSE). This 
 not relicense third-party observations, derived snapshots, source metadata, names, or trademarks.
 See [Third-party data terms](THIRD_PARTY_DATA.md) before redistributing bundled data artifacts.
 
-## Current scope: US OGLI plus a euro-area measured-data pilot
+## Current scope: US OGLI plus international measured-data pilots
 
 The repository provides an auditable US data-ingestion path, experimental OGLI momentum index, and
 Streamlit dashboard. It
@@ -79,6 +79,12 @@ through the keyless BOJ Time-Series Data Search API. It remains a separate month
 series and is not converted, combined, or used in OGLI. BOJ asks public API services to display a
 credit and notify its Research and Statistics Department when the service is released; see
 [Third-party data terms](THIRD_PARTY_DATA.md).
+
+The v0.2c pilot adds Bank of England quarterly consolidated central-bank total assets/liabilities,
+series `RPQB75A`, through the keyless Statistical Interactive Database CSV download. The complete
+balance sheet is published with a five-quarter lag. It remains a separate nominal-GBP measured
+series and is not converted, aligned with other countries, aggregated, or used in OGLI. The
+endpoint is public and requires no account or API key.
 
 ## Research boundaries
 
@@ -149,10 +155,12 @@ is invalid, or no observations are returned. A successful run writes:
 - `data/raw/fred/<SERIES_ID>.parquet`: FRED observations plus retrieval metadata;
 - `data/raw/ecb/bsi_m_u2_n_c_t00_a_1_z5_0000_z01_e.parquet`: cached ECB values and metadata;
 - `data/raw/boj/bs01_mabjmta.parquet`: cached BOJ values and source metadata;
+- `data/raw/boe/rpqb75a.parquet`: cached Bank of England values and retrieval metadata;
 - `data/raw/coinmetrics/btc_priceusd.parquet`: cached Bitcoin USD prices;
 - `data/processed/us_fred_series.parquet`: standardized long-format source observations;
 - `data/processed/euro_area_ecb_series.parquet`: separate monthly Eurosystem assets in nominal EUR;
 - `data/processed/japan_boj_series.parquet`: separate monthly BOJ total assets in nominal JPY;
+- `data/processed/uk_boe_series.parquet`: separate quarterly BoE total assets in nominal GBP;
 - `data/processed/us_liquidity_weekly.parquet`: USD-million Wednesday inputs with source-date and
   staleness lineage;
 - `data/processed/us_liquidity_models.parquet`: the three weekly model levels and formulas.
@@ -356,6 +364,8 @@ directory, and verifies that the public snapshots still render the landing-page 
   monthly cache.
 - `src/open_global_liquidity/data/boj.py` — keyless BOJ API ingestion, exact-series validation,
   and monthly cache.
+- `src/open_global_liquidity/data/boe.py` — keyless BoE CSV ingestion, exact-series validation,
+  and quarterly cache.
 - `src/open_global_liquidity/transforms/` — unit conversion, alignment, growth, and z-scores.
 - `src/open_global_liquidity/models/us_liquidity.py` — configurable Model A/B/C calculations.
 - `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
@@ -477,8 +487,8 @@ Bitcoin is the primary market comparison. Gold now uses the World Bank Pink Shee
 and the Federal Reserve broad dollar index is included without changing its sign. Both remain
 outcome/context variables rather than OGLI inputs. Treasury yields and the 10-year-minus-2-year
 slope remain measured context. S&P 500 may return after appropriate public-display rights are
-secured. The v0.2 pilots begin the global-central-bank roadmap with separate ECB and BOJ measured
-series. Later increments may add balance-sheet counterparts, other central banks, FX conversion,
+secured. The v0.2 pilots begin the global-central-bank roadmap with separate ECB, BOJ, and BoE
+measured series. Later increments may add balance-sheet counterparts, other central banks, FX conversion,
 global aggregation, collateral and repo proxies, shadow monetary base concepts, BIS cross-border
 credit, and explicitly labeled public benchmark calibration.
 

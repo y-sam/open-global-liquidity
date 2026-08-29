@@ -188,3 +188,24 @@ JP:
       start: "1998-04-30"
       source: "Bank of Japan, BOJ Time-Series Data Search, Bank of Japan Accounts"
       source_url: "https://www.boj.or.jp/en/statistics/boj/other/ac/index.htm"
+
+GB:
+  liquidity:
+    boe_total_assets:
+      classification: measured_data
+      provider: boe
+      series_id: RPQB75A
+      component: boe_total_assets
+      title: "Central Bank Assets: Total"
+      description: >-
+        Quarterly total assets/liabilities of the UK central bank reported in the Bank of England
+        consolidated balance sheet. The complete balance sheet is published with a five-quarter
+        lag. This is a
+        separate measured-data pilot in native sterling: it is not converted to U.S. dollars,
+        combined with US, euro-area, or Japan data, or used in OGLI.
+      unit: "Millions of Sterling"
+      frequency: "Quarterly"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2013-09-30"
+      source: "Bank of England, Statistical Interactive Database, consolidated balance sheet"
+      source_url: "https://www.bankofengland.co.uk/boeapps/database/"

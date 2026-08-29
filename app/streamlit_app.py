@@ -21,6 +21,7 @@ from dashboard_support import (  # noqa: E402
     COMPONENT_LABELS,
     DashboardDataError,
     assess_freshness,
+    latest_boe_readings,
     latest_boj_readings,
     latest_ecb_readings,
     latest_model_readings,
@@ -30,6 +31,7 @@ from dashboard_support import (  # noqa: E402
     load_bitcoin_outcomes,
     load_bitcoin_regime_summary,
     load_bitcoin_revision_summary,
+    load_boe_data,
     load_boj_data,
     load_dashboard_data,
     load_ecb_data,
@@ -54,6 +56,8 @@ ECB_DATA_PATH = DATA_ROOT / "processed" / "euro_area_ecb_series.parquet"
 ECB_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "euro_area_ecb_series_snapshot.parquet"
 BOJ_DATA_PATH = DATA_ROOT / "processed" / "japan_boj_series.parquet"
 BOJ_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "japan_boj_series_snapshot.parquet"
+BOE_DATA_PATH = DATA_ROOT / "processed" / "uk_boe_series.parquet"
+BOE_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "uk_boe_series_snapshot.parquet"
 MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
 MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
 OGLI_DATA_PATH = DATA_ROOT / "processed" / "us_ogli.parquet"
@@ -168,6 +172,13 @@ def _load_boj(path: str, modified_ns: int) -> pd.DataFrame:
     """Cache measured BOJ data until its file modification timestamp changes."""
     del modified_ns
     return load_boj_data(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_boe(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache measured Bank of England data until its file modification timestamp changes."""
+    del modified_ns
+    return load_boe_data(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -288,6 +299,11 @@ def _ecb_data() -> tuple[pd.DataFrame, Path, str]:
 def _boj_data() -> tuple[pd.DataFrame, Path, str]:
     path, origin = resolve_dashboard_data_path(BOJ_DATA_PATH, BOJ_SNAPSHOT_DATA_PATH)
     return _load_boj(str(path), path.stat().st_mtime_ns), path, origin
+
+
+def _boe_data() -> tuple[pd.DataFrame, Path, str]:
+    path, origin = resolve_dashboard_data_path(BOE_DATA_PATH, BOE_SNAPSHOT_DATA_PATH)
+    return _load_boe(str(path), path.stat().st_mtime_ns), path, origin
 
 
 def _model_data() -> tuple[pd.DataFrame, str] | None:
@@ -2859,6 +2875,99 @@ def japan_page() -> None:
     )
 
 
+def united_kingdom_page() -> None:
+    """Present official Bank of England total assets without implying a global aggregate."""
+    st.title("United Kingdom measured data")
+    st.caption(
+        "v0.2c expansion pilot · official quarterly Bank of England data in native sterling · "
+        "no FX conversion, UK liquidity model, or global aggregation"
+    )
+    try:
+        data, _path, origin = _boe_data()
+    except DashboardDataError as exc:
+        st.info(str(exc), icon=":material/account_balance:")
+        st.code(
+            "uv run python -m open_global_liquidity.pipeline --publish-dashboard-snapshot",
+            language="zsh",
+        )
+        st.markdown("The Bank of England database download is public and requires **no API key**.")
+        return
+
+    latest = latest_boe_readings(data).iloc[0]
+    level = float(latest["value_gbp_billions"])
+    quarterly_change = latest["change_gbp_billions"]
+    growth_yoy = latest["growth_yoy"]
+    retrieved_at = pd.to_datetime(latest["retrieved_at"], utc=True)
+    with st.container(horizontal=True):
+        st.metric(
+            "Bank of England total assets",
+            f"£{level:,.1f}bn",
+            (
+                None
+                if pd.isna(quarterly_change)
+                else f"£{float(quarterly_change):+,.1f}bn vs prior quarter"
+            ),
+            border=True,
+        )
+        st.metric(
+            "12-month change",
+            "Unavailable" if pd.isna(growth_yoy) else f"{float(growth_yoy):+.1%}",
+            border=True,
+        )
+        st.metric("Latest observation", f"{latest['date']:%d %b %Y}", border=True)
+        st.metric("Data mode", origin, border=True)
+
+    max_date = data["date"].max()
+    history = st.segmented_control(
+        "History", ["5 years", "10 years", "All"], default="10 years", key="uk_history"
+    )
+    if history == "All":
+        visible = data
+    else:
+        years = 5 if history == "5 years" else 10
+        visible = data.loc[data["date"] >= max_date - pd.DateOffset(years=years)]
+    chart_data = visible.rename(columns={"date": "Date", "value_gbp_billions": "GBP billions"})
+    st.line_chart(
+        chart_data,
+        x="Date",
+        y="GBP billions",
+        x_label="Observation date",
+        y_label="GBP billions",
+    )
+    st.info(
+        "Dates and levels are preserved from the quarterly consolidated BoE series. The complete "
+        "balance sheet is published with a five-quarter lag. Values remain nominal GBP stocks "
+        "and are not inputs to the US OGLI.",
+        icon=":material/info:",
+    )
+    st.subheader("Recent observations")
+    recent = data.tail(12).assign(
+        date=lambda frame: frame["date"].dt.strftime("%Y-%m-%d"),
+        value_gbp_billions=lambda frame: frame["value_gbp_billions"].round(1),
+    )
+    st.dataframe(
+        recent[["date", "value_gbp_billions", "series_id"]].rename(
+            columns={
+                "date": "Observation date",
+                "value_gbp_billions": "GBP billions",
+                "series_id": "BoE series",
+            }
+        ),
+        column_config={"GBP billions": st.column_config.NumberColumn(format="localized")},
+        width="stretch",
+        hide_index=True,
+    )
+    st.caption(
+        f"Retrieved {retrieved_at:%Y-%m-%d %H:%M UTC} · Provider: Bank of England · "
+        "Series RPQB75A · quarterly, not seasonally adjusted · five-quarter publication lag"
+    )
+    st.link_button(
+        "Review official BoE metadata",
+        "https://www.bankofengland.co.uk/boeapps/database/index.asp?EC=RPQB75A&From=Template",
+        icon=":material/open_in_new:",
+    )
+
+
 def research_guide_page() -> None:
     st.title("Research guide")
     st.markdown(
@@ -3116,6 +3225,12 @@ def research_guide_page() -> None:
           — database `BS01`, series `MABJMTA`, monthly native-yen stock; not an OGLI input or
           global aggregate
 
+        **United Kingdom v0.2c measured-data pilot**
+
+        - [BoE consolidated central-bank total assets](https://www.bankofengland.co.uk/boeapps/database/index.asp?EC=RPQB75A&From=Template)
+          — series `RPQB75A`, quarterly native-sterling stock published with a five-quarter lag;
+          not an OGLI input or global aggregate
+
         **Primary documentation and broader context**
 
         - [Federal Reserve H.4.1 balance-sheet release](https://www.federalreserve.gov/releases/h41/default.htm)
@@ -3159,6 +3274,12 @@ japan_data_page = st.Page(
     icon=":material/account_balance:",
     url_path="japan",
 )
+uk_data_page = st.Page(
+    united_kingdom_page,
+    title="UK data",
+    icon=":material/account_balance:",
+    url_path="united-kingdom",
+)
 markets_index_page = st.Page(
     markets_page,
     title="Liquidity vs markets",
@@ -3199,6 +3320,7 @@ navigation = st.navigation(
         data_page,
         euro_area_data_page,
         japan_data_page,
+        uk_data_page,
         guide_page,
     ],
     position="top",
