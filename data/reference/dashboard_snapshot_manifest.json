@@ -1,6 +1,34 @@
 {
   "classification": "snapshot_provenance",
   "files": {
+    "china_bis_series_snapshot.parquet": {
+      "bytes": 11270,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "retrieved_at"
+      ],
+      "components": [
+        "china_central_bank_total_assets"
+      ],
+      "earliest_observation": "2002-01-31",
+      "latest_observation": "2026-06-30",
+      "latest_retrieval": "2026-08-30T09:42:48.654260+00:00",
+      "providers": [
+        "BIS"
+      ],
+      "rows": 294,
+      "series_ids": [
+        "BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N"
+      ],
+      "sha256": "e2f1638fd31aa8323623d8747eff8dc41064b03382df1c7bc7c61b2c22348791"
+    },
     "euro_area_ecb_series_snapshot.parquet": {
       "bytes": 11990,
       "columns": [
@@ -28,6 +56,86 @@
         "BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E"
       ],
       "sha256": "4247c689fc6be73e4d05c20df7ffdc5f08e306599830e6bcfed342827a38f74f"
+    },
+    "global_central_bank_assets_detail_snapshot.parquet": {
+      "bytes": 18344,
+      "columns": [
+        "date",
+        "source_date",
+        "native_value",
+        "unit",
+        "component",
+        "central_bank",
+        "native_unit",
+        "native_millions",
+        "fx_component",
+        "fx_date",
+        "fx_rate",
+        "value_usd_millions",
+        "is_balanced"
+      ],
+      "components": [
+        "boe_total_assets",
+        "boj_total_assets",
+        "china_central_bank_total_assets",
+        "eurosystem_total_assets",
+        "fed_assets"
+      ],
+      "earliest_observation": "2013-09-30",
+      "latest_observation": "2025-03-31",
+      "rows": 235,
+      "sha256": "13151969742268b1f75e572678e1fe1125b82a6371e9ccc47d792168e948bffb"
+    },
+    "global_central_bank_assets_snapshot.parquet": {
+      "bytes": 7529,
+      "columns": [
+        "date",
+        "total_usd_millions",
+        "component_count",
+        "total_usd_trillions",
+        "change_1q",
+        "growth_yoy",
+        "classification",
+        "name"
+      ],
+      "earliest_observation": "2013-09-30",
+      "latest_observation": "2025-03-31",
+      "rows": 47,
+      "sha256": "a557968d91859bc3bb2c55b8597997810ce263c49f1bea803bc995eaba3df346"
+    },
+    "global_fx_series_snapshot.parquet": {
+      "bytes": 378878,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "retrieved_at"
+      ],
+      "components": [
+        "usd_per_euro",
+        "usd_per_sterling",
+        "yen_per_usd",
+        "yuan_per_usd"
+      ],
+      "earliest_observation": "1971-01-04",
+      "latest_observation": "2026-08-21",
+      "latest_retrieval": "2026-08-30T09:42:50.873082+00:00",
+      "providers": [
+        "FRED"
+      ],
+      "rows": 48146,
+      "series_ids": [
+        "DEXCHUS",
+        "DEXJPUS",
+        "DEXUSEU",
+        "DEXUSUK"
+      ],
+      "sha256": "c479b3d8a57311c0c9e2a343718e98fee51825c1ae2ac4047c63e95d6bc5b08d"
     },
     "japan_boj_series_snapshot.parquet": {
       "bytes": 11024,
@@ -561,318 +669,12 @@
       ],
       "rows": 1980,
       "sha256": "156d662a9086ffc1525f2ff74e70bc227f61a00a50629b2be98be24de6e02437"
-    },
-    "us_point_in_time_bitcoin_contrasts_snapshot.parquet": {
-      "bytes": 23540,
-      "columns": [
-        "model_id",
-        "model_name",
-        "publication_lag_weeks",
-        "horizon_months",
-        "sample_policy",
-        "expansionary_observations",
-        "contractionary_observations",
-        "expansionary_mean_return",
-        "contractionary_mean_return",
-        "expansionary_median_return",
-        "contractionary_median_return",
-        "expansionary_positive_share",
-        "contractionary_positive_share",
-        "mean_return_spread",
-        "spread_standard_error",
-        "confidence_level",
-        "spread_ci_lower",
-        "spread_ci_upper",
-        "interval_status",
-        "interval_status_classification",
-        "interval_method",
-        "regime_group_classification",
-        "specification_role",
-        "specification_classification",
-        "classification"
-      ],
-      "model_ids": [
-        "model_a",
-        "model_b",
-        "model_c"
-      ],
-      "rows": 96,
-      "sha256": "a66f55c7ff9d416355ead3452cc1104ea7f5daffb559b07d2c6ccfc9ada8cbc2"
-    },
-    "us_point_in_time_bitcoin_outcomes_snapshot.parquet": {
-      "bytes": 97439,
-      "columns": [
-        "information_date",
-        "signal_observation_date",
-        "signal_available_date",
-        "model_id",
-        "model_name",
-        "vintage_ogli",
-        "vintage_momentum_score",
-        "vintage_regime",
-        "market_id",
-        "series_id",
-        "provider",
-        "unit",
-        "source_frequency",
-        "publication_lag_weeks",
-        "horizon_months",
-        "start_target_date",
-        "start_observation_date",
-        "start_value",
-        "end_target_date",
-        "end_observation_date",
-        "end_value",
-        "market_return",
-        "is_non_overlapping",
-        "classification",
-        "current_ogli",
-        "current_momentum_score",
-        "current_regime",
-        "ogli_revision",
-        "momentum_revision",
-        "regime_agrees_with_current",
-        "previous_vintage_regime",
-        "regime_transition",
-        "transition_direction",
-        "maximum_upside_from_start",
-        "maximum_downside_from_start",
-        "maximum_drawdown_from_peak",
-        "bitcoin_research_classification"
-      ],
-      "market_ids": [
-        "bitcoin"
-      ],
-      "model_ids": [
-        "model_a",
-        "model_b",
-        "model_c"
-      ],
-      "providers": [
-        "Coin Metrics"
-      ],
-      "rows": 2964,
-      "series_ids": [
-        "btc.PriceUSD"
-      ],
-      "sha256": "65e65bd830cb304cd124aef940a84d03ae832fe320d2604dd1d13b3cf3580216"
-    },
-    "us_point_in_time_bitcoin_regimes_snapshot.parquet": {
-      "bytes": 56969,
-      "columns": [
-        "model_id",
-        "model_name",
-        "publication_lag_weeks",
-        "horizon_months",
-        "sample_policy",
-        "analysis_dimension",
-        "group_label",
-        "observations",
-        "mean_return",
-        "median_return",
-        "positive_share",
-        "standard_error",
-        "confidence_level",
-        "mean_return_ci_lower",
-        "mean_return_ci_upper",
-        "mean_maximum_upside",
-        "mean_maximum_downside",
-        "mean_maximum_drawdown",
-        "specification_role",
-        "specification_classification",
-        "classification"
-      ],
-      "model_ids": [
-        "model_a",
-        "model_b",
-        "model_c"
-      ],
-      "rows": 816,
-      "sha256": "b80a553c4742445945e6b17cd9e4cf2d49d534cb5359bc27807842f9444d988b"
-    },
-    "us_point_in_time_bitcoin_revisions_snapshot.parquet": {
-      "bytes": 11800,
-      "columns": [
-        "model_id",
-        "model_name",
-        "publication_lag_weeks",
-        "horizon_months",
-        "sample_policy",
-        "observations",
-        "vintage_signal_correlation",
-        "current_vintage_signal_correlation",
-        "correlation_difference",
-        "mean_absolute_momentum_revision",
-        "regime_agreement_share",
-        "specification_role",
-        "specification_classification",
-        "classification"
-      ],
-      "model_ids": [
-        "model_a",
-        "model_b",
-        "model_c"
-      ],
-      "rows": 96,
-      "sha256": "5bed12fe492d03dee9b4831a38e5938d461deaf46d14a4d7ece5cf09baee3ac9"
-    },
-    "us_point_in_time_comparison_snapshot.parquet": {
-      "bytes": 26454,
-      "columns": [
-        "information_date",
-        "signal_observation_date",
-        "model_id",
-        "model_name",
-        "vintage_ogli",
-        "vintage_momentum_score",
-        "vintage_regime",
-        "vintage_growth_3m_annualized",
-        "vintage_growth_12m_yoy",
-        "zscore_mode",
-        "zscore_min_periods",
-        "information_set_classification",
-        "retrieved_at",
-        "current_ogli",
-        "current_momentum_score",
-        "current_regime",
-        "ogli_revision",
-        "momentum_revision",
-        "comparison_policy"
-      ],
-      "latest_retrieval": "2026-08-27T07:29:50.779733+00:00",
-      "model_ids": [
-        "model_a",
-        "model_b",
-        "model_c"
-      ],
-      "rows": 201,
-      "sha256": "e1b249bff918311a710c008dd197a3d28283c03434db5a578866af5cf5440e3f"
-    },
-    "us_point_in_time_market_pairs_snapshot.parquet": {
-      "bytes": 93364,
-      "columns": [
-        "information_date",
-        "signal_observation_date",
-        "signal_available_date",
-        "model_id",
-        "model_name",
-        "vintage_ogli",
-        "vintage_momentum_score",
-        "vintage_regime",
-        "market_id",
-        "series_id",
-        "provider",
-        "unit",
-        "source_frequency",
-        "publication_lag_weeks",
-        "horizon_months",
-        "start_target_date",
-        "start_observation_date",
-        "start_value",
-        "end_target_date",
-        "end_observation_date",
-        "end_value",
-        "market_return",
-        "is_non_overlapping",
-        "classification"
-      ],
-      "market_ids": [
-        "bitcoin",
-        "broad_usd_index",
-        "gold"
-      ],
-      "model_ids": [
-        "model_a",
-        "model_b",
-        "model_c"
-      ],
-      "providers": [
-        "Coin Metrics",
-        "FRED",
-        "World Bank"
-      ],
-      "rows": 8568,
-      "series_ids": [
-        "CMO-GOLD-MONTHLY",
-        "DTWEXBGS",
-        "btc.PriceUSD"
-      ],
-      "sha256": "548808a4118e2351a365fade907c66f90eac8e5ace852589faa87d3a8f8eddfb"
-    },
-    "us_point_in_time_market_series_snapshot.parquet": {
-      "bytes": 178774,
-      "columns": [
-        "date",
-        "country",
-        "provider",
-        "series_id",
-        "component",
-        "value",
-        "unit",
-        "frequency",
-        "retrieved_at"
-      ],
-      "components": [
-        "bitcoin",
-        "broad_usd_index",
-        "gold"
-      ],
-      "earliest_observation": "2006-01-02",
-      "latest_observation": "2026-08-28",
-      "latest_retrieval": "2026-08-29T16:59:54.576138+00:00",
-      "providers": [
-        "Coin Metrics",
-        "FRED",
-        "World Bank"
-      ],
-      "rows": 11331,
-      "series_ids": [
-        "CMO-GOLD-MONTHLY",
-        "DTWEXBGS",
-        "btc.PriceUSD"
-      ],
-      "sha256": "f595bbf636b35441540d5652cfea96fd0c1d2d9252a43e13435087cc7b5e8816"
-    },
-    "us_point_in_time_market_summary_snapshot.parquet": {
-      "bytes": 12686,
-      "columns": [
-        "model_id",
-        "model_name",
-        "market_id",
-        "series_id",
-        "publication_lag_weeks",
-        "horizon_months",
-        "sample_policy",
-        "observations",
-        "correlation",
-        "mean_return",
-        "median_return",
-        "positive_share",
-        "classification"
-      ],
-      "market_ids": [
-        "bitcoin",
-        "broad_usd_index",
-        "gold"
-      ],
-      "model_ids": [
-        "model_a",
-        "model_b",
-        "model_c"
-      ],
-      "rows": 288,
-      "series_ids": [
-        "CMO-GOLD-MONTHLY",
-        "DTWEXBGS",
-        "btc.PriceUSD"
-      ],
-      "sha256": "12849b808f5d11d08cafb6983b72ba59ead0039867aaacc81c3ff415bed4f23d"
     }
   },
-  "generated_at": "2026-08-29T17:03:43.608299+00:00",
-  "pipeline_version": "0.2.0",
+  "generated_at": "2026-08-30T09:51:24.139002+00:00",
+  "pipeline_version": "0.3.0.dev0",
   "schema_version": 1,
-  "snapshot_count": 25,
-  "source_commit": "bad33d2a6d731f48ab0303beeb2f3cde6d116890",
-  "working_tree_dirty": false
+  "snapshot_count": 21,
+  "source_commit": "3ba2e616337d9a34ddc4b90cd3bfbdd1f8232c31",
+  "working_tree_dirty": true
 }

@@ -32,12 +32,18 @@ from open_global_liquidity.config import (
     load_series_config,
 )
 from open_global_liquidity.data.base import DataValidationError
+from open_global_liquidity.data.bis import BisError, BisProvider
 from open_global_liquidity.data.boe import BoeError, BoeProvider
 from open_global_liquidity.data.boj import BojError, BojProvider
 from open_global_liquidity.data.coinmetrics import CoinMetricsError, CoinMetricsProvider
 from open_global_liquidity.data.ecb import EcbError, EcbProvider
 from open_global_liquidity.data.fred import FredError, FredProvider
 from open_global_liquidity.data.pboc import PbocError, PbocProvider
+from open_global_liquidity.models.global_central_bank import (
+    GlobalAggregationError,
+    calculate_global_central_bank_assets,
+    load_global_aggregation_config,
+)
 from open_global_liquidity.models.ogli import OGLICalculationError, calculate_ogli
 from open_global_liquidity.models.us_liquidity import (
     LiquidityModelError,
@@ -78,6 +84,11 @@ def run_pipeline(
     ]
     market_definitions = [item for item in definitions if item.group == "markets"]
     context_definitions = [item for item in definitions if item.group == "context"]
+    fx_definitions = [
+        item
+        for item in definitions
+        if item.provider.lower() == "fred" and item.group == "exchange_rates"
+    ]
     ecb_definitions = [
         item for item in definitions if item.provider.lower() == "ecb" and item.group == "liquidity"
     ]
@@ -91,6 +102,9 @@ def run_pipeline(
         item
         for item in definitions
         if item.provider.lower() == "pboc" and item.group == "liquidity"
+    ]
+    bis_definitions = [
+        item for item in definitions if item.provider.lower() == "bis" and item.group == "liquidity"
     ]
     if not liquidity_definitions:
         raise RuntimeError("No FRED liquidity series are configured")
@@ -192,6 +206,67 @@ def run_pipeline(
         pboc_path = output_dir / "china_pboc_series.parquet"
         pboc_output.to_parquet(pboc_path, index=False)
         LOGGER.info("Wrote %d standardized PBoC observations to %s", len(pboc_output), pboc_path)
+
+    bis_output: pd.DataFrame | None = None
+    if bis_definitions:
+        bis_provider = BisProvider(cache_dir=project_root / "data" / "raw" / "bis")
+        bis_output = pd.concat(
+            [
+                bis_provider.fetch_definition(
+                    definition,
+                    start=start,
+                    end=end,
+                    force_refresh=force_refresh,
+                )
+                for definition in bis_definitions
+            ],
+            ignore_index=True,
+        ).sort_values(["country", "series_id", "date"])
+        bis_path = output_dir / "china_bis_series.parquet"
+        bis_output.to_parquet(bis_path, index=False)
+        LOGGER.info("Wrote %d standardized BIS observations to %s", len(bis_output), bis_path)
+
+    fx_output: pd.DataFrame | None = None
+    if fx_definitions:
+        fx_output = pd.concat(
+            [
+                provider.fetch_definition(
+                    definition,
+                    start=start,
+                    end=end,
+                    force_refresh=force_refresh,
+                )
+                for definition in fx_definitions
+            ],
+            ignore_index=True,
+        ).sort_values(["series_id", "date"])
+        fx_path = output_dir / "global_fx_series.parquet"
+        fx_output.to_parquet(fx_path, index=False)
+        LOGGER.info("Wrote %d standardized FX observations to %s", len(fx_output), fx_path)
+
+    global_detail: pd.DataFrame | None = None
+    global_aggregate: pd.DataFrame | None = None
+    global_config_path = project_root / "config" / "global_aggregation.yaml"
+    global_sources = [output.loc[output["component"] == "fed_assets"]]
+    global_sources.extend(
+        frame for frame in (ecb_output, boj_output, boe_output, bis_output) if frame is not None
+    )
+    if global_config_path.is_file() and fx_output is not None:
+        global_config = load_global_aggregation_config(global_config_path)
+        global_detail, global_aggregate = calculate_global_central_bank_assets(
+            pd.concat(global_sources, ignore_index=True),
+            fx_output,
+            global_config,
+        )
+        global_detail_path = output_dir / "global_central_bank_assets_detail.parquet"
+        global_aggregate_path = output_dir / "global_central_bank_assets.parquet"
+        global_detail.to_parquet(global_detail_path, index=False)
+        global_aggregate.to_parquet(global_aggregate_path, index=False)
+        LOGGER.info(
+            "Wrote %d balanced global aggregate quarters to %s",
+            len(global_aggregate),
+            global_aggregate_path,
+        )
 
     weekly = align_to_weekly_wednesday(
         convert_to_usd_millions(output),
@@ -418,6 +493,13 @@ def run_pipeline(
             snapshots["japan_boj_series_snapshot.parquet"] = boj_output
         if boe_output is not None:
             snapshots["uk_boe_series_snapshot.parquet"] = boe_output
+        if bis_output is not None:
+            snapshots["china_bis_series_snapshot.parquet"] = bis_output
+        if fx_output is not None:
+            snapshots["global_fx_series_snapshot.parquet"] = fx_output
+        if global_detail is not None and global_aggregate is not None:
+            snapshots["global_central_bank_assets_detail_snapshot.parquet"] = global_detail
+            snapshots["global_central_bank_assets_snapshot.parquet"] = global_aggregate
         if pboc_output is not None:
             LOGGER.warning(
                 "PBoC observations are excluded from public snapshots pending explicit "
@@ -457,6 +539,8 @@ def run_pipeline(
         f"and {0 if boj_output is None else len(boj_output):,} BOJ observations "
         f"and {0 if boe_output is None else len(boe_output):,} BoE observations "
         f"and {0 if pboc_output is None else len(pboc_output):,} PBoC observations "
+        f"and {0 if bis_output is None else len(bis_output):,} BIS observations "
+        f"and {0 if global_aggregate is None else len(global_aggregate):,} global quarters "
         f"-> {output_dir}"
     )
     return output_path
@@ -492,6 +576,7 @@ def main() -> None:
             publish_dashboard_snapshot=args.publish_dashboard_snapshot,
         )
     except (
+        BisError,
         ConfigurationError,
         BojError,
         BoeError,
@@ -501,6 +586,7 @@ def main() -> None:
         FredError,
         FrequencyAlignmentError,
         GrowthCalculationError,
+        GlobalAggregationError,
         LiquidityModelError,
         MarketAnalysisError,
         MacroContextError,

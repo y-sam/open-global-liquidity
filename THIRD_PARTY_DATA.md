@@ -5,7 +5,7 @@ documentation only**. It does not grant rights in third-party observations, meta
 trademarks. Downloading, transforming, aggregating, or storing a source series in Parquet does not
 replace its original terms.
 
-This file records the sources used by v0.1 and is not legal advice. Users and redistributors remain
+This file records the sources used by the project and is not legal advice. Users and redistributors remain
 responsible for checking the current source terms for their intended use.
 
 ## European Central Bank
@@ -77,6 +77,22 @@ Local attribution: People's Bank of China, Money and Banking Statistics, Balance
 Authority, Total Assets. Open Global Liquidity maps monthly labels to calendar month-end timestamps
 and divides 100 million yuan by 10 for local display in CNY billions. No PBoC data is used in OGLI.
 
+## Bank for International Settlements
+
+The public China dashboard and v0.3 aggregate use the BIS Central Bank Total Assets series
+`BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N`. The series is monthly, denominated in CNY billions, and marked
+`BIS-spliced`; BIS metadata says that from January 2002 it uses the monthly PBoC balance sheet.
+The [BIS permitted-use terms](https://data.bis.org/help/legal) state that use of BIS statistics is
+unrestricted when the BIS is cited, presentation is not misleading or suggestive of endorsement,
+and the other stated conditions are observed. The [dataset overview](https://data.bis.org/topics/CBTA)
+documents coverage, units, frequency, and compilation concepts.
+
+Attribution: Bank for International Settlements, Central bank total assets, China, monthly,
+domestic currency, BIS-spliced, series `M.CN.B.XDC.CNY.N`. Open Global Liquidity maps monthly
+periods to calendar month-end timestamps and uses the values as CNY billions. The BIS is not
+affiliated with this project, and the series is not investment advice. The direct PBoC extraction
+remains local-only and is used only as a research validation source.
+
 ## FRED and ALFRED
 
 The pipeline accesses FRED and ALFRED through the Federal Reserve Bank of St. Louis API. The
@@ -101,9 +117,13 @@ marks are not licensed under Apache-2.0.
 | `DGS10` | Board of Governors of the Federal Reserve System, H.15 | Public Domain: Citation Requested | Board of Governors of the Federal Reserve System (US), `DGS10`, retrieved from FRED, Federal Reserve Bank of St. Louis |
 | `DGS2` | Board of Governors of the Federal Reserve System, H.15 | Public Domain: Citation Requested | Board of Governors of the Federal Reserve System (US), `DGS2`, retrieved from FRED, Federal Reserve Bank of St. Louis |
 | `DTWEXBGS` | Board of Governors of the Federal Reserve System, H.10 | Public Domain: Citation Requested | Board of Governors of the Federal Reserve System (US), `DTWEXBGS`, retrieved from FRED, Federal Reserve Bank of St. Louis |
+| `DEXUSEU` | Board of Governors of the Federal Reserve System, H.10 | Public Domain: Citation Requested | Board of Governors of the Federal Reserve System (US), `DEXUSEU`, retrieved from FRED, Federal Reserve Bank of St. Louis |
+| `DEXJPUS` | Board of Governors of the Federal Reserve System, H.10 | Public Domain: Citation Requested | Board of Governors of the Federal Reserve System (US), `DEXJPUS`, retrieved from FRED, Federal Reserve Bank of St. Louis |
+| `DEXUSUK` | Board of Governors of the Federal Reserve System, H.10 | Public Domain: Citation Requested | Board of Governors of the Federal Reserve System (US), `DEXUSUK`, retrieved from FRED, Federal Reserve Bank of St. Louis |
+| `DEXCHUS` | Board of Governors of the Federal Reserve System, H.10 | Public Domain: Citation Requested | Board of Governors of the Federal Reserve System (US), `DEXCHUS`, retrieved from FRED, Federal Reserve Bank of St. Louis |
 | `RRPONTSYD` | Federal Reserve Bank of New York | Copyrighted: Citation Required | Federal Reserve Bank of New York, `RRPONTSYD`, retrieved from FRED, Federal Reserve Bank of St. Louis |
 
-The rights labels above were reviewed on 2026-08-26. Each series page linked from
+The rights labels above were reviewed on 2026-08-30. Each series page linked from
 `config/series.yaml` is the controlling source for current notes and attribution. The repository
 preserves provider, series identifier, retrieval time, unit, and frequency with standardized
 observations.

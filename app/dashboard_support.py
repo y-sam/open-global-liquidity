@@ -305,7 +305,10 @@ COMPONENT_LABELS = {
 ECB_COMPONENT_LABELS = {"eurosystem_total_assets": "Eurosystem total assets"}
 BOJ_COMPONENT_LABELS = {"boj_total_assets": "Bank of Japan total assets"}
 BOE_COMPONENT_LABELS = {"boe_total_assets": "Bank of England total assets"}
-PBOC_COMPONENT_LABELS = {"pboc_total_assets": "PBoC total assets"}
+PBOC_COMPONENT_LABELS = {
+    "pboc_total_assets": "PBoC total assets",
+    "china_central_bank_total_assets": "China central-bank total assets",
+}
 
 _UNIT_TO_BILLIONS = {
     "Millions of U.S. Dollars": 0.001,
@@ -614,21 +617,28 @@ def latest_boe_readings(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_pboc_data(path: Path) -> pd.DataFrame:
-    """Load the separate China measured-data pilot in nominal CNY billions."""
-    frame = _read_parquet(path, "PBoC data")
+    """Load public BIS or private PBoC China total assets in nominal CNY billions."""
+    frame = _read_parquet(path, "China central-bank data")
     missing = sorted(set(SOURCE_COLUMNS) - set(frame.columns))
     if missing:
-        raise DashboardDataError("PBoC data is missing columns: " + ", ".join(missing))
-    expected = {"country": {"CN"}, "provider": {"PBOC"}, "unit": {"100 Million Yuan"}}
-    for column, allowed in expected.items():
-        actual = set(frame[column].dropna())
-        if actual != allowed:
-            raise DashboardDataError(f"PBoC data has unexpected {column} values: {sorted(actual)}")
+        raise DashboardDataError("China data is missing columns: " + ", ".join(missing))
+    actual_country = set(frame["country"].dropna())
+    source_contract = (set(frame["provider"].dropna()), set(frame["unit"].dropna()))
+    allowed_contracts = {
+        (("BIS",), ("Billions of Chinese Yuan",)): 1.0,
+        (("PBOC",), ("100 Million Yuan",)): 0.1,
+    }
+    normalized_contract = tuple(sorted(source_contract[0])), tuple(sorted(source_contract[1]))
+    if actual_country != {"CN"} or normalized_contract not in allowed_contracts:
+        raise DashboardDataError(
+            "China data has an unsupported country/provider/unit contract: "
+            f"{sorted(actual_country)}, {normalized_contract}"
+        )
     result = frame[SOURCE_COLUMNS].copy()
     result["date"] = pd.to_datetime(result["date"], errors="coerce")
     if result["date"].isna().any():
         raise DashboardDataError("PBoC data contains invalid dates")
-    result["value_cny_billions"] = result["value"] * 0.1
+    result["value_cny_billions"] = result["value"] * allowed_contracts[normalized_contract]
     result["label"] = result["component"].map(PBOC_COMPONENT_LABELS).fillna(result["component"])
     return result.sort_values(["component", "date"]).reset_index(drop=True)
 
@@ -654,6 +664,7 @@ def latest_pboc_readings(frame: pd.DataFrame) -> pd.DataFrame:
                 "label": latest["label"],
                 "date": latest["date"],
                 "value_cny_billions": latest["value_cny_billions"],
+                "provider": latest["provider"],
                 "change_cny_billions": (
                     latest["value_cny_billions"] - previous["value_cny_billions"]
                     if previous is not None
@@ -1199,3 +1210,57 @@ def load_bitcoin_contrast_summary(path: Path) -> pd.DataFrame:
     return result.sort_values(
         ["model_id", "sample_policy", "publication_lag_weeks", "horizon_months"]
     ).reset_index(drop=True)
+
+
+def load_global_central_bank_aggregate(path: Path) -> pd.DataFrame:
+    """Load the package-calculated balanced quarterly USD aggregate."""
+    frame = _read_parquet(path, "Global central-bank aggregate")
+    required = {
+        "date",
+        "total_usd_millions",
+        "total_usd_trillions",
+        "component_count",
+        "change_1q",
+        "growth_yoy",
+        "classification",
+        "name",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Global aggregate is missing: " + ", ".join(missing))
+    if set(frame["classification"]) != {"model_assumption"}:
+        raise DashboardDataError("Global aggregate must be classified as a model assumption")
+    result = frame[list(required)].copy()
+    result["date"] = pd.to_datetime(result["date"], errors="coerce")
+    if result.empty or result["date"].isna().any() or (result["total_usd_millions"] <= 0).any():
+        raise DashboardDataError("Global aggregate contains invalid observations")
+    return result.sort_values("date").reset_index(drop=True)
+
+
+def load_global_central_bank_detail(path: Path) -> pd.DataFrame:
+    """Load USD-converted component contributions supporting the aggregate."""
+    frame = _read_parquet(path, "Global central-bank detail")
+    required = {
+        "date",
+        "source_date",
+        "component",
+        "central_bank",
+        "native_value",
+        "native_unit",
+        "fx_component",
+        "fx_date",
+        "fx_rate",
+        "value_usd_millions",
+        "is_balanced",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Global aggregate detail is missing: " + ", ".join(missing))
+    result = frame[list(required)].copy()
+    result["date"] = pd.to_datetime(result["date"], errors="coerce")
+    result["source_date"] = pd.to_datetime(result["source_date"], errors="coerce")
+    result["fx_date"] = pd.to_datetime(result["fx_date"], errors="coerce")
+    result = result.loc[result["is_balanced"]].copy()
+    if result.empty or result[["date", "source_date", "fx_date"]].isna().any().any():
+        raise DashboardDataError("Global aggregate detail contains invalid observations")
+    return result.sort_values(["date", "central_bank"]).reset_index(drop=True)

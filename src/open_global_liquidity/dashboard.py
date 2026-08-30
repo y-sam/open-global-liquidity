@@ -17,7 +17,10 @@ COMPONENT_LABELS = {
 ECB_COMPONENT_LABELS = {"eurosystem_total_assets": "Eurosystem total assets"}
 BOJ_COMPONENT_LABELS = {"boj_total_assets": "Bank of Japan total assets"}
 BOE_COMPONENT_LABELS = {"boe_total_assets": "Bank of England total assets"}
-PBOC_COMPONENT_LABELS = {"pboc_total_assets": "PBoC total assets"}
+PBOC_COMPONENT_LABELS = {
+    "pboc_total_assets": "PBoC total assets",
+    "china_central_bank_total_assets": "China central-bank total assets",
+}
 
 _UNIT_TO_BILLIONS = {
     "Millions of U.S. Dollars": 0.001,
@@ -299,24 +302,31 @@ def latest_boe_readings(frame: pd.DataFrame) -> pd.DataFrame:
 
 
 def load_pboc_data(path: Path) -> pd.DataFrame:
-    """Load the separate China measured-data pilot in nominal CNY billions."""
+    """Load public BIS or private PBoC China total assets in nominal CNY billions."""
     if not path.is_file():
         raise DashboardDataError(
-            f"PBoC data not found at {path}. Run the ingestion pipeline first."
+            f"China data not found at {path}. Run the ingestion pipeline first."
         )
     try:
         frame = pd.read_parquet(path)
     except (OSError, ValueError) as exc:
-        raise DashboardDataError(f"Could not read PBoC data at {path}: {exc}") from exc
+        raise DashboardDataError(f"Could not read China data at {path}: {exc}") from exc
     validate_standardized_frame(frame)
-    expected = {"country": {"CN"}, "provider": {"PBOC"}, "unit": {"100 Million Yuan"}}
-    for column, allowed in expected.items():
-        actual = set(frame[column].dropna())
-        if actual != allowed:
-            raise DashboardDataError(f"PBoC data has unexpected {column} values: {sorted(actual)}")
+    actual_country = set(frame["country"].dropna())
+    source_contract = (set(frame["provider"].dropna()), set(frame["unit"].dropna()))
+    allowed_contracts = {
+        (("BIS",), ("Billions of Chinese Yuan",)): 1.0,
+        (("PBOC",), ("100 Million Yuan",)): 0.1,
+    }
+    normalized_contract = tuple(sorted(source_contract[0])), tuple(sorted(source_contract[1]))
+    if actual_country != {"CN"} or normalized_contract not in allowed_contracts:
+        raise DashboardDataError(
+            "China data has an unsupported country/provider/unit contract: "
+            f"{sorted(actual_country)}, {normalized_contract}"
+        )
     result = frame[STANDARD_COLUMNS].copy()
     result["date"] = pd.to_datetime(result["date"])
-    result["value_cny_billions"] = result["value"] * 0.1
+    result["value_cny_billions"] = result["value"] * allowed_contracts[normalized_contract]
     result["label"] = result["component"].map(PBOC_COMPONENT_LABELS).fillna(result["component"])
     return result.sort_values(["component", "date"]).reset_index(drop=True)
 
@@ -342,6 +352,7 @@ def latest_pboc_readings(frame: pd.DataFrame) -> pd.DataFrame:
                 "label": latest["label"],
                 "date": latest["date"],
                 "value_cny_billions": latest["value_cny_billions"],
+                "provider": latest["provider"],
                 "change_cny_billions": (
                     latest["value_cny_billions"] - previous["value_cny_billions"]
                     if previous is not None

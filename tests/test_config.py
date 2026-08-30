@@ -8,7 +8,7 @@ from open_global_liquidity.config import ConfigurationError, load_model_config, 
 def test_load_walcl_config() -> None:
     definitions = load_series_config(Path("config/series.yaml"))
 
-    assert len(definitions) == 13
+    assert len(definitions) == 18
     by_id = {definition.series_id: definition for definition in definitions}
     assert set(by_id) == {
         "WALCL",
@@ -24,6 +24,11 @@ def test_load_walcl_config() -> None:
         "BS01.MABJMTA",
         "RPQB75A",
         "PBOC.BSMA.TOTAL_ASSETS",
+        "BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N",
+        "DEXUSEU",
+        "DEXJPUS",
+        "DEXUSUK",
+        "DEXCHUS",
     }
     walcl = by_id["WALCL"]
     assert walcl.series_id == "WALCL"
@@ -53,6 +58,12 @@ def test_load_walcl_config() -> None:
     assert pboc.country == "CN"
     assert pboc.provider == "pboc"
     assert pboc.unit == "100 Million Yuan"
+    china = by_id["BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N"]
+    assert china.country == "CN"
+    assert china.provider == "bis"
+    assert china.unit == "Billions of Chinese Yuan"
+    assert by_id["DEXUSEU"].group == "exchange_rates"
+    assert by_id["DEXJPUS"].unit == "Japanese Yen to One U.S. Dollar"
 
 
 def test_config_rejects_missing_fields(tmp_path: Path) -> None:

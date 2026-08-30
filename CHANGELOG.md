@@ -3,6 +3,26 @@
 All notable project changes are documented here. The project follows semantic versioning once a
 release is tagged.
 
+## [Unreleased]
+
+### Added
+
+- Keyless BIS SDMX provider with exact-series, key, frequency, currency, and unit-multiplier
+  validation.
+- Redistributable monthly China central-bank total-assets snapshot from the BIS, while retaining
+  the direct PBoC table as a local-only validation source.
+- Four public-domain Federal Reserve H.10 spot exchange-rate inputs for EUR, JPY, GBP, and CNY.
+- Configured balanced-quarter currency normalization and a five-central-bank USD aggregate with
+  source-date and FX-date lineage.
+- Global aggregate dashboard page with level, growth, composition, and an auditable methodology
+  table.
+
+### Research boundary
+
+- The v0.3 aggregate is a current-vintage nominal central-bank-balance-sheet proxy. It is not OGLI,
+  does not model publication lags, and contains no private-credit, shadow-bank, collateral, repo,
+  or offshore-dollar components.
+
 ## [0.2.0] — 2026-08-29
 
 ### Added

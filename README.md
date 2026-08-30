@@ -1,7 +1,7 @@
 # Open Global Liquidity
 
-**Current release:** v0.2.0. It adds international measured-data pilots while deliberately stopping
-short of a global aggregate. See the [changelog](CHANGELOG.md),
+**Current release:** v0.2.0. **Current development milestone:** v0.3 currency normalization and
+global central-bank aggregation. See the [changelog](CHANGELOG.md),
 [citation metadata](CITATION.cff), and [release checklist](RELEASE_CHECKLIST.md). Project code is
 licensed under Apache-2.0; bundled and downloaded third-party data remain subject to their
 respective terms.
@@ -20,7 +20,7 @@ Original project code is licensed under the [Apache License 2.0](LICENSE). This 
 not relicense third-party observations, derived snapshots, source metadata, names, or trademarks.
 See [Third-party data terms](THIRD_PARTY_DATA.md) before redistributing bundled data artifacts.
 
-## Current scope: v0.2 US OGLI plus international measured-data pilots
+## Current scope: v0.3 development
 
 The repository provides an auditable US data-ingestion path, experimental OGLI momentum index, and
 Streamlit dashboard. It
@@ -86,16 +86,23 @@ balance sheet is published with a five-quarter lag. It remains a separate nomina
 series and is not converted, aligned with other countries, aggregated, or used in OGLI. The
 endpoint is public and requires no account or API key.
 
-The v0.2d pilot adds the monthly `Total Assets` row from the PBoC's official Balance Sheet of
-Monetary Authority. `PBOC.BSMA.TOTAL_ASSETS` is this project's stable identifier for the verified
-table row, not an official PBoC series code. The provider discovers annual tables from the official
-archive and requires no account or API key. Values remain in 100 million yuan. Because the PBoC
-website's legal notice reserves reuse rights, China observations are generated locally but are not
-committed as a public dashboard snapshot pending explicit permission.
+The public China series is now the BIS monthly Central Bank Total Assets series
+`BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N`. It is economically aligned with the intended concept and has
+explicit permitted-use terms subject to attribution and non-misleading presentation. The direct
+PBoC `Total Assets` extraction remains available locally as a private validation source and is not
+redistributed.
 
 The **Central banks** dashboard page compares cumulative changes by rebasing each available
 native-currency series independently to 100. This is a display transformation—not currency
 conversion or aggregation—and it does not create a global OGLI.
+
+The v0.3 **Global aggregate** page adds a separate model-assumption layer. It converts Federal
+Reserve, Eurosystem, Bank of Japan, Bank of England, and BIS China central-bank total assets to USD
+at the latest H.10 spot rate on or before each quarter end, subject to explicit staleness limits,
+and retains only complete five-bank quarters. It never interpolates. Because the Bank of England
+input is quarterly and published with a long lag, the balanced aggregate is deliberately quarterly
+and ends at the least-current component. FX translation means changes reflect both native balance
+sheets and exchange rates. This measured-data aggregate is not the US OGLI or a global OGLI.
 
 ## Research boundaries
 
@@ -175,6 +182,11 @@ is invalid, or no observations are returned. A successful run writes:
 - `data/processed/japan_boj_series.parquet`: separate monthly BOJ total assets in nominal JPY;
 - `data/processed/uk_boe_series.parquet`: separate quarterly BoE total assets in nominal GBP;
 - `data/processed/china_pboc_series.parquet`: separate monthly PBoC total assets in nominal CNY;
+- `data/processed/china_bis_series.parquet`: public monthly BIS-spliced China total assets in CNY;
+- `data/processed/global_fx_series.parquet`: four daily H.10 FX inputs with source metadata;
+- `data/processed/global_central_bank_assets_detail.parquet`: quarter-level native values, source
+  dates, FX observations, conversion rates, and USD contributions;
+- `data/processed/global_central_bank_assets.parquet`: balanced five-bank quarterly USD aggregate;
 - `data/processed/us_liquidity_weekly.parquet`: USD-million Wednesday inputs with source-date and
   staleness lineage;
 - `data/processed/us_liquidity_models.parquet`: the three weekly model levels and formulas.
@@ -370,6 +382,7 @@ directory, and verifies that the public snapshots still render the landing-page 
 
 - `config/series.yaml` — measured-series definitions and source metadata.
 - `config/model.yaml` — classified weekly-alignment and model assumptions.
+- `config/global_aggregation.yaml` — v0.3 currency, frequency, staleness, and coverage assumptions.
 - `src/open_global_liquidity/config.py` — validated configuration loading.
 - `src/open_global_liquidity/data/fred.py` — FRED network, error handling, cache, and standardization.
 - `src/open_global_liquidity/data/coinmetrics.py` — no-key Coin Metrics community ingestion and
@@ -382,9 +395,13 @@ directory, and verifies that the public snapshots still render the landing-page 
   and quarterly cache.
 - `src/open_global_liquidity/data/pboc.py` — keyless PBoC archive discovery, bilingual table and
   unit validation, monthly Total Assets extraction, and local cache.
+- `src/open_global_liquidity/data/bis.py` — keyless BIS SDMX ingestion with exact-key and unit
+  validation for the redistributable China series.
 - `src/open_global_liquidity/transforms/` — unit conversion, alignment, growth, and z-scores.
 - `src/open_global_liquidity/models/us_liquidity.py` — configurable Model A/B/C calculations.
 - `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
+- `src/open_global_liquidity/models/global_central_bank.py` — balanced-quarter FX conversion,
+  source/FX lineage, and transparent central-bank asset summation.
 - `src/open_global_liquidity/analysis/lead_lag.py` — market returns and signal/outcome alignment.
 - `src/open_global_liquidity/analysis/correlations.py` — full-sample and rolling correlations.
 - `src/open_global_liquidity/analysis/bootstrap.py` — deterministic moving-block correlation
@@ -505,8 +522,8 @@ outcome/context variables rather than OGLI inputs. Treasury yields and the 10-ye
 slope remain measured context. S&P 500 may return after appropriate public-display rights are
 secured. v0.2 completes the first global-central-bank measured-data layer with separate Federal
 Reserve, ECB, BOJ, BoE, and local-only PBoC total-assets series plus a non-aggregated indexed
-comparison. v0.3 may add explicit FX normalization and global aggregation only after currency,
-frequency, accounting, publication-lag, and weighting assumptions are configured and tested. Later
+comparison. v0.3 now adds explicit FX normalization and a balanced quarterly central-bank asset
+aggregate; point-in-time publication-lag treatment and a global momentum index remain unfinished. Later
 increments may add collateral and repo proxies, shadow monetary base concepts, BIS cross-border
 credit, and explicitly labeled public benchmark calibration.
 

@@ -20,6 +20,7 @@ def test_release_metadata_separates_code_and_data_licenses() -> None:
 
     assert metadata["project"]["license"] == "Apache-2.0"
     assert metadata["project"]["version"] == __version__
+    assert __version__ == "0.3.0.dev0"
     assert PROJECT_ROOT.joinpath("LICENSE").is_file()
     data_terms = PROJECT_ROOT.joinpath("THIRD_PARTY_DATA.md").read_text(encoding="utf-8")
     assert "does not grant rights in third-party observations" in data_terms

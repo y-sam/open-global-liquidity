@@ -1,0 +1,48 @@
+classification: model_assumption
+name: Open global central-bank assets
+description: >-
+  Experimental v0.3 sum of selected central-bank total assets after conversion to U.S. dollars.
+  This is an Open Global Liquidity model assumption, not Michael Howell or CrossBorder Capital's
+  proprietary global-liquidity aggregate. It measures central-bank balance-sheet size only.
+base_currency: USD
+canonical_frequency: quarter_end
+start: "2013-09-30"
+alignment_policy: latest_observation_on_or_before_quarter_end
+missing_policy: balanced_panel_only
+components:
+  fed_assets:
+    central_bank: Federal Reserve
+    native_unit: Millions of U.S. Dollars
+    native_millions_multiplier: 1.0
+    max_staleness_days: 10
+    fx_component: null
+    fx_quote: usd_per_native
+  eurosystem_total_assets:
+    central_bank: Eurosystem
+    native_unit: Millions of Euro
+    native_millions_multiplier: 1.0
+    max_staleness_days: 35
+    fx_component: usd_per_euro
+    fx_quote: usd_per_native
+  boj_total_assets:
+    central_bank: Bank of Japan
+    native_unit: 100 Million Yen
+    native_millions_multiplier: 100.0
+    max_staleness_days: 35
+    fx_component: yen_per_usd
+    fx_quote: native_per_usd
+  boe_total_assets:
+    central_bank: Bank of England
+    native_unit: Millions of Sterling
+    native_millions_multiplier: 1.0
+    max_staleness_days: 10
+    fx_component: usd_per_sterling
+    fx_quote: usd_per_native
+  china_central_bank_total_assets:
+    central_bank: China
+    native_unit: Billions of Chinese Yuan
+    native_millions_multiplier: 1000.0
+    max_staleness_days: 35
+    fx_component: yuan_per_usd
+    fx_quote: native_per_usd
+fx_max_staleness_days: 10

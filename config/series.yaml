@@ -151,6 +151,69 @@ US:
       source: "Board of Governors of the Federal Reserve System (US), H.10"
       source_url: "https://fred.stlouisfed.org/series/DTWEXBGS"
 
+FX:
+  exchange_rates:
+    usd_per_euro:
+      classification: measured_data
+      provider: fred
+      series_id: DEXUSEU
+      component: usd_per_euro
+      title: "U.S. Dollars to Euro Spot Exchange Rate"
+      description: >-
+        Daily noon buying rate in U.S. dollars per euro. Used only to translate euro-denominated
+        central-bank assets into the v0.3 USD aggregate; no interpolation is applied.
+      unit: "U.S. Dollars to One Euro"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "1999-01-04"
+      source: "Board of Governors of the Federal Reserve System (US), H.10"
+      source_url: "https://fred.stlouisfed.org/series/DEXUSEU"
+    yen_per_usd:
+      classification: measured_data
+      provider: fred
+      series_id: DEXJPUS
+      component: yen_per_usd
+      title: "Japanese Yen to U.S. Dollar Spot Exchange Rate"
+      description: >-
+        Daily noon buying rate in yen per U.S. dollar. It is inverted arithmetically when
+        translating yen-denominated central-bank assets into U.S. dollars.
+      unit: "Japanese Yen to One U.S. Dollar"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "1971-01-04"
+      source: "Board of Governors of the Federal Reserve System (US), H.10"
+      source_url: "https://fred.stlouisfed.org/series/DEXJPUS"
+    usd_per_sterling:
+      classification: measured_data
+      provider: fred
+      series_id: DEXUSUK
+      component: usd_per_sterling
+      title: "U.S. Dollars to U.K. Pound Sterling Spot Exchange Rate"
+      description: >-
+        Daily noon buying rate in U.S. dollars per pound sterling. Used only for transparent
+        currency translation in the v0.3 aggregate.
+      unit: "U.S. Dollars to One U.K. Pound Sterling"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "1971-01-04"
+      source: "Board of Governors of the Federal Reserve System (US), H.10"
+      source_url: "https://fred.stlouisfed.org/series/DEXUSUK"
+    yuan_per_usd:
+      classification: measured_data
+      provider: fred
+      series_id: DEXCHUS
+      component: yuan_per_usd
+      title: "Chinese Yuan Renminbi to U.S. Dollar Spot Exchange Rate"
+      description: >-
+        Daily noon buying rate in renminbi per U.S. dollar. It is inverted arithmetically when
+        translating China central-bank assets into U.S. dollars.
+      unit: "Chinese Yuan Renminbi to One U.S. Dollar"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "1981-01-02"
+      source: "Board of Governors of the Federal Reserve System (US), H.10"
+      source_url: "https://fred.stlouisfed.org/series/DEXCHUS"
+
 EA:
   liquidity:
     eurosystem_total_assets:
@@ -212,6 +275,25 @@ GB:
 
 CN:
   liquidity:
+    china_central_bank_total_assets:
+      classification: measured_data
+      provider: bis
+      series_id: BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N
+      component: china_central_bank_total_assets
+      title: "China - Central bank, assets, total, BIS-spliced"
+      description: >-
+        Monthly China central-bank total assets from the BIS central-bank-total-assets dataset.
+        From January 2002 the BIS compilation uses the monthly PBoC balance sheet. The BIS-spliced
+        label identifies a compilation methodology and the series must not be presented as a
+        verbatim PBoC table. BIS statistics have explicit permitted-use terms subject to source
+        citation and non-misleading presentation, so this is the public China series.
+      unit: "Billions of Chinese Yuan"
+      frequency: "Monthly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2002-01-31"
+      source: "Bank for International Settlements, Central bank total assets"
+      source_url: "https://data.bis.org/topics/CBTA/BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N"
+
     pboc_total_assets:
       classification: measured_data
       provider: pboc
@@ -221,8 +303,8 @@ CN:
       description: >-
         Monthly total assets from the People's Bank of China's official Balance Sheet of
         Monetary Authority. PBOC.BSMA.TOTAL_ASSETS is a project identifier for the verified table
-        row, not an official PBoC series code. This is a separate measured-data pilot in native
-        renminbi: it is not converted, combined with other countries, or used in OGLI.
+        row, not an official PBoC series code. It is retained as a local/private validation source
+        and is not redistributed in the hosted dashboard or public data snapshots.
       unit: "100 Million Yuan"
       frequency: "Monthly, End of Period"
       seasonal_adjustment: "Not Seasonally Adjusted"

@@ -1,6 +1,6 @@
 [project]
 name = "open-global-liquidity"
-version = "0.2.0"
+version = "0.3.0.dev0"
 description = "Transparent public-data research infrastructure for the Open Global Liquidity Index."
 readme = "README.md"
 license = "Apache-2.0"

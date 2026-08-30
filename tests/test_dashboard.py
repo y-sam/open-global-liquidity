@@ -49,6 +49,30 @@ def test_load_pboc_data_and_latest_changes(tmp_path: Path) -> None:
     assert latest["growth_yoy"] == pytest.approx(0.122)
 
 
+def test_load_bis_china_data_is_already_in_cny_billions(tmp_path: Path) -> None:
+    path = tmp_path / "china_bis.parquet"
+    pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2025-01-31", "2025-02-28"]),
+            "country": ["CN", "CN"],
+            "provider": ["BIS", "BIS"],
+            "series_id": ["BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N"] * 2,
+            "component": ["china_central_bank_total_assets"] * 2,
+            "value": [46_657.47, 47_020.53],
+            "unit": ["Billions of Chinese Yuan"] * 2,
+            "frequency": ["Monthly, End of Period"] * 2,
+            "retrieved_at": [pd.Timestamp("2025-03-01", tz=UTC)] * 2,
+        }
+    ).to_parquet(path, index=False)
+
+    result = load_pboc_data(path)
+    latest = latest_pboc_readings(result).iloc[0]
+
+    assert result["value_cny_billions"].tolist() == [46_657.47, 47_020.53]
+    assert latest["provider"] == "BIS"
+    assert latest["change_cny_billions"] == pytest.approx(363.06)
+
+
 def test_central_bank_comparison_rebases_each_native_series_independently() -> None:
     comparison = build_central_bank_index_comparison(
         {
@@ -499,6 +523,33 @@ def test_loads_published_bitcoin_research_snapshots() -> None:
     primary_contrasts = contrasts.loc[contrasts["specification_role"] == "primary"]
     assert set(primary_contrasts["model_id"]) == {"model_b"}
     assert set(primary_contrasts["horizon_months"]) == {1, 3, 6, 12}
+
+
+def test_loads_published_global_aggregate_snapshots() -> None:
+    support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
+    spec = importlib.util.spec_from_file_location("dashboard_support_global_test", support_path)
+    assert spec is not None and spec.loader is not None
+    support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(support)
+    snapshots = Path(__file__).resolve().parents[1] / "data" / "reference"
+
+    aggregate = support.load_global_central_bank_aggregate(
+        snapshots / "global_central_bank_assets_snapshot.parquet"
+    )
+    detail = support.load_global_central_bank_detail(
+        snapshots / "global_central_bank_assets_detail_snapshot.parquet"
+    )
+
+    assert aggregate["component_count"].eq(5).all()
+    assert aggregate["classification"].eq("model_assumption").all()
+    assert detail.groupby("date")["central_bank"].nunique().eq(5).all()
+    assert set(detail["fx_component"]) == {
+        "USD",
+        "usd_per_euro",
+        "yen_per_usd",
+        "usd_per_sterling",
+        "yuan_per_usd",
+    }
 
 
 def test_bitcoin_snapshot_loader_rejects_impossible_path_statistic(tmp_path: Path) -> None:

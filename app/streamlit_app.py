@@ -37,6 +37,8 @@ from dashboard_support import (  # noqa: E402
     load_boj_data,
     load_dashboard_data,
     load_ecb_data,
+    load_global_central_bank_aggregate,
+    load_global_central_bank_detail,
     load_liquidity_model_data,
     load_macro_context,
     load_market_comparisons,
@@ -63,6 +65,16 @@ BOE_DATA_PATH = DATA_ROOT / "processed" / "uk_boe_series.parquet"
 BOE_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "uk_boe_series_snapshot.parquet"
 PBOC_DATA_PATH = DATA_ROOT / "processed" / "china_pboc_series.parquet"
 PBOC_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "china_pboc_series_snapshot.parquet"
+BIS_CHINA_DATA_PATH = DATA_ROOT / "processed" / "china_bis_series.parquet"
+BIS_CHINA_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "china_bis_series_snapshot.parquet"
+GLOBAL_AGGREGATE_DATA_PATH = DATA_ROOT / "processed" / "global_central_bank_assets.parquet"
+GLOBAL_AGGREGATE_SNAPSHOT_DATA_PATH = (
+    DATA_ROOT / "reference" / "global_central_bank_assets_snapshot.parquet"
+)
+GLOBAL_DETAIL_DATA_PATH = DATA_ROOT / "processed" / "global_central_bank_assets_detail.parquet"
+GLOBAL_DETAIL_SNAPSHOT_DATA_PATH = (
+    DATA_ROOT / "reference" / "global_central_bank_assets_detail_snapshot.parquet"
+)
 MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
 MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
 OGLI_DATA_PATH = DATA_ROOT / "processed" / "us_ogli.parquet"
@@ -194,6 +206,20 @@ def _load_pboc(path: str, modified_ns: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def _load_global_aggregate(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache the package-calculated quarterly aggregate."""
+    del modified_ns
+    return load_global_central_bank_aggregate(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_global_detail(path: str, modified_ns: int) -> pd.DataFrame:
+    """Cache the package-calculated aggregate contributions."""
+    del modified_ns
+    return load_global_central_bank_detail(Path(path))
+
+
+@st.cache_data(show_spinner=False)
 def _load_models(path: str, modified_ns: int) -> pd.DataFrame:
     """Cache model data until its file modification timestamp changes."""
     del modified_ns
@@ -318,9 +344,32 @@ def _boe_data() -> tuple[pd.DataFrame, Path, str]:
     return _load_boe(str(path), path.stat().st_mtime_ns), path, origin
 
 
-def _pboc_data() -> tuple[pd.DataFrame, Path, str]:
-    path, origin = resolve_dashboard_data_path(PBOC_DATA_PATH, PBOC_SNAPSHOT_DATA_PATH)
+def _china_data() -> tuple[pd.DataFrame, Path, str]:
+    """Prefer redistributable BIS China data; retain the direct PBoC table locally."""
+    try:
+        path, origin = resolve_dashboard_data_path(
+            BIS_CHINA_DATA_PATH, BIS_CHINA_SNAPSHOT_DATA_PATH
+        )
+    except DashboardDataError:
+        path, origin = resolve_dashboard_data_path(PBOC_DATA_PATH, PBOC_SNAPSHOT_DATA_PATH)
+        origin = f"{origin} · private PBoC validation source"
     return _load_pboc(str(path), path.stat().st_mtime_ns), path, origin
+
+
+def _global_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    aggregate_path, origin = resolve_dashboard_data_path(
+        GLOBAL_AGGREGATE_DATA_PATH, GLOBAL_AGGREGATE_SNAPSHOT_DATA_PATH
+    )
+    detail_path, detail_origin = resolve_dashboard_data_path(
+        GLOBAL_DETAIL_DATA_PATH, GLOBAL_DETAIL_SNAPSHOT_DATA_PATH
+    )
+    if detail_origin != origin:
+        raise DashboardDataError("Global aggregate and detail use different data modes")
+    return (
+        _load_global_aggregate(str(aggregate_path), aggregate_path.stat().st_mtime_ns),
+        _load_global_detail(str(detail_path), detail_path.stat().st_mtime_ns),
+        origin,
+    )
 
 
 def _model_data() -> tuple[pd.DataFrame, str] | None:
@@ -791,7 +840,7 @@ def _load_or_explain() -> tuple[pd.DataFrame, Path, str] | None:
 
 
 def landing_page() -> None:
-    st.badge("Independent public-data research · v0.2", icon=":material/science:")
+    st.badge("Independent public-data research · v0.3 development", icon=":material/science:")
     st.title("See the financial system through a liquidity lens")
     st.markdown(
         """
@@ -2986,39 +3035,34 @@ def united_kingdom_page() -> None:
 
 
 def china_page() -> None:
-    """Present official PBoC total assets locally without unauthorized redistribution."""
+    """Present the redistributable BIS China central-bank total-assets series."""
     st.title("China measured data")
     st.caption(
-        "v0.2d expansion pilot · official monthly PBoC monetary-authority total assets in native "
-        "renminbi · no FX conversion, China liquidity model, or global aggregation"
+        "v0.3 source transition · monthly BIS-spliced China central-bank total assets in native "
+        "renminbi · direct PBoC observations remain a local validation source"
     )
     try:
-        data, _path, origin = _pboc_data()
+        data, _path, origin = _china_data()
     except DashboardDataError:
         st.info(
-            "The PBoC provider is available, but its observations are not bundled with the public "
-            "dashboard because the PBoC website reserves reuse rights. Generate the table locally "
-            "for research with the command below.",
+            "China central-bank observations have not yet been generated in this environment. "
+            "Run the pipeline to fetch the public BIS series and the local PBoC validation table.",
             icon=":material/license:",
         )
         st.code(
             "uv run python -m open_global_liquidity.pipeline --force-refresh",
             language="zsh",
         )
-        st.markdown(
-            "The official PBoC archive is public and requires **no account or API key**. The local "
-            "provider discovers annual tables, verifies the bilingual title and unit, and extracts "
-            "only the `Total Assets` row."
-        )
+        st.markdown("The BIS API and official PBoC archive require **no account or API key**.")
         with st.container(horizontal=True):
             st.link_button(
-                "Review PBoC statistics",
-                "https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html",
+                "Review BIS series",
+                "https://data.bis.org/topics/CBTA/BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N",
                 icon=":material/open_in_new:",
             )
             st.link_button(
-                "Review PBoC legal notice",
-                "https://www.pbc.gov.cn/rmyh/109345/index.html",
+                "Review BIS permitted use",
+                "https://data.bis.org/help/legal",
                 icon=":material/open_in_new:",
             )
         return
@@ -3030,7 +3074,7 @@ def china_page() -> None:
     retrieved_at = pd.to_datetime(latest["retrieved_at"], utc=True)
     with st.container(horizontal=True):
         st.metric(
-            "PBoC total assets",
+            "China central-bank assets",
             f"¥{level / 1_000:,.1f}tn",
             (
                 None
@@ -3066,8 +3110,8 @@ def china_page() -> None:
     )
     st.info(
         "Monthly dates are calendar month-end period labels, not modeled publication timestamps. "
-        "PBoC rules state that monthly financial statistics are normally released within 20 days "
-        "after month end. Values remain nominal CNY stocks and are not inputs to the US OGLI.",
+        "The BIS series is a BIS-spliced compilation and, from January 2002, uses the monthly PBoC "
+        "balance sheet. Values remain nominal CNY stocks and are not inputs to the US OGLI.",
         icon=":material/info:",
     )
     st.subheader("Recent observations")
@@ -3080,7 +3124,7 @@ def china_page() -> None:
             columns={
                 "date": "Period end",
                 "value_cny_billions": "CNY billions",
-                "series_id": "Project table identifier",
+                "series_id": "BIS series key or private project identifier",
             }
         ),
         column_config={"CNY billions": st.column_config.NumberColumn(format="localized")},
@@ -3088,14 +3132,20 @@ def china_page() -> None:
         hide_index=True,
     )
     st.caption(
-        f"Retrieved {retrieved_at:%Y-%m-%d %H:%M UTC} · Provider: People's Bank of China · "
-        "Balance Sheet of Monetary Authority · Total Assets · 100 million yuan"
+        f"Retrieved {retrieved_at:%Y-%m-%d %H:%M UTC} · Provider: {latest['provider']} · "
+        "China central-bank total assets · nominal CNY billions"
     )
-    st.link_button(
-        "Review official PBoC archive",
-        "https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html",
-        icon=":material/open_in_new:",
-    )
+    with st.container(horizontal=True):
+        st.link_button(
+            "Review BIS series",
+            "https://data.bis.org/topics/CBTA/BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N",
+            icon=":material/open_in_new:",
+        )
+        st.link_button(
+            "BIS permitted-use terms",
+            "https://data.bis.org/help/legal",
+            icon=":material/license:",
+        )
 
 
 def central_banks_page() -> None:
@@ -3138,7 +3188,7 @@ def central_banks_page() -> None:
         ("Eurosystem", _ecb_data, "value_eur_billions", "EUR billions", "Monthly"),
         ("Bank of Japan", _boj_data, "value_jpy_billions", "JPY billions", "Monthly"),
         ("Bank of England", _boe_data, "value_gbp_billions", "GBP billions", "Quarterly"),
-        ("PBoC", _pboc_data, "value_cny_billions", "CNY billions", "Monthly"),
+        ("China", _china_data, "value_cny_billions", "CNY billions", "Monthly"),
     ]
     unavailable: list[str] = []
     for label, loader, value_column, unit, frequency in loaders:
@@ -3195,14 +3245,146 @@ def central_banks_page() -> None:
     )
     if unavailable:
         st.info(
-            "Unavailable in this environment: " + ", ".join(unavailable) + ". PBoC data is "
-            "intentionally local-only pending redistribution permission.",
+            "Unavailable in this environment: " + ", ".join(unavailable) + ".",
             icon=":material/license:",
         )
     st.subheader("Source coverage")
     coverage = pd.DataFrame(metadata)
     coverage["Latest period"] = pd.to_datetime(coverage["Latest period"]).dt.strftime("%Y-%m-%d")
     st.dataframe(coverage, width="stretch", hide_index=True)
+
+
+def global_aggregate_page() -> None:
+    """Present the v0.3 balanced quarterly USD central-bank asset aggregate."""
+    st.title("Global central-bank aggregate")
+    st.caption(
+        "v0.3 research pilot · Federal Reserve, Eurosystem, Bank of Japan, Bank of England, and "
+        "China · native balance sheets translated at quarter-end spot FX rates"
+    )
+    try:
+        aggregate, detail, origin = _global_data()
+    except DashboardDataError:
+        st.info(
+            "The v0.3 aggregate has not been generated in this environment. Run the pipeline to "
+            "download the four public H.10 exchange rates and build the balanced panel.",
+            icon=":material/currency_exchange:",
+        )
+        st.code("uv run python -m open_global_liquidity.pipeline", language="zsh")
+        return
+
+    latest = aggregate.iloc[-1]
+    latest_date = pd.Timestamp(latest["date"])
+    latest_detail = detail.loc[detail["date"] == latest_date].copy()
+    latest_detail["share"] = (
+        latest_detail["value_usd_millions"] / latest_detail["value_usd_millions"].sum()
+    )
+    with st.container(horizontal=True):
+        st.metric(
+            "Combined assets",
+            f"${float(latest['total_usd_trillions']):,.1f}tn",
+            (
+                "Unavailable"
+                if pd.isna(latest["change_1q"])
+                else f"{float(latest['change_1q']):+.1%} quarter over quarter"
+            ),
+            border=True,
+        )
+        st.metric(
+            "12-month change",
+            "Unavailable"
+            if pd.isna(latest["growth_yoy"])
+            else f"{float(latest['growth_yoy']):+.1%}",
+            border=True,
+        )
+        st.metric("Latest balanced quarter", f"{latest_date:%b %Y}", border=True)
+        st.metric(
+            "Coverage", f"{int(latest['component_count'])} central banks", origin, border=True
+        )
+
+    figure = px.line(
+        aggregate,
+        x="date",
+        y="total_usd_trillions",
+        title="Selected central-bank total assets translated into U.S. dollars",
+        labels={"date": "Quarter end", "total_usd_trillions": "USD trillions"},
+    )
+    figure.update_traces(line={"width": 2.7, "color": "#2563EB"})
+    figure.update_layout(
+        hovermode="x unified",
+        margin={"l": 10, "r": 10, "t": 55, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(figure, width="stretch", config={"displaylogo": False})
+
+    st.subheader(f"Composition at {latest_date:%b %Y}")
+    contribution_chart = px.bar(
+        latest_detail.sort_values("value_usd_millions", ascending=False),
+        x="central_bank",
+        y="value_usd_millions",
+        text="share",
+        labels={"central_bank": "Central bank", "value_usd_millions": "USD millions"},
+    )
+    contribution_chart.update_traces(
+        marker_color="#D97706",
+        texttemplate="%{text:.1%}",
+        hovertemplate="%{x}<br>$%{y:,.0f}m<extra></extra>",
+    )
+    contribution_chart.update_layout(
+        margin={"l": 10, "r": 10, "t": 15, "b": 10},
+        plot_bgcolor="rgba(0,0,0,0)",
+    )
+    st.plotly_chart(contribution_chart, width="stretch", config={"displaylogo": False})
+
+    st.warning(
+        "This is a current-vintage nominal USD balance-sheet aggregate, not OGLI. Changes reflect "
+        "both native balance-sheet movements and exchange-rate translation. The balanced panel is "
+        "quarterly and stops at the least-current component—currently the lagged Bank of England "
+        "series. Publication lags and historical revisions are not yet modeled.",
+        icon=":material/warning:",
+    )
+    with st.expander("Method and audit trail"):
+        st.markdown(
+            """
+            - **Measured data:** five central-bank total-asset series and four Federal Reserve H.10
+              spot exchange rates.
+            - **Model assumptions:** quarter-end frequency, latest-prior observations within
+              configured staleness limits, period-end FX translation, and a complete five-bank
+              balanced panel.
+            - **Calibrated parameters:** none.
+            - Direct USD quotes multiply native-currency millions; inverse quotes divide them.
+              Missing values are never interpolated.
+            """
+        )
+        audit = latest_detail.assign(
+            source_date=lambda frame: frame["source_date"].dt.strftime("%Y-%m-%d"),
+            fx_date=lambda frame: frame["fx_date"].dt.strftime("%Y-%m-%d"),
+            value_usd_billions=lambda frame: frame["value_usd_millions"] / 1_000,
+        )
+        st.dataframe(
+            audit[
+                [
+                    "central_bank",
+                    "source_date",
+                    "native_unit",
+                    "fx_component",
+                    "fx_date",
+                    "fx_rate",
+                    "value_usd_billions",
+                ]
+            ].rename(
+                columns={
+                    "central_bank": "Central bank",
+                    "source_date": "Source observation",
+                    "native_unit": "Native unit",
+                    "fx_component": "FX input",
+                    "fx_date": "FX observation",
+                    "fx_rate": "FX rate",
+                    "value_usd_billions": "USD billions",
+                }
+            ),
+            width="stretch",
+            hide_index=True,
+        )
 
 
 def research_guide_page() -> None:
@@ -3468,15 +3650,18 @@ def research_guide_page() -> None:
           — series `RPQB75A`, quarterly native-sterling stock published with a five-quarter lag;
           not an OGLI input or global aggregate
 
-        **China v0.2d measured-data pilot**
+        **China and v0.3 aggregation**
 
+        - [BIS China central-bank total assets](https://data.bis.org/topics/CBTA/BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N)
+          — public monthly BIS-spliced CNY series used by the hosted dashboard
+        - [BIS permitted-use terms](https://data.bis.org/help/legal)
         - [PBoC Money and Banking Statistics archive](https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html)
-          — monthly monetary-authority Total Assets in 100 million yuan; generated locally and not
-          bundled publicly pending explicit redistribution permission
-        - [PBoC website legal notice](https://www.pbc.gov.cn/rmyh/109345/index.html)
+          — direct local validation source only; observations are not redistributed
 
-        The Central banks page independently rebases available native-currency series to 100. It
-        does not perform FX conversion or create a global aggregate.
+        The **Central banks** page still rebases each native-currency series independently to 100.
+        The separate **Global aggregate** page converts five total-asset stocks with four public
+        H.10 exchange rates and sums only balanced quarters. That aggregation is a declared model
+        assumption, not OGLI, and historical publication lags are not yet reconstructed.
 
         **Primary documentation and broader context**
 
@@ -3539,6 +3724,12 @@ central_bank_data_page = st.Page(
     icon=":material/public:",
     url_path="central-banks",
 )
+global_aggregate_data_page = st.Page(
+    global_aggregate_page,
+    title="Global aggregate",
+    icon=":material/currency_exchange:",
+    url_path="global-aggregate",
+)
 markets_index_page = st.Page(
     markets_page,
     title="Liquidity vs markets",
@@ -3578,6 +3769,7 @@ navigation = st.navigation(
         markets_index_page,
         data_page,
         central_bank_data_page,
+        global_aggregate_data_page,
         euro_area_data_page,
         japan_data_page,
         uk_data_page,
@@ -3595,6 +3787,11 @@ st.caption(
     "(https://fred.stlouisfed.org/docs/api/terms_of_use.html) · Original project code: "
     "[Apache-2.0](https://github.com/y-sam/open-global-liquidity/blob/main/LICENSE) · "
     "Third-party data retain their own terms."
+)
+st.caption(
+    "China central-bank statistics: Bank for International Settlements, Central bank total "
+    "assets. BIS statistics are used under its permitted-use terms; the BIS does not endorse or "
+    "provide investment advice through this project."
 )
 st.caption(
     "This service uses the Bank of Japan Time-Series Data Search API. The Bank of Japan does not "
