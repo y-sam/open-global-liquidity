@@ -363,12 +363,14 @@ uv run streamlit run app/streamlit_app.py
 ```
 
 Streamlit opens the dashboard at `http://localhost:8501`. The app shows latest measured balances,
-the three model levels, an OGLI page, a point-in-time pilot, a dedicated Bitcoin research page with
+the three US model levels, a liquidity-indices page defaulting to Global Model G, a point-in-time
+pilot, a dedicated Bitcoin research page with
 cross-horizon comparison, a
 Liquidity vs markets workspace, a log-scale Bitcoin/OGLI timeline, Bitcoin-focused landing metrics,
 history, a component explorer, recent source
 observations, and methodology notes. Top navigation separates a
-plain-language landing page, the OGLI index, market validation, the data dashboard, and a research
+plain-language landing page, global and US liquidity indices, market validation, the data
+dashboard, and a research
 guide with definitions, assumptions, limitations, and primary-source links. All
 model calculations come from the package and pipeline, not Streamlit.
 

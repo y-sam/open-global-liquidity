@@ -620,7 +620,7 @@ def _ogli_figure(frame: pd.DataFrame, title: str):
         frame,
         x="date",
         y="ogli",
-        labels={"date": "", "ogli": "OGLI (0-100)"},
+        labels={"date": "", "ogli": "Liquidity momentum index (0-100)"},
         title=title,
     )
     figure.update_traces(line={"width": 2.5, "color": "#2563EB"})
@@ -1385,39 +1385,92 @@ def data_dashboard_page() -> None:
 
 
 def ogli_page() -> None:
-    st.title("OGLI momentum index")
+    st.title("Open liquidity momentum indices")
     st.caption(
-        "Experimental 0-100 normalization of US liquidity momentum. Independent Open Global "
-        "Liquidity methodology—not CrossBorder Capital's proprietary GLI."
+        "Global Model G plus three US/Fed research definitions. Every index is an independent "
+        "Open Global Liquidity methodology—not CrossBorder Capital's proprietary GLI."
     )
+    global_data = pd.DataFrame()
+    global_origin = "Unavailable"
     try:
-        data, data_origin = _ogli_data()
-        latest_by_model = latest_ogli_readings(data)
-    except DashboardDataError as exc:
-        st.error(str(exc), icon=":material/error:")
+        global_aggregate, _global_detail, global_origin = _global_data()
+        global_data = global_aggregate.dropna(subset=["global_cb_index"]).rename(
+            columns={
+                "global_cb_index": "index_value",
+                "global_cb_momentum_score": "momentum_score",
+                "global_cb_regime": "regime",
+                "monthly_annualized_growth": "short_growth",
+                "global_cb_zscore_mode": "zscore_mode",
+                "global_cb_zscore_min_periods": "zscore_min_periods",
+            }
+        )
+    except DashboardDataError:
+        pass
+
+    us_data = pd.DataFrame()
+    us_origin = "Unavailable"
+    try:
+        us_data, us_origin = _ogli_data()
+        latest_by_model = latest_ogli_readings(us_data)
+    except DashboardDataError:
+        latest_by_model = pd.DataFrame()
+    if global_data.empty and us_data.empty:
+        st.error("Neither the global nor US liquidity-index dataset is available.")
         st.code(
-            "uv run python -m open_global_liquidity.pipeline --start 2020-01-01",
+            "uv run python -m open_global_liquidity.pipeline",
             language="zsh",
         )
         return
 
-    model_options = dict(
-        latest_by_model[["model_name", "model_id"]].itertuples(index=False, name=None)
-    )
+    model_options: dict[str, str] = {}
+    if not global_data.empty:
+        model_options["Global Model G — five central banks"] = "global_model_g"
+    if not latest_by_model.empty:
+        model_options.update(
+            {
+                f"US · {name}": model_id
+                for name, model_id in latest_by_model[["model_name", "model_id"]].itertuples(
+                    index=False, name=None
+                )
+            }
+        )
     with st.sidebar:
-        st.header("OGLI controls")
+        st.header("Index controls")
         selected_name = st.selectbox(
             "Liquidity definition",
             list(model_options),
-            index=list(model_options).index("Model B — Net Fed liquidity proxy"),
+            index=0,
         )
         history = st.segmented_control(
-            "History", ["1 year", "3 years", "All"], default="3 years", key="ogli_history"
+            "History",
+            ["1 year", "3 years", "5 years", "All"],
+            default="5 years",
+            key="ogli_history",
         )
-        st.caption(f"Data mode: {data_origin}")
 
     model_id = model_options[selected_name]
-    model_data = data.loc[(data["model_id"] == model_id) & data["ogli"].notna()].copy()
+    is_global = model_id == "global_model_g"
+    if is_global:
+        model_data = global_data.copy()
+        data_origin = global_origin
+        model_data["model_name"] = "Global Model G — central-bank assets momentum"
+        frequency_label = "Monthly"
+        short_growth_label = "1m annualized growth"
+        index_label = "Global Model G"
+    else:
+        model_data = us_data.loc[(us_data["model_id"] == model_id) & us_data["ogli"].notna()].copy()
+        model_data = model_data.rename(
+            columns={"ogli": "index_value", "growth_3m_annualized": "short_growth"}
+        )
+        data_origin = us_origin
+        frequency_label = "Weekly"
+        short_growth_label = "3m annualized growth"
+        index_label = "US OGLI"
+    with st.sidebar:
+        st.caption(f"Scope: {'Global central banks' if is_global else 'United States / Fed'}")
+        st.caption(f"Frequency: {frequency_label}")
+        st.caption(f"Data mode: {data_origin}")
+
     latest = model_data.iloc[-1]
     if history == "All":
         visible = model_data
@@ -1429,24 +1482,27 @@ def ogli_page() -> None:
 
     with st.container(horizontal=True):
         st.metric(
-            "Latest OGLI",
-            f"{latest['ogli']:.1f}",
+            index_label,
+            f"{latest['index_value']:.1f}",
             border=True,
-            chart_data=model_data["ogli"].tail(26).tolist(),
+            chart_data=model_data["index_value"].tail(26).tolist(),
         )
         st.metric("Liquidity regime", str(latest["regime"]), border=True)
         st.metric(
             "Momentum score", f"{latest['momentum_score']:+.2f} standard deviations", border=True
         )
         st.metric(
-            "3m annualized growth",
-            f"{latest['growth_3m_annualized']:.1%}",
+            short_growth_label,
+            f"{latest['short_growth']:.1%}",
             border=True,
         )
         st.metric("12m YoY growth", f"{latest['growth_12m_yoy']:.1%}", border=True)
 
     st.plotly_chart(
-        _ogli_figure(visible, f"{selected_name} · OGLI history"),
+        _ogli_figure(
+            visible.rename(columns={"index_value": "ogli"}),
+            f"{selected_name} · normalized momentum history",
+        ),
         width="stretch",
         config={"displaylogo": False},
     )
@@ -1456,13 +1512,13 @@ def ogli_page() -> None:
     )
 
     with st.container(border=True):
-        st.subheader("How to read OGLI")
+        st.subheader("How to read the selected index")
         st.markdown(
             """
-            OGLI measures how unusual current liquidity momentum is relative to historical
-            observations. It uses z-score normalization and the standard normal cumulative
-            distribution function. It is not normalized against the historical maximum, so new
-            liquidity highs do not mechanically rescale the entire historical index.
+            The index measures how unusual current liquidity momentum is relative to its own
+            historical observations. It uses z-score normalization and the standard normal
+            cumulative distribution function. It is not normalized against the historical
+            maximum, so new liquidity highs do not mechanically rescale the historical index.
 
             **Around 50 is statistically neutral.** Higher readings indicate momentum above its
             historical norm; lower readings indicate momentum below its historical norm. This is
@@ -1471,9 +1527,11 @@ def ogli_page() -> None:
         )
 
     with st.expander("Formula, weights, and regimes"):
+        short_formula = "1m annualized growth" if is_global else "3m annualized growth"
+        output_name = "Global Model G" if is_global else "US OGLI"
         st.code(
-            "Momentum = 0.60 * z(3m annualized growth) + 0.40 * z(12m YoY growth)\n"
-            "OGLI = 100 * Phi(Momentum)",
+            f"Momentum = 0.60 * z({short_formula}) + 0.40 * z(12m YoY growth)\n"
+            f"{output_name} = 100 * Phi(Momentum)",
             language=None,
         )
         st.write(
@@ -1481,6 +1539,20 @@ def ogli_page() -> None:
             "research assumptions. They are not calibrated parameters and are not Howell or "
             "CrossBorder Capital parameters."
         )
+        if is_global:
+            st.info(
+                "Global Model G aggregates Federal Reserve, Eurosystem, Bank of Japan, Bank of "
+                "England, and China central-bank total assets after USD conversion. It is global "
+                "central-bank liquidity, not yet a complete global OGLI covering private credit, "
+                "repo, collateral, offshore dollars, or shadow banking.",
+                icon=":material/public:",
+            )
+        else:
+            st.info(
+                "Models A/B/C use only US Federal Reserve-related inputs. They remain available as "
+                "domestic diagnostics and are not presented as global models.",
+                icon=":material/account_balance:",
+            )
         st.dataframe(
             pd.DataFrame(
                 {
@@ -4054,7 +4126,7 @@ bitcoin_page = st.Page(
 )
 ogli_index_page = st.Page(
     ogli_page,
-    title="OGLI index",
+    title="Liquidity indices",
     icon=":material/speed:",
     url_path="ogli",
 )
