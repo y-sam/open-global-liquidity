@@ -1213,19 +1213,19 @@ def load_bitcoin_contrast_summary(path: Path) -> pd.DataFrame:
 
 
 def load_global_central_bank_aggregate(path: Path) -> pd.DataFrame:
-    """Load the package-calculated balanced quarterly USD aggregate."""
+    """Load the package-calculated balanced monthly USD aggregate."""
     frame = _read_parquet(path, "Global central-bank aggregate")
     required = {
         "date",
         "total_usd_millions",
         "total_usd_trillions",
         "component_count",
-        "change_1q",
+        "change_1m",
         "growth_yoy",
         "classification",
         "name",
-        "quarterly_annualized_growth",
-        "z_quarterly_annualized_growth",
+        "monthly_annualized_growth",
+        "z_monthly_annualized_growth",
         "z_growth_yoy",
         "global_cb_momentum_score",
         "global_cb_index",
@@ -1260,9 +1260,15 @@ def load_global_central_bank_detail(path: Path) -> pd.DataFrame:
         "source_date",
         "component",
         "central_bank",
+        "source_provider",
+        "source_series_id",
+        "source_retrieved_at",
         "native_value",
         "native_unit",
         "fx_component",
+        "fx_provider",
+        "fx_series_id",
+        "fx_retrieved_at",
         "fx_date",
         "fx_rate",
         "value_usd_millions",
@@ -1279,3 +1285,78 @@ def load_global_central_bank_detail(path: Path) -> pd.DataFrame:
     if result.empty or result[["date", "source_date", "fx_date"]].isna().any().any():
         raise DashboardDataError("Global aggregate detail contains invalid observations")
     return result.sort_values(["date", "central_bank"]).reset_index(drop=True)
+
+
+def load_global_bitcoin_pairs(path: Path) -> pd.DataFrame:
+    """Load current-vintage Global Model G and subsequent Bitcoin outcome pairs."""
+    frame = _read_parquet(path, "Global Model G Bitcoin pairs")
+    required = {
+        "signal_date",
+        "signal_available_date",
+        "model_id",
+        "global_cb_index",
+        "global_cb_momentum_score",
+        "global_cb_regime",
+        "market_id",
+        "availability_lag_months",
+        "horizon_months",
+        "market_return",
+        "is_non_overlapping",
+        "timing_classification",
+        "classification",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Global Bitcoin pairs are missing: " + ", ".join(missing))
+    result = frame[list(required)].copy()
+    result["signal_date"] = pd.to_datetime(result["signal_date"], errors="coerce")
+    result["signal_available_date"] = pd.to_datetime(
+        result["signal_available_date"], errors="coerce"
+    )
+    if (
+        result.empty
+        or result[["signal_date", "signal_available_date"]].isna().any().any()
+        or set(result["model_id"]) != {"global_model_g"}
+        or set(result["market_id"]) != {"bitcoin"}
+        or set(result["timing_classification"]) != {"model_assumption"}
+        or set(result["classification"]) != {"statistical_transformation"}
+    ):
+        raise DashboardDataError("Global Bitcoin pairs contain invalid metadata")
+    return result.sort_values(
+        ["availability_lag_months", "horizon_months", "signal_date"]
+    ).reset_index(drop=True)
+
+
+def load_global_bitcoin_summary(path: Path) -> pd.DataFrame:
+    """Load descriptive Global Model G versus Bitcoin summary statistics."""
+    frame = _read_parquet(path, "Global Model G Bitcoin summary")
+    required = {
+        "model_id",
+        "market_id",
+        "availability_lag_months",
+        "horizon_months",
+        "sample_policy",
+        "observations",
+        "correlation",
+        "mean_return",
+        "median_return",
+        "positive_share",
+        "classification",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Global Bitcoin summary is missing: " + ", ".join(missing))
+    result = frame[list(required)].copy()
+    if (
+        result.empty
+        or set(result["model_id"]) != {"global_model_g"}
+        or set(result["market_id"]) != {"bitcoin"}
+        or not set(result["sample_policy"]).issubset({"overlapping", "non_overlapping"})
+        or set(result["classification"]) != {"descriptive_statistic"}
+        or result["observations"].le(0).any()
+        or not result["positive_share"].between(0, 1).all()
+    ):
+        raise DashboardDataError("Global Bitcoin summary contains invalid statistics")
+    return result.sort_values(
+        ["sample_policy", "availability_lag_months", "horizon_months"]
+    ).reset_index(drop=True)

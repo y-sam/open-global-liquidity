@@ -1,41 +1,42 @@
 classification: model_assumption
 name: Open global central-bank assets
 description: >-
-  Experimental v0.3 sum of selected central-bank total assets after conversion to U.S. dollars.
+  Experimental v0.3 sum of five harmonized BIS-spliced monthly central-bank total-assets series
+  after conversion to U.S. dollars.
   This is an Open Global Liquidity model assumption, not Michael Howell or CrossBorder Capital's
   proprietary global-liquidity aggregate. It measures central-bank balance-sheet size only.
 base_currency: USD
-canonical_frequency: quarter_end
-start: "2013-09-30"
-alignment_policy: latest_observation_on_or_before_quarter_end
+canonical_frequency: month_end
+start: "2002-01-31"
+alignment_policy: latest_observation_on_or_before_month_end
 missing_policy: balanced_panel_only
 components:
-  fed_assets:
+  us_central_bank_total_assets:
     central_bank: Federal Reserve
-    native_unit: Millions of U.S. Dollars
-    native_millions_multiplier: 1.0
-    max_staleness_days: 10
+    native_unit: Billions of U.S. Dollars
+    native_millions_multiplier: 1000.0
+    max_staleness_days: 35
     fx_component: null
     fx_quote: usd_per_native
-  eurosystem_total_assets:
+  euro_area_central_bank_total_assets:
     central_bank: Eurosystem
-    native_unit: Millions of Euro
-    native_millions_multiplier: 1.0
+    native_unit: Billions of Euro
+    native_millions_multiplier: 1000.0
     max_staleness_days: 35
     fx_component: usd_per_euro
     fx_quote: usd_per_native
-  boj_total_assets:
+  japan_central_bank_total_assets:
     central_bank: Bank of Japan
-    native_unit: 100 Million Yen
-    native_millions_multiplier: 100.0
+    native_unit: Billions of Japanese Yen
+    native_millions_multiplier: 1000.0
     max_staleness_days: 35
     fx_component: yen_per_usd
     fx_quote: native_per_usd
-  boe_total_assets:
+  uk_central_bank_total_assets:
     central_bank: Bank of England
-    native_unit: Millions of Sterling
-    native_millions_multiplier: 1.0
-    max_staleness_days: 10
+    native_unit: Billions of Sterling
+    native_millions_multiplier: 1000.0
+    max_staleness_days: 35
     fx_component: usd_per_sterling
     fx_quote: usd_per_native
   china_central_bank_total_assets:
@@ -54,9 +55,9 @@ index:
     central-bank balance-sheet index, not a complete global-liquidity measure and not the official
     CrossBorder Capital GLI.
   normalization: expanding
-  min_periods: 20
+  min_periods: 60
   momentum_weights:
-    quarterly_annualized_growth: 0.60
+    monthly_annualized_growth: 0.60
     growth_yoy: 0.40
   regimes:
     - {label: "Strong contraction", max: 10}
@@ -66,3 +67,14 @@ index:
     - {label: "Above normal", max: 70}
     - {label: "Expansion", max: 90}
     - {label: "Strong expansion", max: 100}
+market_analysis:
+  classification: model_assumption
+  description: >-
+    Current-vintage descriptive comparison of Global Model G momentum with subsequent Bitcoin
+    returns. Availability delays are sensitivity assumptions because historical BIS release
+    timestamps are not reconstructed. Bitcoin outcomes never enter Model G.
+  availability_lag_months: [0, 1, 2, 3]
+  forward_horizons_months: [1, 3, 6, 12]
+  primary_availability_lag_months: 2
+  overlapping_min_periods: 24
+  non_overlapping_min_periods: 8

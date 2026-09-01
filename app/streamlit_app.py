@@ -37,6 +37,8 @@ from dashboard_support import (  # noqa: E402
     load_boj_data,
     load_dashboard_data,
     load_ecb_data,
+    load_global_bitcoin_pairs,
+    load_global_bitcoin_summary,
     load_global_central_bank_aggregate,
     load_global_central_bank_detail,
     load_liquidity_model_data,
@@ -74,6 +76,16 @@ GLOBAL_AGGREGATE_SNAPSHOT_DATA_PATH = (
 GLOBAL_DETAIL_DATA_PATH = DATA_ROOT / "processed" / "global_central_bank_assets_detail.parquet"
 GLOBAL_DETAIL_SNAPSHOT_DATA_PATH = (
     DATA_ROOT / "reference" / "global_central_bank_assets_detail_snapshot.parquet"
+)
+GLOBAL_BITCOIN_PAIRS_PATH = DATA_ROOT / "processed" / "global_central_bank_bitcoin_pairs.parquet"
+GLOBAL_BITCOIN_PAIRS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "global_central_bank_bitcoin_pairs_snapshot.parquet"
+)
+GLOBAL_BITCOIN_SUMMARY_PATH = (
+    DATA_ROOT / "processed" / "global_central_bank_bitcoin_summary.parquet"
+)
+GLOBAL_BITCOIN_SUMMARY_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "global_central_bank_bitcoin_summary_snapshot.parquet"
 )
 MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
 MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
@@ -220,7 +232,7 @@ def _load_pboc(path: str, modified_ns: int) -> pd.DataFrame:
 
 @st.cache_data(show_spinner=False)
 def _load_global_aggregate(path: str, modified_ns: int) -> pd.DataFrame:
-    """Cache the package-calculated quarterly aggregate."""
+    """Cache the package-calculated monthly aggregate."""
     del modified_ns
     return load_global_central_bank_aggregate(Path(path))
 
@@ -230,6 +242,18 @@ def _load_global_detail(path: str, modified_ns: int) -> pd.DataFrame:
     """Cache the package-calculated aggregate contributions."""
     del modified_ns
     return load_global_central_bank_detail(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_global_bitcoin_pairs(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_global_bitcoin_pairs(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_global_bitcoin_summary(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_global_bitcoin_summary(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -381,6 +405,22 @@ def _global_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
     return (
         _load_global_aggregate(str(aggregate_path), aggregate_path.stat().st_mtime_ns),
         _load_global_detail(str(detail_path), detail_path.stat().st_mtime_ns),
+        origin,
+    )
+
+
+def _global_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    pairs_path, origin = resolve_dashboard_data_path(
+        GLOBAL_BITCOIN_PAIRS_PATH, GLOBAL_BITCOIN_PAIRS_SNAPSHOT_PATH
+    )
+    summary_path, summary_origin = resolve_dashboard_data_path(
+        GLOBAL_BITCOIN_SUMMARY_PATH, GLOBAL_BITCOIN_SUMMARY_SNAPSHOT_PATH
+    )
+    if summary_origin != origin:
+        raise DashboardDataError("Global Bitcoin pairs and summary use different data modes")
+    return (
+        _load_global_bitcoin_pairs(str(pairs_path), pairs_path.stat().st_mtime_ns),
+        _load_global_bitcoin_summary(str(summary_path), summary_path.stat().st_mtime_ns),
         origin,
     )
 
@@ -898,9 +938,9 @@ def landing_page() -> None:
                     border=True,
                 )
             st.metric(
-                "Latest balanced quarter",
+                "Latest balanced month",
                 f"{pd.Timestamp(global_latest['date']):%b %Y}",
-                "Limited by the slowest source",
+                "Harmonized monthly BIS panel",
                 border=True,
             )
             st.metric(
@@ -3358,18 +3398,18 @@ def central_banks_page() -> None:
 
 
 def global_aggregate_page() -> None:
-    """Present the v0.3 balanced quarterly USD central-bank asset aggregate."""
+    """Present the v0.3 balanced monthly USD central-bank asset aggregate."""
     st.title("Global central-bank aggregate")
     st.caption(
-        "v0.3 research pilot · Federal Reserve, Eurosystem, Bank of Japan, Bank of England, and "
-        "China · native balance sheets translated at quarter-end spot FX rates"
+        "v0.3 monthly research panel · BIS-spliced United States, euro area, Japan, United "
+        "Kingdom, and China total assets · translated at month-end spot FX rates"
     )
     try:
         aggregate, detail, origin = _global_data()
     except DashboardDataError:
         st.info(
             "The v0.3 aggregate has not been generated in this environment. Run the pipeline to "
-            "download the four public H.10 exchange rates and build the balanced panel.",
+            "download the BIS central-bank series and four public H.10 exchange rates.",
             icon=":material/currency_exchange:",
         )
         st.code("uv run python -m open_global_liquidity.pipeline", language="zsh")
@@ -3389,8 +3429,8 @@ def global_aggregate_page() -> None:
             f"${float(latest['total_usd_trillions']):,.1f}tn",
             (
                 "Unavailable"
-                if pd.isna(latest["change_1q"])
-                else f"{float(latest['change_1q']):+.1%} quarter over quarter"
+                if pd.isna(latest["change_1m"])
+                else f"{float(latest['change_1m']):+.1%} month over month"
             ),
             border=True,
         )
@@ -3401,7 +3441,7 @@ def global_aggregate_page() -> None:
             else f"{float(latest['growth_yoy']):+.1%}",
             border=True,
         )
-        st.metric("Latest balanced quarter", f"{latest_date:%b %Y}", border=True)
+        st.metric("Latest balanced month", f"{latest_date:%b %Y}", border=True)
         st.metric(
             "Coverage", f"{int(latest['component_count'])} central banks", origin, border=True
         )
@@ -3409,7 +3449,7 @@ def global_aggregate_page() -> None:
     st.subheader("Global Model G — central-bank assets momentum")
     if latest_index is None:
         st.info(
-            "The expanding normalization does not yet have the configured 20 quarterly growth "
+            "The expanding normalization does not yet have the configured 60 monthly growth "
             "observations.",
             icon=":material/history:",
         )
@@ -3428,9 +3468,9 @@ def global_aggregate_page() -> None:
                 border=True,
             )
             st.metric(
-                "Latest indexed quarter",
+                "Latest indexed month",
                 f"{pd.Timestamp(latest_index['date']):%b %Y}",
-                "Five-bank balanced panel",
+                "Five-bank monthly panel",
                 border=True,
             )
         index_figure = px.line(
@@ -3438,24 +3478,138 @@ def global_aggregate_page() -> None:
             x="date",
             y="global_cb_index",
             title="Global central-bank balance-sheet momentum · non-look-ahead normalization",
-            labels={"date": "Quarter end", "global_cb_index": "0-100 index"},
+            labels={"date": "Month end", "global_cb_index": "0-100 index"},
         )
         index_figure.add_hline(y=50, line_dash="dot", line_color="gray")
         index_figure.update_yaxes(range=[0, 100])
         index_figure.update_traces(line={"width": 2.7, "color": "#7C3AED"})
         st.plotly_chart(index_figure, width="stretch", config={"displaylogo": False})
         st.caption(
-            "60% expanding z-score of one-quarter annualized growth + 40% expanding z-score of "
-            "four-quarter growth, mapped through the standard normal CDF. Around 50 is neutral "
-            "relative to information available through that quarter. Weights are assumptions."
+            "60% expanding z-score of one-month annualized growth + 40% expanding z-score of "
+            "12-month growth, mapped through the standard normal CDF. Around 50 is neutral "
+            "relative to information available through that month. Weights are assumptions."
         )
+
+    st.subheader("Global Model G vs subsequent Bitcoin returns")
+    try:
+        global_pairs, global_summary, global_market_origin = _global_bitcoin_data()
+    except DashboardDataError:
+        global_pairs = pd.DataFrame()
+        global_summary = pd.DataFrame()
+        global_market_origin = "Unavailable"
+    if global_summary.empty:
+        st.info(
+            "The monthly Global Model G and Bitcoin comparison has not been generated in this "
+            "environment.",
+            icon=":material/currency_bitcoin:",
+        )
+    else:
+        with st.container(horizontal=True):
+            selected_global_lag = st.selectbox(
+                "Assumed availability delay",
+                sorted(global_summary["availability_lag_months"].unique()),
+                index=2,
+                format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
+                key="global_bitcoin_lag",
+            )
+            selected_global_sample = st.segmented_control(
+                "Sample",
+                ["Non-overlapping", "Overlapping"],
+                default="Non-overlapping",
+                key="global_bitcoin_sample",
+            )
+            selected_global_horizon = st.selectbox(
+                "Forward horizon",
+                sorted(global_summary["horizon_months"].unique()),
+                index=1,
+                format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
+                key="global_bitcoin_horizon",
+            )
+        sample_key = (
+            "non_overlapping" if selected_global_sample == "Non-overlapping" else "overlapping"
+        )
+        visible_summary = global_summary.loc[
+            (global_summary["availability_lag_months"] == selected_global_lag)
+            & (global_summary["sample_policy"] == sample_key)
+        ].copy()
+        selected_result = visible_summary.loc[
+            visible_summary["horizon_months"] == selected_global_horizon
+        ].iloc[0]
+        with st.container(horizontal=True):
+            st.metric(
+                "Pearson correlation",
+                (
+                    "Insufficient sample"
+                    if pd.isna(selected_result["correlation"])
+                    else f"{float(selected_result['correlation']):+.2f}"
+                ),
+                border=True,
+            )
+            st.metric(
+                "Paired observations", f"{int(selected_result['observations']):,}", border=True
+            )
+            st.metric(
+                "Median Bitcoin return",
+                f"{float(selected_result['median_return']):.1%}",
+                border=True,
+            )
+            st.metric(
+                "Positive outcomes",
+                f"{float(selected_result['positive_share']):.0%}",
+                border=True,
+            )
+        correlation_chart = px.bar(
+            visible_summary,
+            x="horizon_months",
+            y="correlation",
+            text="correlation",
+            title="Model G momentum correlation with subsequent Bitcoin returns",
+            labels={"horizon_months": "Forward horizon (months)", "correlation": "Correlation"},
+        )
+        correlation_chart.update_traces(
+            marker_color="#D97706",
+            texttemplate="%{text:+.2f}",
+            textposition="outside",
+        )
+        correlation_chart.add_hline(y=0, line_color="gray", line_width=1)
+        correlation_chart.update_yaxes(range=[-1, 1])
+        correlation_chart.update_xaxes(dtick=1)
+        st.plotly_chart(correlation_chart, width="stretch", config={"displaylogo": False})
+
+        selected_pairs = global_pairs.loc[
+            (global_pairs["availability_lag_months"] == selected_global_lag)
+            & (global_pairs["horizon_months"] == selected_global_horizon)
+        ].copy()
+        if sample_key == "non_overlapping":
+            selected_pairs = selected_pairs.loc[selected_pairs["is_non_overlapping"]]
+        scatter = px.scatter(
+            selected_pairs,
+            x="global_cb_momentum_score",
+            y="market_return",
+            hover_data={"signal_date": "|%Y-%m-%d", "global_cb_regime": True},
+            title="Monthly global central-bank momentum and later Bitcoin return",
+            labels={
+                "global_cb_momentum_score": "Global Model G momentum score",
+                "market_return": "Subsequent Bitcoin return",
+            },
+        )
+        scatter.update_yaxes(tickformat=".0%")
+        st.plotly_chart(scatter, width="stretch", config={"displaylogo": False})
+        st.warning(
+            "This is a current-vintage descriptive comparison. The selected availability delay "
+            "is an assumption because historical BIS release timestamps are not reconstructed. "
+            "Correlation does not establish causation or an investable signal, and Bitcoin "
+            "outcomes are never inputs to Model G.",
+            icon=":material/warning:",
+        )
+        st.caption(f"Data mode: {global_market_origin} · Bitcoin: Coin Metrics Community Data")
 
     figure = px.line(
         aggregate,
         x="date",
         y="total_usd_trillions",
         title="Selected central-bank total assets translated into U.S. dollars",
-        labels={"date": "Quarter end", "total_usd_trillions": "USD trillions"},
+        labels={"date": "Month end", "total_usd_trillions": "USD trillions"},
     )
     figure.update_traces(line={"width": 2.7, "color": "#2563EB"})
     figure.update_layout(
@@ -3487,17 +3641,17 @@ def global_aggregate_page() -> None:
     st.warning(
         "Model G is a global central-bank balance-sheet model, not a complete global OGLI. "
         "Changes reflect "
-        "both native balance-sheet movements and exchange-rate translation. The balanced panel is "
-        "quarterly and stops at the least-current component—currently the lagged Bank of England "
-        "series. Publication lags and historical revisions are not yet modeled.",
+        "both native balance-sheet movements and exchange-rate translation. The balanced panel "
+        "uses harmonized monthly BIS-spliced series through their latest common period. "
+        "Publication lags and historical revisions are not yet modeled.",
         icon=":material/warning:",
     )
     with st.expander("Method and audit trail"):
         st.markdown(
             """
-            - **Measured data:** five central-bank total-asset series and four Federal Reserve H.10
-              spot exchange rates.
-            - **Model assumptions:** quarter-end frequency, latest-prior observations within
+            - **Measured data:** five BIS central-bank total-asset series and four Federal Reserve
+              H.10 spot exchange rates.
+            - **Model assumptions:** month-end frequency, latest-prior observations within
               configured staleness limits, period-end FX translation, and a complete five-bank
               balanced panel.
             - **Calibrated parameters:** none.
@@ -3514,9 +3668,11 @@ def global_aggregate_page() -> None:
             audit[
                 [
                     "central_bank",
+                    "source_series_id",
                     "source_date",
                     "native_unit",
                     "fx_component",
+                    "fx_series_id",
                     "fx_date",
                     "fx_rate",
                     "value_usd_billions",
@@ -3524,9 +3680,11 @@ def global_aggregate_page() -> None:
             ].rename(
                 columns={
                     "central_bank": "Central bank",
+                    "source_series_id": "BIS series",
                     "source_date": "Source observation",
                     "native_unit": "Native unit",
                     "fx_component": "FX input",
+                    "fx_series_id": "H.10 series",
                     "fx_date": "FX observation",
                     "fx_rate": "FX rate",
                     "value_usd_billions": "USD billions",
@@ -3810,7 +3968,7 @@ def research_guide_page() -> None:
 
         The **Central banks** page still rebases each native-currency series independently to 100.
         The separate **Global aggregate** page converts five total-asset stocks with four public
-        H.10 exchange rates and sums only balanced quarters. It also reports Global Model G, an
+        H.10 exchange rates and sums only balanced months. It also reports Global Model G, an
         expanding-normalized central-bank momentum index. The aggregation and momentum weights are
         declared assumptions; it is not a complete global OGLI, and historical publication lags
         are not yet reconstructed.
@@ -3941,9 +4099,10 @@ st.caption(
     "Third-party data retain their own terms."
 )
 st.caption(
-    "China central-bank statistics: Bank for International Settlements, Central bank total "
-    "assets. BIS statistics are used under its permitted-use terms; the BIS does not endorse or "
-    "provide investment advice through this project."
+    "Global Model G central-bank statistics: Bank for International Settlements, Central bank "
+    "total assets, United States, euro area, Japan, United Kingdom, and China. BIS statistics are "
+    "used under its permitted-use terms; the BIS does not endorse or provide investment advice "
+    "through this project."
 )
 st.caption(
     "This service uses the Bank of Japan Time-Series Data Search API. The Bank of Japan does not "

@@ -1,5 +1,22 @@
 US:
   liquidity:
+    us_central_bank_total_assets:
+      classification: measured_data
+      provider: bis
+      series_id: BIS,WS_CBTA,1.0/M.US.B.XDC.USD.N
+      component: us_central_bank_total_assets
+      title: "United States - Central bank, assets, total, BIS-spliced"
+      description: >-
+        Monthly BIS-spliced US central-bank total assets in domestic currency. This harmonized
+        series is used only in Global Model G; WALCL remains the direct Federal Reserve source for
+        the higher-frequency US models.
+      unit: "Billions of U.S. Dollars"
+      frequency: "Monthly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2002-01-31"
+      source: "Bank for International Settlements, Central bank total assets"
+      source_url: "https://data.bis.org/topics/CBTA/BIS,WS_CBTA,1.0/M.US.B.XDC.USD.N"
+
     fed_assets:
       classification: measured_data
       provider: fred
@@ -216,6 +233,22 @@ FX:
 
 EA:
   liquidity:
+    euro_area_central_bank_total_assets:
+      classification: measured_data
+      provider: bis
+      series_id: BIS,WS_CBTA,1.0/M.XM.B.XDC.EUR.N
+      component: euro_area_central_bank_total_assets
+      title: "Euro area - Central bank, assets, total, BIS-spliced"
+      description: >-
+        Monthly BIS-spliced euro-area central-bank total assets in domestic currency, used only in
+        the harmonized Global Model G panel. The direct ECB series remains a validation source.
+      unit: "Billions of Euro"
+      frequency: "Monthly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2002-01-31"
+      source: "Bank for International Settlements, Central bank total assets"
+      source_url: "https://data.bis.org/topics/CBTA/BIS,WS_CBTA,1.0/M.XM.B.XDC.EUR.N"
+
     eurosystem_total_assets:
       classification: measured_data
       provider: ecb
@@ -235,6 +268,22 @@ EA:
 
 JP:
   liquidity:
+    japan_central_bank_total_assets:
+      classification: measured_data
+      provider: bis
+      series_id: BIS,WS_CBTA,1.0/M.JP.B.XDC.JPY.N
+      component: japan_central_bank_total_assets
+      title: "Japan - Central bank, assets, total, BIS-spliced"
+      description: >-
+        Monthly BIS-spliced Japanese central-bank total assets in domestic currency, used only in
+        the harmonized Global Model G panel. The direct BOJ series remains a validation source.
+      unit: "Billions of Japanese Yen"
+      frequency: "Monthly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2002-01-31"
+      source: "Bank for International Settlements, Central bank total assets"
+      source_url: "https://data.bis.org/topics/CBTA/BIS,WS_CBTA,1.0/M.JP.B.XDC.JPY.N"
+
     boj_total_assets:
       classification: measured_data
       provider: boj
@@ -254,6 +303,22 @@ JP:
 
 GB:
   liquidity:
+    uk_central_bank_total_assets:
+      classification: measured_data
+      provider: bis
+      series_id: BIS,WS_CBTA,1.0/M.GB.B.XDC.GBP.N
+      component: uk_central_bank_total_assets
+      title: "United Kingdom - Central bank, assets, total, BIS-spliced"
+      description: >-
+        Monthly BIS-spliced UK central-bank total assets in domestic currency, used only in the
+        harmonized Global Model G panel. The lagged direct BoE series remains a validation source.
+      unit: "Billions of Sterling"
+      frequency: "Monthly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2002-01-31"
+      source: "Bank for International Settlements, Central bank total assets"
+      source_url: "https://data.bis.org/topics/CBTA/BIS,WS_CBTA,1.0/M.GB.B.XDC.GBP.N"
+
     boe_total_assets:
       classification: measured_data
       provider: boe

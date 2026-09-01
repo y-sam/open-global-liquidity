@@ -20,6 +20,11 @@ from open_global_liquidity.analysis.diagnostics import (
     calculate_regime_return_statistics,
     select_non_overlapping_returns,
 )
+from open_global_liquidity.analysis.global_markets import (
+    GlobalMarketAnalysisError,
+    build_global_bitcoin_pairs,
+    summarize_global_bitcoin_pairs,
+)
 from open_global_liquidity.analysis.lead_lag import (
     MarketAnalysisError,
     build_liquidity_market_comparison,
@@ -222,9 +227,12 @@ def run_pipeline(
             ],
             ignore_index=True,
         ).sort_values(["country", "series_id", "date"])
-        bis_path = output_dir / "china_bis_series.parquet"
+        bis_path = output_dir / "global_bis_central_bank_series.parquet"
         bis_output.to_parquet(bis_path, index=False)
         LOGGER.info("Wrote %d standardized BIS observations to %s", len(bis_output), bis_path)
+        china_bis_output = bis_output.loc[bis_output["country"] == "CN"].copy()
+        china_bis_path = output_dir / "china_bis_series.parquet"
+        china_bis_output.to_parquet(china_bis_path, index=False)
 
     fx_output: pd.DataFrame | None = None
     if fx_definitions:
@@ -246,15 +254,12 @@ def run_pipeline(
 
     global_detail: pd.DataFrame | None = None
     global_aggregate: pd.DataFrame | None = None
+    global_config = None
     global_config_path = project_root / "config" / "global_aggregation.yaml"
-    global_sources = [output.loc[output["component"] == "fed_assets"]]
-    global_sources.extend(
-        frame for frame in (ecb_output, boj_output, boe_output, bis_output) if frame is not None
-    )
-    if global_config_path.is_file() and fx_output is not None:
+    if global_config_path.is_file() and fx_output is not None and bis_output is not None:
         global_config = load_global_aggregation_config(global_config_path)
         global_detail, global_aggregate = calculate_global_central_bank_assets(
-            pd.concat(global_sources, ignore_index=True),
+            bis_output,
             fx_output,
             global_config,
         )
@@ -263,7 +268,7 @@ def run_pipeline(
         global_detail.to_parquet(global_detail_path, index=False)
         global_aggregate.to_parquet(global_aggregate_path, index=False)
         LOGGER.info(
-            "Wrote %d balanced global aggregate quarters to %s",
+            "Wrote %d balanced global aggregate months to %s",
             len(global_aggregate),
             global_aggregate_path,
         )
@@ -317,6 +322,32 @@ def run_pipeline(
     LOGGER.info(
         "Wrote %d standardized market observations to %s", len(market_source), market_source_path
     )
+
+    global_bitcoin_pairs: pd.DataFrame | None = None
+    global_bitcoin_summary: pd.DataFrame | None = None
+    if global_aggregate is not None and global_config is not None:
+        global_bitcoin_pairs = build_global_bitcoin_pairs(
+            global_aggregate,
+            market_source,
+            availability_lag_months=(global_config.market_analysis.availability_lag_months),
+            forward_horizons_months=(global_config.market_analysis.forward_horizons_months),
+        )
+        global_bitcoin_summary = summarize_global_bitcoin_pairs(
+            global_bitcoin_pairs,
+            overlapping_min_periods=(global_config.market_analysis.overlapping_min_periods),
+            non_overlapping_min_periods=(global_config.market_analysis.non_overlapping_min_periods),
+        )
+        global_bitcoin_pairs.to_parquet(
+            output_dir / "global_central_bank_bitcoin_pairs.parquet", index=False
+        )
+        global_bitcoin_summary.to_parquet(
+            output_dir / "global_central_bank_bitcoin_summary.parquet", index=False
+        )
+        LOGGER.info(
+            "Wrote %d Global Model G/Bitcoin pairs and %d summary rows",
+            len(global_bitcoin_pairs),
+            len(global_bitcoin_summary),
+        )
 
     market_weekly = align_market_closes_to_weekly_wednesday(
         market_source,
@@ -494,12 +525,20 @@ def run_pipeline(
         if boe_output is not None:
             snapshots["uk_boe_series_snapshot.parquet"] = boe_output
         if bis_output is not None:
-            snapshots["china_bis_series_snapshot.parquet"] = bis_output
+            snapshots["global_bis_central_bank_series_snapshot.parquet"] = bis_output
+            snapshots["china_bis_series_snapshot.parquet"] = bis_output.loc[
+                bis_output["country"] == "CN"
+            ].copy()
         if fx_output is not None:
             snapshots["global_fx_series_snapshot.parquet"] = fx_output
         if global_detail is not None and global_aggregate is not None:
             snapshots["global_central_bank_assets_detail_snapshot.parquet"] = global_detail
             snapshots["global_central_bank_assets_snapshot.parquet"] = global_aggregate
+        if global_bitcoin_pairs is not None and global_bitcoin_summary is not None:
+            snapshots["global_central_bank_bitcoin_pairs_snapshot.parquet"] = global_bitcoin_pairs
+            snapshots["global_central_bank_bitcoin_summary_snapshot.parquet"] = (
+                global_bitcoin_summary
+            )
         if pboc_output is not None:
             LOGGER.warning(
                 "PBoC observations are excluded from public snapshots pending explicit "
@@ -540,7 +579,7 @@ def run_pipeline(
         f"and {0 if boe_output is None else len(boe_output):,} BoE observations "
         f"and {0 if pboc_output is None else len(pboc_output):,} PBoC observations "
         f"and {0 if bis_output is None else len(bis_output):,} BIS observations "
-        f"and {0 if global_aggregate is None else len(global_aggregate):,} global quarters "
+        f"and {0 if global_aggregate is None else len(global_aggregate):,} global months "
         f"-> {output_dir}"
     )
     return output_path
@@ -587,6 +626,7 @@ def main() -> None:
         FrequencyAlignmentError,
         GrowthCalculationError,
         GlobalAggregationError,
+        GlobalMarketAnalysisError,
         LiquidityModelError,
         MarketAnalysisError,
         MacroContextError,

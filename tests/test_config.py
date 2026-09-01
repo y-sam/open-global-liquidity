@@ -8,7 +8,7 @@ from open_global_liquidity.config import ConfigurationError, load_model_config, 
 def test_load_walcl_config() -> None:
     definitions = load_series_config(Path("config/series.yaml"))
 
-    assert len(definitions) == 18
+    assert len(definitions) == 22
     by_id = {definition.series_id: definition for definition in definitions}
     assert set(by_id) == {
         "WALCL",
@@ -25,6 +25,10 @@ def test_load_walcl_config() -> None:
         "RPQB75A",
         "PBOC.BSMA.TOTAL_ASSETS",
         "BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N",
+        "BIS,WS_CBTA,1.0/M.US.B.XDC.USD.N",
+        "BIS,WS_CBTA,1.0/M.XM.B.XDC.EUR.N",
+        "BIS,WS_CBTA,1.0/M.JP.B.XDC.JPY.N",
+        "BIS,WS_CBTA,1.0/M.GB.B.XDC.GBP.N",
         "DEXUSEU",
         "DEXJPUS",
         "DEXUSUK",

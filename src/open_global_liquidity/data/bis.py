@@ -26,6 +26,13 @@ BIS_RAW_COLUMNS = [
     "title",
     "retrieved_at",
 ]
+BIS_DOMESTIC_BILLION_UNITS = {
+    "USD": "Billions of U.S. Dollars",
+    "EUR": "Billions of Euro",
+    "JPY": "Billions of Japanese Yen",
+    "GBP": "Billions of Sterling",
+    "CNY": "Billions of Chinese Yuan",
+}
 
 
 class BisError(RuntimeError):
@@ -35,10 +42,10 @@ class BisError(RuntimeError):
 class BisProvider:
     """Fetch one exact BIS SDMX series and maintain a small Parquet cache.
 
-    The v0.3 implementation deliberately supports the verified monthly China central-bank
-    total-assets key. BIS reports this series with a 10^9 multiplier, so values are already
-    billions of renminbi. Monthly periods are represented as calendar month ends; this is a
-    period-label convention and not a modeled publication timestamp.
+    The provider supports exact monthly domestic-currency central-bank-total-assets keys. BIS
+    reports these series with a 10^9 multiplier, so values are already billions of the configured
+    native currency. Monthly periods are represented as calendar month ends; this is a period-label
+    convention and not a modeled publication timestamp.
     """
 
     def __init__(
@@ -88,9 +95,19 @@ class BisProvider:
                 strict=True,
             )
         )
-        if definition.unit == "Billions of Chinese Yuan" and metadata != {("M", "XDC", "CNY", 9)}:
+        _agency, _flow, _version, key = _parse_series_id(definition.series_id)
+        key_parts = key.split(".")
+        expected_currency = key_parts[4] if len(key_parts) == 6 else ""
+        expected_unit = BIS_DOMESTIC_BILLION_UNITS.get(expected_currency)
+        if expected_unit is None or definition.unit != expected_unit:
             raise BisError(
-                f"BIS metadata for {definition.series_id} does not match monthly CNY billions: "
+                f"Configured unit for {definition.series_id} must be the supported domestic "
+                f"currency billions label; received {definition.unit}"
+            )
+        if metadata != {("M", "XDC", expected_currency, 9)}:
+            raise BisError(
+                f"BIS metadata for {definition.series_id} does not match monthly "
+                f"{expected_currency} billions: "
                 f"{sorted(metadata)}"
             )
 

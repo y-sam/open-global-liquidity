@@ -539,11 +539,19 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     detail = support.load_global_central_bank_detail(
         snapshots / "global_central_bank_assets_detail_snapshot.parquet"
     )
+    global_pairs = support.load_global_bitcoin_pairs(
+        snapshots / "global_central_bank_bitcoin_pairs_snapshot.parquet"
+    )
+    global_summary = support.load_global_bitcoin_summary(
+        snapshots / "global_central_bank_bitcoin_summary_snapshot.parquet"
+    )
 
     assert aggregate["component_count"].eq(5).all()
     assert aggregate["classification"].eq("model_assumption").all()
     assert aggregate["global_cb_index"].dropna().between(0, 100).all()
     assert aggregate["global_cb_index"].notna().any()
+    assert len(aggregate) >= 290
+    assert aggregate["date"].min() == pd.Timestamp("2002-01-31")
     assert detail.groupby("date")["central_bank"].nunique().eq(5).all()
     assert set(detail["fx_component"]) == {
         "USD",
@@ -552,6 +560,8 @@ def test_loads_published_global_aggregate_snapshots() -> None:
         "usd_per_sterling",
         "yuan_per_usd",
     }
+    assert global_pairs["signal_date"].nunique() >= 190
+    assert set(global_summary["sample_policy"]) == {"overlapping", "non_overlapping"}
 
 
 def test_bitcoin_snapshot_loader_rejects_impossible_path_statistic(tmp_path: Path) -> None:

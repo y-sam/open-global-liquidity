@@ -75,9 +75,12 @@ jobs:
         run: |
           git add \
             data/reference/china_bis_series_snapshot.parquet \
+            data/reference/global_bis_central_bank_series_snapshot.parquet \
             data/reference/global_fx_series_snapshot.parquet \
             data/reference/global_central_bank_assets_detail_snapshot.parquet \
             data/reference/global_central_bank_assets_snapshot.parquet \
+            data/reference/global_central_bank_bitcoin_pairs_snapshot.parquet \
+            data/reference/global_central_bank_bitcoin_summary_snapshot.parquet \
             data/reference/euro_area_ecb_series_snapshot.parquet \
             data/reference/japan_boj_series_snapshot.parquet \
             data/reference/uk_boe_series_snapshot.parquet \
@@ -102,6 +105,7 @@ jobs:
             data/reference/us_point_in_time_bitcoin_outcomes_snapshot.parquet \
             data/reference/us_point_in_time_bitcoin_regimes_snapshot.parquet \
             data/reference/us_point_in_time_bitcoin_revisions_snapshot.parquet \
+            data/reference/us_point_in_time_bitcoin_contrasts_snapshot.parquet \
             data/reference/dashboard_snapshot_manifest.json
 
           if git diff --cached --quiet; then

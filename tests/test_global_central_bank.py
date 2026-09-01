@@ -19,23 +19,23 @@ def test_load_global_aggregation_config_is_explicit() -> None:
     config = _config()
 
     assert config.classification == "model_assumption"
-    assert config.canonical_frequency == "quarter_end"
+    assert config.canonical_frequency == "month_end"
     assert config.missing_policy == "balanced_panel_only"
     assert len(config.components) == 5
     assert config.components[-1].fx_component == "yuan_per_usd"
     assert config.index.normalization == "expanding"
-    assert config.index.min_periods == 20
+    assert config.index.min_periods == 60
     assert sum(config.index.momentum_weights.values()) == pytest.approx(1.0)
 
 
 def test_calculate_global_assets_converts_direct_and_inverse_quotes() -> None:
     config = _config()
-    dates = pd.to_datetime(["2013-09-30", "2013-12-31"])
+    dates = pd.to_datetime(["2002-01-31", "2002-02-28"])
     values = {
-        "fed_assets": ("Millions of U.S. Dollars", [4_000_000.0, 4_100_000.0]),
-        "eurosystem_total_assets": ("Millions of Euro", [3_000_000.0, 3_100_000.0]),
-        "boj_total_assets": ("100 Million Yen", [1_000.0, 1_100.0]),
-        "boe_total_assets": ("Millions of Sterling", [500_000.0, 510_000.0]),
+        "us_central_bank_total_assets": ("Billions of U.S. Dollars", [4_000.0, 4_100.0]),
+        "euro_area_central_bank_total_assets": ("Billions of Euro", [3_000.0, 3_100.0]),
+        "japan_central_bank_total_assets": ("Billions of Japanese Yen", [1_000.0, 1_100.0]),
+        "uk_central_bank_total_assets": ("Billions of Sterling", [500.0, 510.0]),
         "china_central_bank_total_assets": (
             "Billions of Chinese Yuan",
             [30_000.0, 31_000.0],
@@ -45,7 +45,15 @@ def test_calculate_global_assets_converts_direct_and_inverse_quotes() -> None:
     for component, (unit, component_values) in values.items():
         for observation_date, value in zip(dates, component_values, strict=True):
             source_rows.append(
-                {"date": observation_date, "component": component, "value": value, "unit": unit}
+                {
+                    "date": observation_date,
+                    "component": component,
+                    "value": value,
+                    "unit": unit,
+                    "provider": "BIS",
+                    "series_id": component,
+                    "retrieved_at": pd.Timestamp("2026-01-01", tz="UTC"),
+                }
             )
     fx_values = {
         "usd_per_euro": [1.3, 1.4],
@@ -67,14 +75,20 @@ def test_calculate_global_assets_converts_direct_and_inverse_quotes() -> None:
                         else value
                     ),
                     "unit": "FX",
+                    "provider": "FRED",
+                    "series_id": component,
+                    "retrieved_at": pd.Timestamp("2026-01-01", tz="UTC"),
                 }
             )
     fx_rows.append(
         {
-            "date": pd.Timestamp("2013-12-30"),
+            "date": pd.Timestamp("2002-02-27"),
             "component": "usd_per_euro",
             "value": 1.4,
             "unit": "FX",
+            "provider": "FRED",
+            "series_id": "usd_per_euro",
+            "retrieved_at": pd.Timestamp("2026-01-01", tz="UTC"),
         }
     )
 
@@ -83,24 +97,24 @@ def test_calculate_global_assets_converts_direct_and_inverse_quotes() -> None:
     )
 
     first = detail.loc[detail["date"] == dates[0]].set_index("component")
-    assert first.loc["eurosystem_total_assets", "value_usd_millions"] == 3_900_000.0
-    assert first.loc["boj_total_assets", "value_usd_millions"] == 1_000.0
+    assert first.loc["euro_area_central_bank_total_assets", "value_usd_millions"] == 3_900_000.0
+    assert first.loc["japan_central_bank_total_assets", "value_usd_millions"] == 10_000.0
     assert first.loc["china_central_bank_total_assets", "value_usd_millions"] == 5_000_000.0
-    assert aggregate.iloc[0]["total_usd_millions"] == 13_651_000.0
+    assert aggregate.iloc[0]["total_usd_millions"] == 13_660_000.0
     assert aggregate["component_count"].tolist() == [5, 5]
 
 
 def test_global_index_uses_expanding_history_and_is_bounded() -> None:
-    dates = pd.date_range("2010-03-31", periods=32, freq="QE")
+    dates = pd.date_range("2002-01-31", periods=96, freq="ME")
     values = pd.Series(
-        [10_000_000 * (1.01**period) * (1 + 0.01 * ((period % 5) - 2)) for period in range(32)]
+        [10_000_000 * (1.01**period) * (1 + 0.01 * ((period % 5) - 2)) for period in range(96)]
     )
     aggregate = pd.DataFrame(
         {
             "date": dates,
             "total_usd_millions": values,
-            "change_1q": values.pct_change(),
-            "growth_yoy": values.pct_change(4),
+            "change_1m": values.pct_change(),
+            "growth_yoy": values.pct_change(12),
         }
     )
 
@@ -114,8 +128,8 @@ def test_global_index_uses_expanding_history_and_is_bounded() -> None:
     first_valid = valid.index[0]
     changed_future = aggregate.copy()
     changed_future.loc[changed_future.index[-1], "total_usd_millions"] *= 10
-    changed_future["change_1q"] = changed_future["total_usd_millions"].pct_change()
-    changed_future["growth_yoy"] = changed_future["total_usd_millions"].pct_change(4)
+    changed_future["change_1m"] = changed_future["total_usd_millions"].pct_change()
+    changed_future["growth_yoy"] = changed_future["total_usd_millions"].pct_change(12)
     revised = calculate_global_central_bank_index(changed_future, _config())
     assert revised.loc[first_valid, "global_cb_index"] == pytest.approx(
         result.loc[first_valid, "global_cb_index"]
@@ -129,9 +143,14 @@ def test_calculate_global_assets_rejects_missing_component() -> None:
             "component": ["fed_assets"],
             "value": [1.0],
             "unit": ["Millions of U.S. Dollars"],
+            "provider": ["BIS"],
+            "series_id": ["test"],
+            "retrieved_at": [pd.Timestamp("2026-01-01", tz="UTC")],
         }
     )
-    fx = pd.DataFrame(columns=["date", "component", "value", "unit"])
+    fx = pd.DataFrame(
+        columns=["date", "component", "value", "unit", "provider", "series_id", "retrieved_at"]
+    )
 
     with pytest.raises(GlobalAggregationError, match="missing configured components"):
         calculate_global_central_bank_assets(source, fx, _config())

@@ -79,19 +79,21 @@ and divides 100 million yuan by 10 for local display in CNY billions. No PBoC da
 
 ## Bank for International Settlements
 
-The public China dashboard and v0.3 aggregate use the BIS Central Bank Total Assets series
-`BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N`. The series is monthly, denominated in CNY billions, and marked
-`BIS-spliced`; BIS metadata says that from January 2002 it uses the monthly PBoC balance sheet.
+The public China dashboard uses `M.CN.B.XDC.CNY.N`. Global Model G uses the monthly BIS-spliced
+domestic-currency Central Bank Total Assets series for the United States, euro area, Japan, United
+Kingdom, and China: `M.US.B.XDC.USD.N`, `M.XM.B.XDC.EUR.N`, `M.JP.B.XDC.JPY.N`,
+`M.GB.B.XDC.GBP.N`, and `M.CN.B.XDC.CNY.N`. The China metadata says that from January 2002 it uses
+the monthly PBoC balance sheet.
 The [BIS permitted-use terms](https://data.bis.org/help/legal) state that use of BIS statistics is
 unrestricted when the BIS is cited, presentation is not misleading or suggestive of endorsement,
 and the other stated conditions are observed. The [dataset overview](https://data.bis.org/topics/CBTA)
 documents coverage, units, frequency, and compilation concepts.
 
-Attribution: Bank for International Settlements, Central bank total assets, China, monthly,
-domestic currency, BIS-spliced, series `M.CN.B.XDC.CNY.N`. Open Global Liquidity maps monthly
-periods to calendar month-end timestamps and uses the values as CNY billions. The BIS is not
-affiliated with this project, and the series is not investment advice. The direct PBoC extraction
-remains local-only and is used only as a research validation source.
+Attribution: Bank for International Settlements, Central bank total assets, monthly domestic
+currency, BIS-spliced, the five exact series listed above. Open Global Liquidity maps monthly
+periods to calendar month-end timestamps and converts native-currency billions to USD using named
+H.10 inputs. The BIS is not affiliated with this project, and the series are not investment advice.
+The direct PBoC extraction remains local-only and is used only as a research validation source.
 
 ## FRED and ALFRED
 

@@ -109,6 +109,44 @@ def test_fetch_definition_rejects_inconsistent_unit_metadata(tmp_path: Path) -> 
         provider.fetch_definition(_definition())
 
 
+@pytest.mark.parametrize(
+    ("country", "key", "unit"),
+    [
+        ("US", "M.US.B.XDC.USD.N", "Billions of U.S. Dollars"),
+        ("EA", "M.XM.B.XDC.EUR.N", "Billions of Euro"),
+        ("JP", "M.JP.B.XDC.JPY.N", "Billions of Japanese Yen"),
+        ("GB", "M.GB.B.XDC.GBP.N", "Billions of Sterling"),
+    ],
+)
+def test_fetch_definition_supports_harmonized_global_native_units(
+    tmp_path: Path, country: str, key: str, unit: str
+) -> None:
+    definition = SeriesDefinition(
+        country=country,
+        group="liquidity",
+        name="central_bank_total_assets",
+        classification="measured_data",
+        provider="bis",
+        series_id=f"BIS,WS_CBTA,1.0/{key}",
+        component="central_bank_total_assets",
+        title="Central-bank assets",
+        description="Measured test data",
+        unit=unit,
+        frequency="Monthly, End of Period",
+        seasonal_adjustment="Not Seasonally Adjusted",
+        start=pd.Timestamp("2025-01-31").date(),
+        source="BIS",
+        source_url="https://data.bis.org/topics/CBTA",
+    )
+    client = httpx.Client(
+        transport=httpx.MockTransport(lambda _request: httpx.Response(200, content=_xml(key=key)))
+    )
+
+    result = BisProvider(cache_dir=tmp_path / country, client=client).fetch_definition(definition)
+
+    assert result["unit"].unique().tolist() == [unit]
+
+
 def test_fetch_definition_reports_http_failure(tmp_path: Path) -> None:
     client = httpx.Client(
         transport=httpx.MockTransport(lambda _request: httpx.Response(404, text="not found"))

@@ -96,17 +96,17 @@ The **Central banks** dashboard page compares cumulative changes by rebasing eac
 native-currency series independently to 100. This is a display transformation—not currency
 conversion or aggregation—and it does not create a global OGLI.
 
-The v0.3 **Global aggregate** page adds a separate model-assumption layer. It converts Federal
-Reserve, Eurosystem, Bank of Japan, Bank of England, and BIS China central-bank total assets to USD
-at the latest H.10 spot rate on or before each quarter end, subject to explicit staleness limits,
-and retains only complete five-bank quarters. It never interpolates. Because the Bank of England
-input is quarterly and published with a long lag, the balanced aggregate is deliberately quarterly
-and ends at the least-current component. FX translation means changes reflect both native balance
-sheets and exchange rates. This measured-data aggregate is not the US OGLI or a global OGLI.
+The v0.3 **Global aggregate** page adds a separate model-assumption layer. It uses harmonized
+monthly BIS-spliced central-bank total-assets series for the United States, euro area, Japan,
+United Kingdom, and China. It converts native-currency stocks to USD at the latest H.10 spot rate
+on or before each month end, subject to explicit staleness limits, and retains only complete
+five-bank months. It never interpolates. The balanced history runs from January 2002; the direct
+national sources remain separate validation inputs. FX translation means changes reflect both
+native balance sheets and exchange rates. This is not the US OGLI or a complete global OGLI.
 
 The same page now reports **Global Model G — central-bank assets momentum**, an experimental
 0–100 non-look-ahead normalization of the five-bank USD aggregate. It combines 60% of the
-expanding z-score of quarterly annualized growth with 40% of the expanding z-score of annual
+expanding z-score of monthly annualized growth with 40% of the expanding z-score of annual
 growth, then applies the standard normal CDF. This is a genuinely global central-bank model, while
 Models A/B/C remain explicitly US/Fed models. Model G is not yet a complete global OGLI because it
 does not include private credit, repo, offshore dollar funding, collateral, or shadow banking.
@@ -190,10 +190,17 @@ is invalid, or no observations are returned. A successful run writes:
 - `data/processed/uk_boe_series.parquet`: separate quarterly BoE total assets in nominal GBP;
 - `data/processed/china_pboc_series.parquet`: separate monthly PBoC total assets in nominal CNY;
 - `data/processed/china_bis_series.parquet`: public monthly BIS-spliced China total assets in CNY;
+- `data/processed/global_bis_central_bank_series.parquet`: harmonized five-economy monthly BIS
+  central-bank total assets in native currencies;
 - `data/processed/global_fx_series.parquet`: four daily H.10 FX inputs with source metadata;
-- `data/processed/global_central_bank_assets_detail.parquet`: quarter-level native values, source
+- `data/processed/global_central_bank_assets_detail.parquet`: month-level native values, source
   dates, FX observations, conversion rates, and USD contributions;
-- `data/processed/global_central_bank_assets.parquet`: balanced five-bank quarterly USD aggregate;
+- `data/processed/global_central_bank_assets.parquet`: balanced five-bank monthly USD aggregate and
+  Global Model G index;
+- `data/processed/global_central_bank_bitcoin_pairs.parquet`: current-vintage Model G signals and
+  subsequent Bitcoin returns under declared availability-delay assumptions;
+- `data/processed/global_central_bank_bitcoin_summary.parquet`: overlapping and non-overlapping
+  descriptive correlations and outcome summaries;
 - `data/processed/us_liquidity_weekly.parquet`: USD-million Wednesday inputs with source-date and
   staleness lineage;
 - `data/processed/us_liquidity_models.parquet`: the three weekly model levels and formulas.
@@ -274,7 +281,7 @@ intraday release timestamps or exact trade availability. Instead, it reports pre
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
 
-The publication commands together write twenty-nine Git-versioned Parquet
+The publication commands together write thirty-two Git-versioned Parquet
 artifacts plus a JSON provenance manifest:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
@@ -314,8 +321,9 @@ artifacts plus a JSON provenance manifest:
 - `data/reference/us_point_in_time_bitcoin_contrasts_snapshot.parquet` — predeclared directional
   regime comparisons reporting expansionary and contractionary Bitcoin outcomes, their arithmetic
   mean spread, group sample sizes, and a descriptive Welch interval.
-- Seven international files contain the ECB, BOJ, BoE, BIS China, global FX, balanced global
-  component-detail, and Global Model G aggregate/index snapshots.
+- Ten international files contain the ECB, BOJ, BoE, BIS China, harmonized five-economy BIS,
+  global FX, balanced global component-detail, Global Model G aggregate/index, and Model G/Bitcoin
+  pair and summary snapshots.
 - `data/reference/dashboard_snapshot_manifest.json` — generation time, pipeline version, source
   commit, row/date coverage, and SHA-256 digest for every published Parquet file.
 
@@ -329,7 +337,7 @@ mode and source retrieval time.
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
 environment, downloads fresh FRED, ALFRED, Coin Metrics, World Bank, ECB, BOJ, BoE, and BIS
-observations, regenerates the twenty-nine public Parquet snapshots and provenance manifest, and
+observations, regenerates the thirty-two public Parquet snapshots and provenance manifest, and
 runs formatting, linting, and offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 
@@ -404,12 +412,12 @@ directory, and verifies that the public snapshots still render the landing-page 
   and quarterly cache.
 - `src/open_global_liquidity/data/pboc.py` — keyless PBoC archive discovery, bilingual table and
   unit validation, monthly Total Assets extraction, and local cache.
-- `src/open_global_liquidity/data/bis.py` — keyless BIS SDMX ingestion with exact-key and unit
-  validation for the redistributable China series.
+- `src/open_global_liquidity/data/bis.py` — keyless BIS SDMX ingestion with exact-key, currency,
+  and unit validation for five redistributable central-bank series.
 - `src/open_global_liquidity/transforms/` — unit conversion, alignment, growth, and z-scores.
 - `src/open_global_liquidity/models/us_liquidity.py` — configurable Model A/B/C calculations.
 - `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
-- `src/open_global_liquidity/models/global_central_bank.py` — balanced-quarter FX conversion,
+- `src/open_global_liquidity/models/global_central_bank.py` — balanced-month FX conversion,
   source/FX lineage, and transparent central-bank asset summation.
 - `src/open_global_liquidity/analysis/lead_lag.py` — market returns and signal/outcome alignment.
 - `src/open_global_liquidity/analysis/correlations.py` — full-sample and rolling correlations.
@@ -531,9 +539,10 @@ outcome/context variables rather than OGLI inputs. Treasury yields and the 10-ye
 slope remain measured context. S&P 500 may return after appropriate public-display rights are
 secured. v0.2 completes the first global-central-bank measured-data layer with separate Federal
 Reserve, ECB, BOJ, BoE, and local-only PBoC total-assets series plus a non-aggregated indexed
-comparison. v0.3 now adds explicit FX normalization and a balanced quarterly central-bank asset
-aggregate and its expanding-normalized global central-bank momentum index. Point-in-time
-publication-lag treatment for the global panel remains unfinished. Later increments may add
+comparison. v0.3 now adds explicit FX normalization, a balanced monthly central-bank asset
+aggregate, its expanding-normalized global momentum index, and a current-vintage Bitcoin
+comparison under explicit availability-delay sensitivity assumptions. Exact point-in-time
+publication-lag reconstruction for the global panel remains unfinished. Later increments may add
 collateral and repo proxies, shadow monetary base concepts, BIS cross-border
 credit, and explicitly labeled public benchmark calibration.
 

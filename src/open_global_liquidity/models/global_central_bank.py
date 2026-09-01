@@ -45,8 +45,21 @@ class GlobalIndexConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class GlobalMarketAnalysisConfig:
+    """Predeclared current-vintage Global Model G versus Bitcoin assumptions."""
+
+    classification: str
+    description: str
+    availability_lag_months: tuple[int, ...]
+    forward_horizons_months: tuple[int, ...]
+    primary_availability_lag_months: int
+    overlapping_min_periods: int
+    non_overlapping_min_periods: int
+
+
+@dataclass(frozen=True, slots=True)
 class GlobalAggregationConfig:
-    """Auditable assumptions for the v0.3 balanced quarterly aggregate."""
+    """Auditable assumptions for the v0.3 balanced period-end aggregate."""
 
     classification: str
     name: str
@@ -59,6 +72,7 @@ class GlobalAggregationConfig:
     components: tuple[GlobalComponentConfig, ...]
     fx_max_staleness_days: int
     index: GlobalIndexConfig
+    market_analysis: GlobalMarketAnalysisConfig
 
 
 def load_global_aggregation_config(path: Path) -> GlobalAggregationConfig:
@@ -79,14 +93,18 @@ def load_global_aggregation_config(path: Path) -> GlobalAggregationConfig:
         "components",
         "fx_max_staleness_days",
         "index",
+        "market_analysis",
     }
     if not isinstance(raw, dict) or required - raw.keys():
         missing = sorted(required - raw.keys()) if isinstance(raw, dict) else sorted(required)
         raise GlobalAggregationError("Global aggregation config is missing: " + ", ".join(missing))
     if raw["classification"] != "model_assumption":
         raise GlobalAggregationError("Global aggregation must be a model_assumption")
-    if raw["base_currency"] != "USD" or raw["canonical_frequency"] != "quarter_end":
-        raise GlobalAggregationError("v0.3 requires USD and quarter_end")
+    if raw["base_currency"] != "USD" or raw["canonical_frequency"] not in {
+        "month_end",
+        "quarter_end",
+    }:
+        raise GlobalAggregationError("Global aggregation requires USD and a supported frequency")
     if raw["missing_policy"] != "balanced_panel_only":
         raise GlobalAggregationError("v0.3 requires balanced_panel_only")
     components_raw = raw["components"]
@@ -140,8 +158,13 @@ def load_global_aggregation_config(path: Path) -> GlobalAggregationConfig:
     if not isinstance(index_raw, dict) or index_required - index_raw.keys():
         raise GlobalAggregationError("Global index configuration is incomplete")
     weights = {str(key): float(value) for key, value in index_raw["momentum_weights"].items()}
+    expected_growth = (
+        "monthly_annualized_growth"
+        if raw["canonical_frequency"] == "month_end"
+        else "quarterly_annualized_growth"
+    )
     if (
-        set(weights) != {"quarterly_annualized_growth", "growth_yoy"}
+        set(weights) != {expected_growth, "growth_yoy"}
         or not abs(sum(weights.values()) - 1.0) < 1e-12
     ):
         raise GlobalAggregationError(
@@ -171,18 +194,56 @@ def load_global_aggregation_config(path: Path) -> GlobalAggregationConfig:
         raise GlobalAggregationError(
             "Global index must use expanding normalization with at least four periods"
         )
+    market_raw = raw["market_analysis"]
+    market_required = {
+        "classification",
+        "description",
+        "availability_lag_months",
+        "forward_horizons_months",
+        "primary_availability_lag_months",
+        "overlapping_min_periods",
+        "non_overlapping_min_periods",
+    }
+    if not isinstance(market_raw, dict) or market_required - market_raw.keys():
+        raise GlobalAggregationError("Global market-analysis configuration is incomplete")
+    market_config = GlobalMarketAnalysisConfig(
+        classification=str(market_raw["classification"]),
+        description=str(market_raw["description"]),
+        availability_lag_months=tuple(
+            int(value) for value in market_raw["availability_lag_months"]
+        ),
+        forward_horizons_months=tuple(
+            int(value) for value in market_raw["forward_horizons_months"]
+        ),
+        primary_availability_lag_months=int(market_raw["primary_availability_lag_months"]),
+        overlapping_min_periods=int(market_raw["overlapping_min_periods"]),
+        non_overlapping_min_periods=int(market_raw["non_overlapping_min_periods"]),
+    )
+    if (
+        market_config.classification != "model_assumption"
+        or not market_config.availability_lag_months
+        or min(market_config.availability_lag_months) < 0
+        or market_config.primary_availability_lag_months
+        not in market_config.availability_lag_months
+        or not market_config.forward_horizons_months
+        or min(market_config.forward_horizons_months) < 1
+        or market_config.overlapping_min_periods < 3
+        or market_config.non_overlapping_min_periods < 3
+    ):
+        raise GlobalAggregationError("Global market-analysis assumptions are invalid")
     return GlobalAggregationConfig(
         classification="model_assumption",
         name=str(raw["name"]),
         description=str(raw["description"]),
         base_currency="USD",
-        canonical_frequency="quarter_end",
+        canonical_frequency=str(raw["canonical_frequency"]),
         start=start,
         alignment_policy=str(raw["alignment_policy"]),
         missing_policy="balanced_panel_only",
         components=tuple(components),
         fx_max_staleness_days=fx_staleness,
         index=index_config,
+        market_analysis=market_config,
     )
 
 
@@ -192,20 +253,27 @@ def calculate_global_central_bank_index(
 ) -> pd.DataFrame:
     """Add a non-look-ahead 0-100 momentum index to the global asset aggregate.
 
-    The quarterly annualized growth rate and four-quarter growth rate are standardized against
+    The one-period annualized growth rate and 12-month growth rate are standardized against
     expanding history only, then combined with configured weights and mapped through the standard
     normal CDF. This is deliberately named a global *central-bank* index: it does not measure bank
     credit, repo, offshore dollars, collateral, or shadow banking.
     """
-    required = {"date", "total_usd_millions", "change_1q", "growth_yoy"}
+    change_column = "change_1m" if config.canonical_frequency == "month_end" else "change_1q"
+    required = {"date", "total_usd_millions", change_column, "growth_yoy"}
     missing = sorted(required - set(aggregate.columns))
     if missing:
         raise GlobalAggregationError("Global aggregate is missing: " + ", ".join(missing))
     result = aggregate.sort_values("date").reset_index(drop=True).copy()
-    result["quarterly_annualized_growth"] = (
+    periods_per_year = 12 if config.canonical_frequency == "month_end" else 4
+    annualized_column = (
+        "monthly_annualized_growth"
+        if config.canonical_frequency == "month_end"
+        else "quarterly_annualized_growth"
+    )
+    result[annualized_column] = (
         result["total_usd_millions"] / result["total_usd_millions"].shift(1)
-    ).pow(4) - 1
-    growth_columns = ("quarterly_annualized_growth", "growth_yoy")
+    ).pow(periods_per_year) - 1
+    growth_columns = (annualized_column, "growth_yoy")
     for column in growth_columns:
         result[f"z_{column}"] = historical_zscore(
             result[column], mode="expanding", min_periods=config.index.min_periods
@@ -234,14 +302,14 @@ def calculate_global_central_bank_assets(
     fx: pd.DataFrame,
     config: GlobalAggregationConfig,
 ) -> tuple[pd.DataFrame, pd.DataFrame]:
-    """Convert configured native stocks at quarter-end spot rates and form a balanced sum.
+    """Convert configured native stocks at period-end spot rates and form a balanced sum.
 
     For direct quotes (USD per native currency), native-currency millions are multiplied by the
     FX rate. For inverse quotes (native currency per USD), they are divided by the rate. The
     function uses backward as-of matching within explicit staleness limits and never interpolates.
-    Only quarters with every configured component are retained in the aggregate.
+    Only periods with every configured component are retained in the aggregate.
     """
-    required = {"date", "component", "value", "unit"}
+    required = {"date", "component", "value", "unit", "provider", "series_id", "retrieved_at"}
     for label, frame in (("central-bank source", source), ("FX source", fx)):
         missing = sorted(required - set(frame.columns))
         if missing:
@@ -261,15 +329,19 @@ def calculate_global_central_bank_assets(
         source.loc[source["component"] == item.component, "date"].max()
         for item in config.components
     )
-    quarter_ends = pd.date_range(pd.Timestamp(config.start), latest_common, freq="QE")
-    if quarter_ends.empty:
-        raise GlobalAggregationError("No quarter ends fall inside the balanced source range")
+    period_frequency = "ME" if config.canonical_frequency == "month_end" else "QE"
+    period_ends = pd.date_range(pd.Timestamp(config.start), latest_common, freq=period_frequency)
+    if period_ends.empty:
+        raise GlobalAggregationError("No period ends fall inside the balanced source range")
 
     rows: list[pd.DataFrame] = []
-    targets = pd.DataFrame({"date": quarter_ends})
+    targets = pd.DataFrame({"date": period_ends})
     for item in config.components:
         observations = (
-            source.loc[source["component"] == item.component, ["date", "value", "unit"]]
+            source.loc[
+                source["component"] == item.component,
+                ["date", "value", "unit", "provider", "series_id", "retrieved_at"],
+            ]
             .dropna(subset=["value"])
             .sort_values("date")
         )
@@ -278,7 +350,15 @@ def calculate_global_central_bank_assets(
             raise GlobalAggregationError(
                 f"{item.component} units {sorted(units)} do not match {item.native_unit}"
             )
-        observations = observations.rename(columns={"date": "source_date", "value": "native_value"})
+        observations = observations.rename(
+            columns={
+                "date": "source_date",
+                "value": "native_value",
+                "provider": "source_provider",
+                "series_id": "source_series_id",
+                "retrieved_at": "source_retrieved_at",
+            }
+        )
         aligned = pd.merge_asof(
             targets,
             observations,
@@ -295,17 +375,29 @@ def calculate_global_central_bank_assets(
             aligned["fx_component"] = "USD"
             aligned["fx_date"] = aligned["source_date"]
             aligned["fx_rate"] = 1.0
+            aligned["fx_provider"] = "Identity conversion"
+            aligned["fx_series_id"] = "USD"
+            aligned["fx_retrieved_at"] = aligned["source_retrieved_at"]
             aligned["value_usd_millions"] = aligned["native_millions"]
         else:
             fx_observations = (
-                fx.loc[fx["component"] == item.fx_component, ["date", "value"]]
+                fx.loc[
+                    fx["component"] == item.fx_component,
+                    ["date", "value", "provider", "series_id", "retrieved_at"],
+                ]
                 .dropna(subset=["value"])
                 .sort_values("date")
             )
             if fx_observations.empty:
                 raise GlobalAggregationError(f"FX source is missing {item.fx_component}")
             fx_observations = fx_observations.rename(
-                columns={"date": "fx_date", "value": "fx_rate"}
+                columns={
+                    "date": "fx_date",
+                    "value": "fx_rate",
+                    "provider": "fx_provider",
+                    "series_id": "fx_series_id",
+                    "retrieved_at": "fx_retrieved_at",
+                }
             )
             aligned = pd.merge_asof(
                 aligned.sort_values("date"),
@@ -333,7 +425,7 @@ def calculate_global_central_bank_assets(
     detail["is_balanced"] = detail["date"].isin(balanced_dates)
     balanced = detail.loc[detail["is_balanced"]].copy()
     if balanced.empty:
-        raise GlobalAggregationError("No complete balanced quarter remains after alignment")
+        raise GlobalAggregationError("No complete balanced period remains after alignment")
     aggregate = (
         balanced.groupby("date", as_index=False)
         .agg(
@@ -343,8 +435,10 @@ def calculate_global_central_bank_assets(
         .sort_values("date")
     )
     aggregate["total_usd_trillions"] = aggregate["total_usd_millions"] / 1_000_000
-    aggregate["change_1q"] = aggregate["total_usd_millions"].pct_change()
-    aggregate["growth_yoy"] = aggregate["total_usd_millions"].pct_change(4)
+    change_column = "change_1m" if config.canonical_frequency == "month_end" else "change_1q"
+    periods_per_year = 12 if config.canonical_frequency == "month_end" else 4
+    aggregate[change_column] = aggregate["total_usd_millions"].pct_change()
+    aggregate["growth_yoy"] = aggregate["total_usd_millions"].pct_change(periods_per_year)
     aggregate["classification"] = config.classification
     aggregate["name"] = config.name
     aggregate = calculate_global_central_bank_index(aggregate, config)
