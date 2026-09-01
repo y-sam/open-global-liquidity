@@ -8,6 +8,7 @@ from pathlib import Path
 import pandas as pd
 import yaml
 from streamlit.testing.v1 import AppTest
+from streamlit.util import calc_hash
 
 from open_global_liquidity import __version__
 
@@ -149,6 +150,30 @@ def test_streamlit_deployment_mode_needs_no_local_data_or_fred_secret(
         "not endorsed or certified by the Federal Reserve Bank of St. Louis" in caption.value
         for caption in app.caption
     )
+
+
+def test_global_model_g_is_available_in_both_bitcoin_workspaces(monkeypatch) -> None:
+    monkeypatch.setenv("OGLI_DATA_ROOT", str(PROJECT_ROOT / "data"))
+    app_path = PROJECT_ROOT / "app" / "streamlit_app.py"
+
+    for route in ("markets", "bitcoin-research"):
+        app = AppTest.from_file(app_path, default_timeout=20)
+        app._page_hash = calc_hash(route)
+        app.run()
+
+        assert not app.exception
+        model_selector = next(
+            selector for selector in app.selectbox if selector.label == "Liquidity definition"
+        )
+        assert model_selector.value == "Global Model G — five central banks"
+        assert "Model B — Net Fed liquidity proxy" in model_selector.options
+        assert any(
+            "current-vintage global analysis" in caption.value.lower() for caption in app.caption
+        )
+
+        model_selector.set_value("Model B — Net Fed liquidity proxy")
+        app.run()
+        assert not app.exception
 
 
 def test_streamlit_is_independent_of_broken_installed_package(tmp_path: Path) -> None:

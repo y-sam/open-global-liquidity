@@ -110,6 +110,11 @@ expanding z-score of monthly annualized growth with 40% of the expanding z-score
 growth, then applies the standard normal CDF. This is a genuinely global central-bank model, while
 Models A/B/C remain explicitly US/Fed models. Model G is not yet a complete global OGLI because it
 does not include private credit, repo, offshore dollar funding, collateral, or shadow banking.
+Model G is selectable across the liquidity-indices, Liquidity vs markets, and Bitcoin research
+workspaces. Its Bitcoin comparisons use the same monthly five-bank panel and are labeled
+current-vintage: the displayed availability delay is an explicit assumption because historical BIS
+release vintages have not yet been reconstructed. The US/Fed alternatives retain their separate
+weekly and ALFRED point-in-time research policies.
 
 ## Research boundaries
 
@@ -364,9 +369,11 @@ uv run streamlit run app/streamlit_app.py
 
 Streamlit opens the dashboard at `http://localhost:8501`. The app shows latest measured balances,
 the three US model levels, a liquidity-indices page defaulting to Global Model G, a point-in-time
-pilot, a dedicated Bitcoin research page with
+pilot, a dedicated Bitcoin research page where Global Model G and the US point-in-time models are
+selectable, with
 cross-horizon comparison, a
-Liquidity vs markets workspace, a log-scale Bitcoin/OGLI timeline, Bitcoin-focused landing metrics,
+Liquidity vs markets workspace offering Global Model G and the three US/Fed definitions, a
+log-scale Bitcoin/OGLI timeline, Bitcoin-focused landing metrics,
 history, a component explorer, recent source
 observations, and methodology notes. Top navigation separates a
 plain-language landing page, global and US liquidity indices, market validation, the data

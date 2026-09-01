@@ -764,6 +764,132 @@ def _horizon_correlation_figure(frame: pd.DataFrame, title: str):
     return figure
 
 
+def _render_global_model_g_bitcoin(*, key_prefix: str, show_heading: bool = True) -> None:
+    """Render the shared current-vintage Model G versus Bitcoin workspace."""
+    if show_heading:
+        st.subheader("Global Model G vs subsequent Bitcoin returns")
+    st.badge(
+        "Global Model G · five central banks · monthly",
+        icon=":material/public:",
+        color="blue",
+    )
+    st.caption(
+        "Current-vintage global analysis. Model G combines central-bank assets for the United "
+        "States, euro area, Japan, United Kingdom, and China after USD translation."
+    )
+    try:
+        global_pairs, global_summary, global_market_origin = _global_bitcoin_data()
+    except DashboardDataError:
+        global_pairs = pd.DataFrame()
+        global_summary = pd.DataFrame()
+        global_market_origin = "Unavailable"
+    if global_summary.empty:
+        st.info(
+            "The monthly Global Model G and Bitcoin comparison has not been generated in this "
+            "environment.",
+            icon=":material/currency_bitcoin:",
+        )
+        return
+
+    lag_options = sorted(global_summary["availability_lag_months"].unique())
+    horizon_options = sorted(global_summary["horizon_months"].unique())
+    with st.container(horizontal=True):
+        selected_global_lag = st.selectbox(
+            "Assumed availability delay",
+            lag_options,
+            index=lag_options.index(2) if 2 in lag_options else 0,
+            format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
+            key=f"{key_prefix}_global_bitcoin_lag",
+        )
+        selected_global_sample = st.segmented_control(
+            "Sample",
+            ["Non-overlapping", "Overlapping"],
+            default="Non-overlapping",
+            key=f"{key_prefix}_global_bitcoin_sample",
+        )
+        selected_global_horizon = st.selectbox(
+            "Forward horizon",
+            horizon_options,
+            index=horizon_options.index(3) if 3 in horizon_options else 0,
+            format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
+            key=f"{key_prefix}_global_bitcoin_horizon",
+        )
+    sample_key = "non_overlapping" if selected_global_sample == "Non-overlapping" else "overlapping"
+    visible_summary = global_summary.loc[
+        (global_summary["availability_lag_months"] == selected_global_lag)
+        & (global_summary["sample_policy"] == sample_key)
+    ].copy()
+    selected_result = visible_summary.loc[
+        visible_summary["horizon_months"] == selected_global_horizon
+    ].iloc[0]
+    with st.container(horizontal=True):
+        st.metric(
+            "Pearson correlation",
+            (
+                "Insufficient sample"
+                if pd.isna(selected_result["correlation"])
+                else f"{float(selected_result['correlation']):+.2f}"
+            ),
+            border=True,
+        )
+        st.metric("Paired observations", f"{int(selected_result['observations']):,}", border=True)
+        st.metric(
+            "Median Bitcoin return",
+            f"{float(selected_result['median_return']):.1%}",
+            border=True,
+        )
+        st.metric(
+            "Positive outcomes",
+            f"{float(selected_result['positive_share']):.0%}",
+            border=True,
+        )
+    correlation_chart = px.bar(
+        visible_summary,
+        x="horizon_months",
+        y="correlation",
+        text="correlation",
+        title="Model G momentum correlation with subsequent Bitcoin returns",
+        labels={"horizon_months": "Forward horizon (months)", "correlation": "Correlation"},
+    )
+    correlation_chart.update_traces(
+        marker_color="#D97706",
+        texttemplate="%{text:+.2f}",
+        textposition="outside",
+    )
+    correlation_chart.add_hline(y=0, line_color="gray", line_width=1)
+    correlation_chart.update_yaxes(range=[-1, 1])
+    correlation_chart.update_xaxes(dtick=1)
+    st.plotly_chart(correlation_chart, width="stretch", config={"displaylogo": False})
+
+    selected_pairs = global_pairs.loc[
+        (global_pairs["availability_lag_months"] == selected_global_lag)
+        & (global_pairs["horizon_months"] == selected_global_horizon)
+    ].copy()
+    if sample_key == "non_overlapping":
+        selected_pairs = selected_pairs.loc[selected_pairs["is_non_overlapping"]]
+    scatter = px.scatter(
+        selected_pairs,
+        x="global_cb_momentum_score",
+        y="market_return",
+        hover_data={"signal_date": "|%Y-%m-%d", "global_cb_regime": True},
+        title="Monthly global central-bank momentum and later Bitcoin return",
+        labels={
+            "global_cb_momentum_score": "Global Model G momentum score",
+            "market_return": "Subsequent Bitcoin return",
+        },
+    )
+    scatter.update_yaxes(tickformat=".0%")
+    st.plotly_chart(scatter, width="stretch", config={"displaylogo": False})
+    st.warning(
+        "This is a current-vintage descriptive comparison. The selected availability delay is "
+        "an assumption because historical BIS release timestamps are not reconstructed. "
+        "Correlation does not establish causation or an investable signal, and Bitcoin outcomes "
+        "are never inputs to Model G.",
+        icon=":material/warning:",
+    )
+    st.caption(f"Data mode: {global_market_origin} · Bitcoin: Coin Metrics Community Data")
+
+
 def _subperiod_correlation_figure(frame: pd.DataFrame, title: str):
     figure = go.Figure(
         go.Bar(
@@ -1581,12 +1707,27 @@ def bitcoin_research_page() -> None:
     try:
         loaded = _bitcoin_research_data()
     except DashboardDataError as exc:
-        st.error(str(exc), icon=":material/error:")
-        return
+        loaded = None
+        us_research_error = str(exc)
+    else:
+        us_research_error = None
     if loaded is None:
+        with st.sidebar:
+            st.header("Bitcoin research controls")
+            st.selectbox(
+                "Liquidity definition",
+                ["Global Model G — five central banks"],
+                key="bitcoin_model",
+            )
+        _render_global_model_g_bitcoin(key_prefix="bitcoin_research", show_heading=False)
         st.info(
-            "Bitcoin research outputs have not been generated in this environment. The existing "
-            "FRED key is sufficient and Coin Metrics Community Data requires no key.",
+            (
+                f"US point-in-time research is unavailable: {us_research_error}"
+                if us_research_error is not None
+                else "US point-in-time research outputs have not been generated in this "
+                "environment. The existing FRED key is sufficient and Coin Metrics Community "
+                "Data requires no key."
+            ),
             icon=":material/currency_bitcoin:",
         )
         st.code("uv run ogli-point-in-time --publish-dashboard-snapshot", language="zsh")
@@ -1605,57 +1746,60 @@ def bitcoin_research_page() -> None:
         if primary_rows["sample_policy"].iloc[0] == "non_overlapping"
         else "Overlapping"
     )
-    st.badge(
-        "Primary: Model B · 1-week delay · non-overlapping · 1/3/6/12 months",
-        icon=":material/check_circle:",
-        color="blue",
-    )
-    st.caption(
-        "This primary display policy is a predeclared model assumption. Change any control to "
-        "inspect robustness alternatives; no Bitcoin outcome was used to calculate OGLI."
-    )
-
-    model_options = dict(
+    us_model_options = dict(
         outcomes[["model_name", "model_id"]].drop_duplicates().itertuples(index=False)
     )
-    default_name = "Model B — Net Fed liquidity proxy"
-    default_name = next(
-        name
-        for name, configured_model_id in model_options.items()
-        if configured_model_id == primary_model_id
-    )
+    model_options = {"Global Model G — five central banks": "global_model_g", **us_model_options}
     with st.sidebar:
         st.header("Bitcoin research controls")
         selected_name = st.selectbox(
             "Liquidity definition",
             list(model_options),
-            index=list(model_options).index(default_name),
+            index=0,
             key="bitcoin_model",
         )
-        horizon = st.selectbox(
-            "Forward horizon",
-            sorted(outcomes["horizon_months"].unique()),
-            index=sorted(outcomes["horizon_months"].unique()).index(
-                3 if 3 in primary_horizons else primary_horizons[0]
-            ),
-            format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
-            key="bitcoin_horizon",
-        )
-        publication_lag = st.selectbox(
-            "Assumed availability delay",
-            sorted(outcomes["publication_lag_weeks"].unique()),
-            index=sorted(outcomes["publication_lag_weeks"].unique()).index(primary_lag),
-            format_func=lambda value: f"{value} week{'s' if value != 1 else ''}",
-            key="bitcoin_lag",
-        )
-        sample_policy = st.segmented_control(
-            "Sample",
-            ["Non-overlapping", "Overlapping"],
-            default=primary_sample_label,
-            key="bitcoin_sample",
-        )
-        st.caption(f"Data mode: {data_origin}")
+        if model_options[selected_name] != "global_model_g":
+            horizon = st.selectbox(
+                "Forward horizon",
+                sorted(outcomes["horizon_months"].unique()),
+                index=sorted(outcomes["horizon_months"].unique()).index(
+                    3 if 3 in primary_horizons else primary_horizons[0]
+                ),
+                format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
+                key="bitcoin_horizon",
+            )
+            publication_lag = st.selectbox(
+                "Assumed availability delay",
+                sorted(outcomes["publication_lag_weeks"].unique()),
+                index=sorted(outcomes["publication_lag_weeks"].unique()).index(primary_lag),
+                format_func=lambda value: f"{value} week{'s' if value != 1 else ''}",
+                key="bitcoin_lag",
+            )
+            sample_policy = st.segmented_control(
+                "Sample",
+                ["Non-overlapping", "Overlapping"],
+                default=primary_sample_label,
+                key="bitcoin_sample",
+            )
+        if model_options[selected_name] == "global_model_g":
+            st.caption("Global monthly controls and data provenance are shown in the workspace.")
+        else:
+            st.caption(f"US point-in-time data mode: {data_origin}")
 
+    model_id = model_options[selected_name]
+    if model_id == "global_model_g":
+        _render_global_model_g_bitcoin(key_prefix="bitcoin_research", show_heading=False)
+        return
+
+    st.badge(
+        "US point-in-time: Model B · 1-week delay · non-overlapping · 1/3/6/12 months",
+        icon=":material/check_circle:",
+        color="blue",
+    )
+    st.caption(
+        "This primary US display policy is a predeclared model assumption. Change any control to "
+        "inspect robustness alternatives; no Bitcoin outcome was used to calculate OGLI."
+    )
     view = st.segmented_control(
         "Research view",
         [
@@ -1669,7 +1813,6 @@ def bitcoin_research_page() -> None:
         default="Regime contrast",
         key="bitcoin_view",
     )
-    model_id = model_options[selected_name]
     sample_key = "non_overlapping" if sample_policy == "Non-overlapping" else "overlapping"
     selected_is_primary = (
         model_id == primary_model_id
@@ -2478,29 +2621,23 @@ def markets_page() -> None:
     try:
         comparisons, correlations, data_origin = _market_data()
     except DashboardDataError as exc:
-        st.info(str(exc), icon=":material/info:")
-        st.markdown(
-            "Bitcoin comparison files are unavailable. Run the pipeline to refresh the public "
-            "Coin Metrics market snapshot:"
+        comparisons = None
+        correlations = pd.DataFrame(
+            columns=["model_name", "model_id", "analysis_mode", "sample_policy"]
         )
-        st.code(
-            "uv run python -m open_global_liquidity.pipeline --start 2020-01-01",
-            language="zsh",
-        )
-        st.link_button(
-            "Review Coin Metrics community data",
-            "https://github.com/coinmetrics/data",
-            icon=":material/open_in_new:",
-        )
-        return
+        data_origin = "US comparison unavailable"
+        us_market_error = str(exc)
+    else:
+        us_market_error = None
     if comparisons is not None:
         _show_freshness(comparisons, "Bitcoin/OGLI comparison")
 
-    model_options = dict(
+    us_model_options = dict(
         correlations[["model_name", "model_id"]]
         .drop_duplicates()
         .itertuples(index=False, name=None)
     )
+    model_options = {"Global Model G — five central banks": "global_model_g", **us_model_options}
     horizon_options = {
         "Current 1-week return": 0,
         "4 weeks forward": 4,
@@ -2532,35 +2669,53 @@ def markets_page() -> None:
         selected_model = st.selectbox(
             "Liquidity definition",
             list(model_options),
-            index=list(model_options).index("Model B — Net Fed liquidity proxy"),
+            index=0,
             key="market_model",
         )
-        selected_horizon_label = st.selectbox(
-            "Return horizon",
-            list(horizon_options),
-            index=3,
-            key="market_horizon",
-        )
-        selected_analysis_label = st.selectbox(
-            "Signal timing",
-            list(analysis_options),
-            key="market_analysis_mode",
-        )
-        selected_sample_label = st.selectbox(
-            "Statistical sample",
-            list(sample_options),
-            key="market_sample_policy",
-        )
-        timeline_history = st.segmented_control(
-            "Timeline history",
-            ["3 years", "5 years", "All"],
-            default="5 years",
-            key="market_timeline_history",
-        )
+        if model_options[selected_model] != "global_model_g":
+            selected_horizon_label = st.selectbox(
+                "Return horizon",
+                list(horizon_options),
+                index=3,
+                key="market_horizon",
+            )
+            selected_analysis_label = st.selectbox(
+                "Signal timing",
+                list(analysis_options),
+                key="market_analysis_mode",
+            )
+            selected_sample_label = st.selectbox(
+                "Statistical sample",
+                list(sample_options),
+                key="market_sample_policy",
+            )
+            timeline_history = st.segmented_control(
+                "Timeline history",
+                ["3 years", "5 years", "All"],
+                default="5 years",
+                key="market_timeline_history",
+            )
         st.caption("Market: Bitcoin · Coin Metrics daily USD price")
-        st.caption(f"Data mode: {data_origin}")
+        if model_options[selected_model] == "global_model_g":
+            st.caption("Global monthly controls and data provenance are shown in the workspace.")
+        else:
+            st.caption(f"US/Fed data mode: {data_origin}")
 
     model_id = model_options[selected_model]
+    if model_id == "global_model_g":
+        _render_global_model_g_bitcoin(key_prefix="markets", show_heading=False)
+        return
+    if us_market_error is not None:
+        st.info(us_market_error, icon=":material/info:")
+        st.markdown(
+            "US/Fed Bitcoin comparison files are unavailable. Run the pipeline to refresh the "
+            "public Coin Metrics market snapshot:"
+        )
+        st.code(
+            "uv run python -m open_global_liquidity.pipeline --start 2020-01-01",
+            language="zsh",
+        )
+        return
     horizon = horizon_options[selected_horizon_label]
     analysis_mode = analysis_options[selected_analysis_label]
     sample_policy = sample_options[selected_sample_label]
@@ -3554,119 +3709,7 @@ def global_aggregate_page() -> None:
             "relative to information available through that month. Weights are assumptions."
         )
 
-    st.subheader("Global Model G vs subsequent Bitcoin returns")
-    try:
-        global_pairs, global_summary, global_market_origin = _global_bitcoin_data()
-    except DashboardDataError:
-        global_pairs = pd.DataFrame()
-        global_summary = pd.DataFrame()
-        global_market_origin = "Unavailable"
-    if global_summary.empty:
-        st.info(
-            "The monthly Global Model G and Bitcoin comparison has not been generated in this "
-            "environment.",
-            icon=":material/currency_bitcoin:",
-        )
-    else:
-        with st.container(horizontal=True):
-            selected_global_lag = st.selectbox(
-                "Assumed availability delay",
-                sorted(global_summary["availability_lag_months"].unique()),
-                index=2,
-                format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
-                key="global_bitcoin_lag",
-            )
-            selected_global_sample = st.segmented_control(
-                "Sample",
-                ["Non-overlapping", "Overlapping"],
-                default="Non-overlapping",
-                key="global_bitcoin_sample",
-            )
-            selected_global_horizon = st.selectbox(
-                "Forward horizon",
-                sorted(global_summary["horizon_months"].unique()),
-                index=1,
-                format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
-                key="global_bitcoin_horizon",
-            )
-        sample_key = (
-            "non_overlapping" if selected_global_sample == "Non-overlapping" else "overlapping"
-        )
-        visible_summary = global_summary.loc[
-            (global_summary["availability_lag_months"] == selected_global_lag)
-            & (global_summary["sample_policy"] == sample_key)
-        ].copy()
-        selected_result = visible_summary.loc[
-            visible_summary["horizon_months"] == selected_global_horizon
-        ].iloc[0]
-        with st.container(horizontal=True):
-            st.metric(
-                "Pearson correlation",
-                (
-                    "Insufficient sample"
-                    if pd.isna(selected_result["correlation"])
-                    else f"{float(selected_result['correlation']):+.2f}"
-                ),
-                border=True,
-            )
-            st.metric(
-                "Paired observations", f"{int(selected_result['observations']):,}", border=True
-            )
-            st.metric(
-                "Median Bitcoin return",
-                f"{float(selected_result['median_return']):.1%}",
-                border=True,
-            )
-            st.metric(
-                "Positive outcomes",
-                f"{float(selected_result['positive_share']):.0%}",
-                border=True,
-            )
-        correlation_chart = px.bar(
-            visible_summary,
-            x="horizon_months",
-            y="correlation",
-            text="correlation",
-            title="Model G momentum correlation with subsequent Bitcoin returns",
-            labels={"horizon_months": "Forward horizon (months)", "correlation": "Correlation"},
-        )
-        correlation_chart.update_traces(
-            marker_color="#D97706",
-            texttemplate="%{text:+.2f}",
-            textposition="outside",
-        )
-        correlation_chart.add_hline(y=0, line_color="gray", line_width=1)
-        correlation_chart.update_yaxes(range=[-1, 1])
-        correlation_chart.update_xaxes(dtick=1)
-        st.plotly_chart(correlation_chart, width="stretch", config={"displaylogo": False})
-
-        selected_pairs = global_pairs.loc[
-            (global_pairs["availability_lag_months"] == selected_global_lag)
-            & (global_pairs["horizon_months"] == selected_global_horizon)
-        ].copy()
-        if sample_key == "non_overlapping":
-            selected_pairs = selected_pairs.loc[selected_pairs["is_non_overlapping"]]
-        scatter = px.scatter(
-            selected_pairs,
-            x="global_cb_momentum_score",
-            y="market_return",
-            hover_data={"signal_date": "|%Y-%m-%d", "global_cb_regime": True},
-            title="Monthly global central-bank momentum and later Bitcoin return",
-            labels={
-                "global_cb_momentum_score": "Global Model G momentum score",
-                "market_return": "Subsequent Bitcoin return",
-            },
-        )
-        scatter.update_yaxes(tickformat=".0%")
-        st.plotly_chart(scatter, width="stretch", config={"displaylogo": False})
-        st.warning(
-            "This is a current-vintage descriptive comparison. The selected availability delay "
-            "is an assumption because historical BIS release timestamps are not reconstructed. "
-            "Correlation does not establish causation or an investable signal, and Bitcoin "
-            "outcomes are never inputs to Model G.",
-            icon=":material/warning:",
-        )
-        st.caption(f"Data mode: {global_market_origin} · Bitcoin: Coin Metrics Community Data")
+    _render_global_model_g_bitcoin(key_prefix="global_aggregate")
 
     figure = px.line(
         aggregate,
