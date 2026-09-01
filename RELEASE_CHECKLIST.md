@@ -18,7 +18,8 @@
       snapshots are included in the scheduled refresh workflow.
 - [x] The current-vintage and incomplete-global-liquidity limitations are visible in code,
       configuration, documentation, and the dashboard.
-- [ ] The v0.3.0 release commit passes GitHub Actions and the hosted Model G workspaces are verified.
+- [x] The v0.3.0 release candidate passes GitHub Actions and the hosted Model G workspaces are
+      verified.
 
 ## v0.2.0 international measured-data milestone
 
