@@ -53,6 +53,7 @@ from dashboard_support import (  # noqa: E402
     load_point_in_time_market_pairs,
     load_point_in_time_market_summary,
     load_snapshot_manifest,
+    prepare_global_index_display,
     resolve_dashboard_data_path,
 )
 
@@ -1394,16 +1395,7 @@ def ogli_page() -> None:
     global_origin = "Unavailable"
     try:
         global_aggregate, _global_detail, global_origin = _global_data()
-        global_data = global_aggregate.dropna(subset=["global_cb_index"]).rename(
-            columns={
-                "global_cb_index": "index_value",
-                "global_cb_momentum_score": "momentum_score",
-                "global_cb_regime": "regime",
-                "monthly_annualized_growth": "short_growth",
-                "global_cb_zscore_mode": "zscore_mode",
-                "global_cb_zscore_min_periods": "zscore_min_periods",
-            }
-        )
+        global_data = prepare_global_index_display(global_aggregate)
     except DashboardDataError:
         pass
 

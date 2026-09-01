@@ -550,6 +550,11 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     assert aggregate["classification"].eq("model_assumption").all()
     assert aggregate["global_cb_index"].dropna().between(0, 100).all()
     assert aggregate["global_cb_index"].notna().any()
+    global_display = support.prepare_global_index_display(aggregate)
+    assert global_display["growth_12m_yoy"].equals(
+        aggregate.loc[aggregate["global_cb_index"].notna(), "growth_yoy"]
+    )
+    assert global_display["index_value"].notna().all()
     assert len(aggregate) >= 290
     assert aggregate["date"].min() == pd.Timestamp("2002-01-31")
     assert detail.groupby("date")["central_bank"].nunique().eq(5).all()

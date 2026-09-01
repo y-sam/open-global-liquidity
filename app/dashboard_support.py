@@ -1252,6 +1252,34 @@ def load_global_central_bank_aggregate(path: Path) -> pd.DataFrame:
     return result.sort_values("date").reset_index(drop=True)
 
 
+def prepare_global_index_display(frame: pd.DataFrame) -> pd.DataFrame:
+    """Adapt Global Model G columns to the shared liquidity-index presentation schema."""
+    required = {
+        "date",
+        "global_cb_index",
+        "global_cb_momentum_score",
+        "global_cb_regime",
+        "monthly_annualized_growth",
+        "growth_yoy",
+        "global_cb_zscore_mode",
+        "global_cb_zscore_min_periods",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Global index display is missing: " + ", ".join(missing))
+    return frame.dropna(subset=["global_cb_index"]).rename(
+        columns={
+            "global_cb_index": "index_value",
+            "global_cb_momentum_score": "momentum_score",
+            "global_cb_regime": "regime",
+            "monthly_annualized_growth": "short_growth",
+            "growth_yoy": "growth_12m_yoy",
+            "global_cb_zscore_mode": "zscore_mode",
+            "global_cb_zscore_min_periods": "zscore_min_periods",
+        }
+    )
+
+
 def load_global_central_bank_detail(path: Path) -> pd.DataFrame:
     """Load USD-converted component contributions supporting the aggregate."""
     frame = _read_parquet(path, "Global central-bank detail")
