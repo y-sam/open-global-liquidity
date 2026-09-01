@@ -1,7 +1,7 @@
 # Open Global Liquidity
 
-**Current release:** v0.2.0. **Current development milestone:** v0.3 currency normalization and
-global central-bank aggregation. See the [changelog](CHANGELOG.md),
+**Current release:** v0.3.0 — currency normalization, global central-bank aggregation, and Global
+Model G. See the [changelog](CHANGELOG.md),
 [citation metadata](CITATION.cff), and [release checklist](RELEASE_CHECKLIST.md). Project code is
 licensed under Apache-2.0; bundled and downloaded third-party data remain subject to their
 respective terms.
@@ -20,7 +20,7 @@ Original project code is licensed under the [Apache License 2.0](LICENSE). This 
 not relicense third-party observations, derived snapshots, source metadata, names, or trademarks.
 See [Third-party data terms](THIRD_PARTY_DATA.md) before redistributing bundled data artifacts.
 
-## Current scope: v0.3 development
+## Current scope: v0.3
 
 The repository provides an auditable US data-ingestion path, experimental OGLI momentum index, and
 Streamlit dashboard. It

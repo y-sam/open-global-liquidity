@@ -1,5 +1,25 @@
 # Release checklist
 
+## v0.3.0 global aggregation milestone
+
+- [x] Five exact BIS central-bank total-assets series and four H.10 FX inputs are configured with
+      explicit identifiers, units, quote conventions, and staleness limits.
+- [x] The aggregate uses balanced monthly period-end observations, never interpolates, and retains
+      source-date and FX-date lineage.
+- [x] Global Model G is classified as an experimental statistical transformation with configurable
+      momentum weights and regime thresholds.
+- [x] Model G is available across the liquidity-index and Bitcoin research workspaces while the
+      three US/Fed definitions remain separately labeled.
+- [x] Model G/Bitcoin comparisons expose lag, horizon, and sample-policy sensitivity and do not feed
+      market outcomes into the index.
+- [x] BIS, Federal Reserve H.10, and Coin Metrics reuse terms and attribution are documented
+      separately from the Apache-2.0 code license.
+- [x] Public global source, detail, aggregate, Bitcoin-pair, Bitcoin-summary, and provenance
+      snapshots are included in the scheduled refresh workflow.
+- [x] The current-vintage and incomplete-global-liquidity limitations are visible in code,
+      configuration, documentation, and the dashboard.
+- [ ] The v0.3.0 release commit passes GitHub Actions and the hosted Model G workspaces are verified.
+
 ## v0.2.0 international measured-data milestone
 
 - [x] ECB, BOJ, BoE, and PBoC providers validate exact source definitions and native units.

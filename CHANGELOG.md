@@ -5,6 +5,8 @@ release is tagged.
 
 ## [Unreleased]
 
+## [0.3.0] — 2026-09-01
+
 ### Added
 
 - Keyless BIS SDMX provider with exact-series, key, frequency, currency, and unit-multiplier
@@ -12,16 +14,40 @@ release is tagged.
 - Redistributable monthly China central-bank total-assets snapshot from the BIS, while retaining
   the direct PBoC table as a local-only validation source.
 - Four public-domain Federal Reserve H.10 spot exchange-rate inputs for EUR, JPY, GBP, and CNY.
-- Configured balanced-quarter currency normalization and a five-central-bank USD aggregate with
+- Configured balanced monthly currency normalization and a five-central-bank USD aggregate with
   source-date and FX-date lineage.
 - Global aggregate dashboard page with level, growth, composition, and an auditable methodology
   table.
+- Global Model G, an experimental 0–100 expanding-normalized momentum index of the five-bank USD
+  aggregate, with configurable weights and regime thresholds.
+- Monthly Model G versus subsequent Bitcoin comparisons across 1/3/6/12-month horizons, assumed
+  0–3-month availability delays, and overlapping or non-overlapping samples.
+- Model G selection across the liquidity-indices, Liquidity vs markets, Bitcoin research, and
+  global-aggregate workspaces while retaining the three US/Fed research definitions.
+- Versioned global source, detail, aggregate, market-pair, market-summary, and manifest snapshots
+  for reproducible hosted deployment.
+
+### Changed
+
+- Extended the balanced global panel to monthly observations beginning in January 2002.
+- Made Global Model G the default liquidity definition in the index and Bitcoin comparison
+  workspaces; US Models A/B/C remain explicitly labeled alternatives.
+- Reused one canonical Streamlit presentation for Model G/Bitcoin statistics so assumptions and
+  provenance are consistent across pages.
+
+### Research interpretation
+
+- Current Model G/Bitcoin results are descriptive and sensitive to horizon, lag, and sampling
+  policy. They do not establish a stable predictive relationship, causation, or an investable
+  signal, and they were not used to calibrate Model G.
 
 ### Research boundary
 
-- The v0.3 aggregate is a current-vintage nominal central-bank-balance-sheet proxy. It is not OGLI,
-  does not model publication lags, and contains no private-credit, shadow-bank, collateral, repo,
-  or offshore-dollar components.
+- Global Model G is a current-vintage nominal central-bank-balance-sheet momentum proxy, not a
+  complete global-liquidity index. Its availability-delay controls are assumptions because
+  historical BIS release vintages have not been reconstructed.
+- Model G contains no private-credit, shadow-bank, collateral, repo, FX-swap, or offshore-dollar
+  components and does not reproduce CrossBorder Capital's proprietary methodology.
 
 ## [0.2.0] — 2026-08-29
 
@@ -95,6 +121,8 @@ release is tagged.
 The historical `v0.1.0` tag predates the finalized code license, citation metadata, and release
 audit. It is retained unchanged for reproducibility and is superseded by v0.1.1.
 
+[Unreleased]: https://github.com/y-sam/open-global-liquidity/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.3.0
 [0.2.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.2.0
 [0.1.1]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.1.1
 [0.1.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.1.0

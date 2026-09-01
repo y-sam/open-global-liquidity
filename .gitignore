@@ -12,6 +12,7 @@ __pycache__/
 htmlcov/
 .venv/
 .uv-cache/
+dist/
 
 # Secrets
 .env
