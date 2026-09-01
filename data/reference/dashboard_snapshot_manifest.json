@@ -19,7 +19,7 @@
       ],
       "earliest_observation": "2002-01-31",
       "latest_observation": "2026-06-30",
-      "latest_retrieval": "2026-08-30T09:42:48.654260+00:00",
+      "latest_retrieval": "2026-09-01T12:12:53.225108+00:00",
       "providers": [
         "BIS"
       ],
@@ -27,7 +27,7 @@
       "series_ids": [
         "BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N"
       ],
-      "sha256": "e2f1638fd31aa8323623d8747eff8dc41064b03382df1c7bc7c61b2c22348791"
+      "sha256": "eedb1e81a511fa6b12c862127cd090fdfe548db7df6d10c419a27fb11a8f1820"
     },
     "euro_area_ecb_series_snapshot.parquet": {
       "bytes": 11990,
@@ -57,13 +57,52 @@
       ],
       "sha256": "4247c689fc6be73e4d05c20df7ffdc5f08e306599830e6bcfed342827a38f74f"
     },
+    "global_bis_central_bank_series_snapshot.parquet": {
+      "bytes": 21664,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "retrieved_at"
+      ],
+      "components": [
+        "china_central_bank_total_assets",
+        "euro_area_central_bank_total_assets",
+        "japan_central_bank_total_assets",
+        "uk_central_bank_total_assets",
+        "us_central_bank_total_assets"
+      ],
+      "earliest_observation": "2002-01-31",
+      "latest_observation": "2026-07-31",
+      "latest_retrieval": "2026-09-01T12:12:53.225108+00:00",
+      "providers": [
+        "BIS"
+      ],
+      "rows": 1474,
+      "series_ids": [
+        "BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N",
+        "BIS,WS_CBTA,1.0/M.GB.B.XDC.GBP.N",
+        "BIS,WS_CBTA,1.0/M.JP.B.XDC.JPY.N",
+        "BIS,WS_CBTA,1.0/M.US.B.XDC.USD.N",
+        "BIS,WS_CBTA,1.0/M.XM.B.XDC.EUR.N"
+      ],
+      "sha256": "37723f7d8927f54e973975a4d87f23a8e24af1704bef313b8b00a3020df1254a"
+    },
     "global_central_bank_assets_detail_snapshot.parquet": {
-      "bytes": 18344,
+      "bytes": 68928,
       "columns": [
         "date",
         "source_date",
         "native_value",
         "unit",
+        "source_provider",
+        "source_series_id",
+        "source_retrieved_at",
         "component",
         "central_bank",
         "native_unit",
@@ -71,34 +110,37 @@
         "fx_component",
         "fx_date",
         "fx_rate",
+        "fx_provider",
+        "fx_series_id",
+        "fx_retrieved_at",
         "value_usd_millions",
         "is_balanced"
       ],
       "components": [
-        "boe_total_assets",
-        "boj_total_assets",
         "china_central_bank_total_assets",
-        "eurosystem_total_assets",
-        "fed_assets"
+        "euro_area_central_bank_total_assets",
+        "japan_central_bank_total_assets",
+        "uk_central_bank_total_assets",
+        "us_central_bank_total_assets"
       ],
-      "earliest_observation": "2013-09-30",
-      "latest_observation": "2025-03-31",
-      "rows": 235,
-      "sha256": "13151969742268b1f75e572678e1fe1125b82a6371e9ccc47d792168e948bffb"
+      "earliest_observation": "2002-01-31",
+      "latest_observation": "2026-06-30",
+      "rows": 1470,
+      "sha256": "cfb5ded7c3ee93b4f2ba6470d2b2f2c5d6083f2ca07eb0b1bfa91df728cdd996"
     },
     "global_central_bank_assets_snapshot.parquet": {
-      "bytes": 16542,
+      "bytes": 37630,
       "columns": [
         "date",
         "total_usd_millions",
         "component_count",
         "total_usd_trillions",
-        "change_1q",
+        "change_1m",
         "growth_yoy",
         "classification",
         "name",
-        "quarterly_annualized_growth",
-        "z_quarterly_annualized_growth",
+        "monthly_annualized_growth",
+        "z_monthly_annualized_growth",
         "z_growth_yoy",
         "global_cb_momentum_score",
         "global_cb_index",
@@ -109,10 +151,74 @@
         "global_cb_zscore_mode",
         "global_cb_zscore_min_periods"
       ],
-      "earliest_observation": "2013-09-30",
-      "latest_observation": "2025-03-31",
-      "rows": 47,
-      "sha256": "3dd3f75d7f9008d378dce48c49c36443ef7c09a87c158ef0706f2adf0f7a09eb"
+      "earliest_observation": "2002-01-31",
+      "latest_observation": "2026-06-30",
+      "rows": 294,
+      "sha256": "438ff19964b0412ba21968e77d7f67437a721b0e31f35302f66568fe556fec1f"
+    },
+    "global_central_bank_bitcoin_pairs_snapshot.parquet": {
+      "bytes": 66328,
+      "columns": [
+        "signal_date",
+        "signal_available_date",
+        "model_id",
+        "model_name",
+        "global_cb_index",
+        "global_cb_momentum_score",
+        "global_cb_regime",
+        "market_id",
+        "series_id",
+        "provider",
+        "availability_lag_months",
+        "horizon_months",
+        "start_observation_date",
+        "start_value",
+        "end_observation_date",
+        "end_value",
+        "market_return",
+        "is_non_overlapping",
+        "timing_classification",
+        "classification"
+      ],
+      "market_ids": [
+        "bitcoin"
+      ],
+      "model_ids": [
+        "global_model_g"
+      ],
+      "providers": [
+        "Coin Metrics"
+      ],
+      "rows": 3015,
+      "series_ids": [
+        "btc.PriceUSD"
+      ],
+      "sha256": "7da7c8b75505181b099aa983cf3e8f740a282a76f41b194c2fdb2658d2e12648"
+    },
+    "global_central_bank_bitcoin_summary_snapshot.parquet": {
+      "bytes": 8828,
+      "columns": [
+        "model_id",
+        "model_name",
+        "market_id",
+        "availability_lag_months",
+        "horizon_months",
+        "sample_policy",
+        "observations",
+        "correlation",
+        "mean_return",
+        "median_return",
+        "positive_share",
+        "classification"
+      ],
+      "market_ids": [
+        "bitcoin"
+      ],
+      "model_ids": [
+        "global_model_g"
+      ],
+      "rows": 32,
+      "sha256": "98f350274eeb49ac4da36ca6a16aef2e363ea3e418ee0c5505c29b8dd0e01904"
     },
     "global_fx_series_snapshot.parquet": {
       "bytes": 378878,
@@ -988,10 +1094,10 @@
       "sha256": "12849b808f5d11d08cafb6983b72ba59ead0039867aaacc81c3ff415bed4f23d"
     }
   },
-  "generated_at": "2026-09-01T11:59:33.991733+00:00",
+  "generated_at": "2026-09-01T12:21:35.602986+00:00",
   "pipeline_version": "0.3.0.dev0",
   "schema_version": 1,
-  "snapshot_count": 29,
-  "source_commit": "1b5afa538c6b6525152de0acc1607029990a4fca",
+  "snapshot_count": 32,
+  "source_commit": "b4f64d4ae05bb2190b6860ccfb0d0ee1d52373da",
   "working_tree_dirty": false
 }
