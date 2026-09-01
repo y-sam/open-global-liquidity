@@ -6,6 +6,7 @@ import pytest
 from open_global_liquidity.models.global_central_bank import (
     GlobalAggregationError,
     calculate_global_central_bank_assets,
+    calculate_global_central_bank_index,
     load_global_aggregation_config,
 )
 
@@ -22,6 +23,9 @@ def test_load_global_aggregation_config_is_explicit() -> None:
     assert config.missing_policy == "balanced_panel_only"
     assert len(config.components) == 5
     assert config.components[-1].fx_component == "yuan_per_usd"
+    assert config.index.normalization == "expanding"
+    assert config.index.min_periods == 20
+    assert sum(config.index.momentum_weights.values()) == pytest.approx(1.0)
 
 
 def test_calculate_global_assets_converts_direct_and_inverse_quotes() -> None:
@@ -84,6 +88,38 @@ def test_calculate_global_assets_converts_direct_and_inverse_quotes() -> None:
     assert first.loc["china_central_bank_total_assets", "value_usd_millions"] == 5_000_000.0
     assert aggregate.iloc[0]["total_usd_millions"] == 13_651_000.0
     assert aggregate["component_count"].tolist() == [5, 5]
+
+
+def test_global_index_uses_expanding_history_and_is_bounded() -> None:
+    dates = pd.date_range("2010-03-31", periods=32, freq="QE")
+    values = pd.Series(
+        [10_000_000 * (1.01**period) * (1 + 0.01 * ((period % 5) - 2)) for period in range(32)]
+    )
+    aggregate = pd.DataFrame(
+        {
+            "date": dates,
+            "total_usd_millions": values,
+            "change_1q": values.pct_change(),
+            "growth_yoy": values.pct_change(4),
+        }
+    )
+
+    result = calculate_global_central_bank_index(aggregate, _config())
+
+    valid = result.dropna(subset=["global_cb_index"])
+    assert not valid.empty
+    assert valid["global_cb_index"].between(0, 100).all()
+    assert set(valid["global_cb_zscore_mode"]) == {"expanding"}
+    assert set(valid["global_cb_index_classification"]) == {"statistical_transformation"}
+    first_valid = valid.index[0]
+    changed_future = aggregate.copy()
+    changed_future.loc[changed_future.index[-1], "total_usd_millions"] *= 10
+    changed_future["change_1q"] = changed_future["total_usd_millions"].pct_change()
+    changed_future["growth_yoy"] = changed_future["total_usd_millions"].pct_change(4)
+    revised = calculate_global_central_bank_index(changed_future, _config())
+    assert revised.loc[first_valid, "global_cb_index"] == pytest.approx(
+        result.loc[first_valid, "global_cb_index"]
+    )
 
 
 def test_calculate_global_assets_rejects_missing_component() -> None:

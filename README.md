@@ -104,6 +104,13 @@ input is quarterly and published with a long lag, the balanced aggregate is deli
 and ends at the least-current component. FX translation means changes reflect both native balance
 sheets and exchange rates. This measured-data aggregate is not the US OGLI or a global OGLI.
 
+The same page now reports **Global Model G — central-bank assets momentum**, an experimental
+0–100 non-look-ahead normalization of the five-bank USD aggregate. It combines 60% of the
+expanding z-score of quarterly annualized growth with 40% of the expanding z-score of annual
+growth, then applies the standard normal CDF. This is a genuinely global central-bank model, while
+Models A/B/C remain explicitly US/Fed models. Model G is not yet a complete global OGLI because it
+does not include private credit, repo, offshore dollar funding, collateral, or shadow banking.
+
 ## Research boundaries
 
 The project will keep three categories separate:
@@ -523,8 +530,9 @@ slope remain measured context. S&P 500 may return after appropriate public-displ
 secured. v0.2 completes the first global-central-bank measured-data layer with separate Federal
 Reserve, ECB, BOJ, BoE, and local-only PBoC total-assets series plus a non-aggregated indexed
 comparison. v0.3 now adds explicit FX normalization and a balanced quarterly central-bank asset
-aggregate; point-in-time publication-lag treatment and a global momentum index remain unfinished. Later
-increments may add collateral and repo proxies, shadow monetary base concepts, BIS cross-border
+aggregate and its expanding-normalized global central-bank momentum index. Point-in-time
+publication-lag treatment for the global panel remains unfinished. Later increments may add
+collateral and repo proxies, shadow monetary base concepts, BIS cross-border
 credit, and explicitly labeled public benchmark calibration.
 
 ## Limitations and disclaimer

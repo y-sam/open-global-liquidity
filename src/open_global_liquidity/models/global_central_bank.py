@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date
+from itertools import pairwise
 from pathlib import Path
 
 import pandas as pd
 import yaml
+
+from open_global_liquidity.models.ogli import momentum_to_ogli
+from open_global_liquidity.transforms.normalize import historical_zscore
 
 
 class GlobalAggregationError(ValueError):
@@ -28,6 +32,19 @@ class GlobalComponentConfig:
 
 
 @dataclass(frozen=True, slots=True)
+class GlobalIndexConfig:
+    """Transparent statistical assumptions for the global central-bank momentum index."""
+
+    name: str
+    classification: str
+    description: str
+    normalization: str
+    min_periods: int
+    momentum_weights: dict[str, float]
+    regimes: tuple[tuple[str, float], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class GlobalAggregationConfig:
     """Auditable assumptions for the v0.3 balanced quarterly aggregate."""
 
@@ -41,6 +58,7 @@ class GlobalAggregationConfig:
     missing_policy: str
     components: tuple[GlobalComponentConfig, ...]
     fx_max_staleness_days: int
+    index: GlobalIndexConfig
 
 
 def load_global_aggregation_config(path: Path) -> GlobalAggregationConfig:
@@ -60,6 +78,7 @@ def load_global_aggregation_config(path: Path) -> GlobalAggregationConfig:
         "missing_policy",
         "components",
         "fx_max_staleness_days",
+        "index",
     }
     if not isinstance(raw, dict) or required - raw.keys():
         missing = sorted(required - raw.keys()) if isinstance(raw, dict) else sorted(required)
@@ -108,6 +127,50 @@ def load_global_aggregation_config(path: Path) -> GlobalAggregationConfig:
         raise GlobalAggregationError("Global aggregation dates/staleness are invalid") from exc
     if fx_staleness < 0 or any(item.max_staleness_days < 0 for item in components):
         raise GlobalAggregationError("Global aggregation staleness cannot be negative")
+    index_raw = raw["index"]
+    index_required = {
+        "name",
+        "classification",
+        "description",
+        "normalization",
+        "min_periods",
+        "momentum_weights",
+        "regimes",
+    }
+    if not isinstance(index_raw, dict) or index_required - index_raw.keys():
+        raise GlobalAggregationError("Global index configuration is incomplete")
+    weights = {str(key): float(value) for key, value in index_raw["momentum_weights"].items()}
+    if (
+        set(weights) != {"quarterly_annualized_growth", "growth_yoy"}
+        or not abs(sum(weights.values()) - 1.0) < 1e-12
+    ):
+        raise GlobalAggregationError(
+            "Global index weights must contain the two growth rates and sum to one"
+        )
+    regimes = tuple((str(item["label"]), float(item["max"])) for item in index_raw["regimes"])
+    if (
+        not regimes
+        or regimes[-1][1] != 100
+        or any(current[1] <= previous[1] for previous, current in pairwise(regimes))
+    ):
+        raise GlobalAggregationError("Global index regime thresholds must increase through 100")
+    index_config = GlobalIndexConfig(
+        name=str(index_raw["name"]),
+        classification=str(index_raw["classification"]),
+        description=str(index_raw["description"]),
+        normalization=str(index_raw["normalization"]),
+        min_periods=int(index_raw["min_periods"]),
+        momentum_weights=weights,
+        regimes=regimes,
+    )
+    if (
+        index_config.classification != "statistical_transformation"
+        or index_config.normalization != "expanding"
+        or index_config.min_periods < 4
+    ):
+        raise GlobalAggregationError(
+            "Global index must use expanding normalization with at least four periods"
+        )
     return GlobalAggregationConfig(
         classification="model_assumption",
         name=str(raw["name"]),
@@ -119,7 +182,51 @@ def load_global_aggregation_config(path: Path) -> GlobalAggregationConfig:
         missing_policy="balanced_panel_only",
         components=tuple(components),
         fx_max_staleness_days=fx_staleness,
+        index=index_config,
     )
+
+
+def calculate_global_central_bank_index(
+    aggregate: pd.DataFrame,
+    config: GlobalAggregationConfig,
+) -> pd.DataFrame:
+    """Add a non-look-ahead 0-100 momentum index to the global asset aggregate.
+
+    The quarterly annualized growth rate and four-quarter growth rate are standardized against
+    expanding history only, then combined with configured weights and mapped through the standard
+    normal CDF. This is deliberately named a global *central-bank* index: it does not measure bank
+    credit, repo, offshore dollars, collateral, or shadow banking.
+    """
+    required = {"date", "total_usd_millions", "change_1q", "growth_yoy"}
+    missing = sorted(required - set(aggregate.columns))
+    if missing:
+        raise GlobalAggregationError("Global aggregate is missing: " + ", ".join(missing))
+    result = aggregate.sort_values("date").reset_index(drop=True).copy()
+    result["quarterly_annualized_growth"] = (
+        result["total_usd_millions"] / result["total_usd_millions"].shift(1)
+    ).pow(4) - 1
+    growth_columns = ("quarterly_annualized_growth", "growth_yoy")
+    for column in growth_columns:
+        result[f"z_{column}"] = historical_zscore(
+            result[column], mode="expanding", min_periods=config.index.min_periods
+        )
+    result["global_cb_momentum_score"] = sum(
+        result[f"z_{column}"] * config.index.momentum_weights[column] for column in growth_columns
+    )
+    result["global_cb_index"] = momentum_to_ogli(result["global_cb_momentum_score"])
+    result["global_cb_regime"] = result["global_cb_index"].map(
+        lambda value: (
+            None
+            if pd.isna(value)
+            else next(label for label, maximum in config.index.regimes if value <= maximum)
+        )
+    )
+    result["global_cb_index_name"] = config.index.name
+    result["global_cb_index_classification"] = config.index.classification
+    result["global_cb_weight_classification"] = "model_assumption"
+    result["global_cb_zscore_mode"] = config.index.normalization
+    result["global_cb_zscore_min_periods"] = config.index.min_periods
+    return result
 
 
 def calculate_global_central_bank_assets(
@@ -240,4 +347,5 @@ def calculate_global_central_bank_assets(
     aggregate["growth_yoy"] = aggregate["total_usd_millions"].pct_change(4)
     aggregate["classification"] = config.classification
     aggregate["name"] = config.name
+    aggregate = calculate_global_central_bank_index(aggregate, config)
     return detail.reset_index(drop=True), aggregate.reset_index(drop=True)

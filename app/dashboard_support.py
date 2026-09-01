@@ -1224,12 +1224,27 @@ def load_global_central_bank_aggregate(path: Path) -> pd.DataFrame:
         "growth_yoy",
         "classification",
         "name",
+        "quarterly_annualized_growth",
+        "z_quarterly_annualized_growth",
+        "z_growth_yoy",
+        "global_cb_momentum_score",
+        "global_cb_index",
+        "global_cb_regime",
+        "global_cb_index_name",
+        "global_cb_index_classification",
+        "global_cb_weight_classification",
+        "global_cb_zscore_mode",
+        "global_cb_zscore_min_periods",
     }
     missing = sorted(required - set(frame.columns))
     if missing:
         raise DashboardDataError("Global aggregate is missing: " + ", ".join(missing))
     if set(frame["classification"]) != {"model_assumption"}:
         raise DashboardDataError("Global aggregate must be classified as a model assumption")
+    if set(frame["global_cb_index_classification"]) != {"statistical_transformation"}:
+        raise DashboardDataError("Global central-bank index classification is invalid")
+    if set(frame["global_cb_weight_classification"]) != {"model_assumption"}:
+        raise DashboardDataError("Global central-bank index weights are misclassified")
     result = frame[list(required)].copy()
     result["date"] = pd.to_datetime(result["date"], errors="coerce")
     if result.empty or result["date"].isna().any() or (result["total_usd_millions"] <= 0).any():

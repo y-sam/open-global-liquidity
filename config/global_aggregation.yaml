@@ -46,3 +46,23 @@ components:
     fx_component: yuan_per_usd
     fx_quote: native_per_usd
 fx_max_staleness_days: 10
+index:
+  name: "Global Model G — central-bank assets momentum"
+  classification: statistical_transformation
+  description: >-
+    Experimental 0–100 momentum normalization of the five-central-bank USD aggregate. This is a
+    central-bank balance-sheet index, not a complete global-liquidity measure and not the official
+    CrossBorder Capital GLI.
+  normalization: expanding
+  min_periods: 20
+  momentum_weights:
+    quarterly_annualized_growth: 0.60
+    growth_yoy: 0.40
+  regimes:
+    - {label: "Strong contraction", max: 10}
+    - {label: "Contraction", max: 30}
+    - {label: "Below normal", max: 45}
+    - {label: "Neutral", max: 55}
+    - {label: "Above normal", max: 70}
+    - {label: "Expansion", max: 90}
+    - {label: "Strong expansion", max: 100}

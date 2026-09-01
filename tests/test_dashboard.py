@@ -542,6 +542,8 @@ def test_loads_published_global_aggregate_snapshots() -> None:
 
     assert aggregate["component_count"].eq(5).all()
     assert aggregate["classification"].eq("model_assumption").all()
+    assert aggregate["global_cb_index"].dropna().between(0, 100).all()
+    assert aggregate["global_cb_index"].notna().any()
     assert detail.groupby("date")["central_bank"].nunique().eq(5).all()
     assert set(detail["fx_component"]) == {
         "USD",

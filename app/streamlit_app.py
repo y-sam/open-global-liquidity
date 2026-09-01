@@ -156,11 +156,24 @@ MODEL_COLORS = {
     "Model C — Reserve-based liquidity": "#059669",
 }
 CONTRAST_STATUS_LABELS = {
-    "insufficient_sample": "Insufficient sample",
-    "inconclusive": "Inconclusive",
-    "positive_interval": "Positive interval",
-    "negative_interval": "Negative interval",
+    "insufficient_sample": "Estimate only — interval unavailable",
+    "inconclusive": "Direction uncertain",
+    "positive_interval": "Positive interval excludes zero",
+    "negative_interval": "Negative interval excludes zero",
 }
+
+
+def _contrast_evidence_label(row: pd.Series) -> str:
+    """Describe estimate direction separately from interval precision."""
+    status = str(row["interval_status"])
+    spread = row["mean_return_spread"]
+    if status == "insufficient_sample":
+        return "Estimate shown; too few observations for an interval"
+    if status == "inconclusive":
+        direction = "Positive" if spread > 0 else "Negative" if spread < 0 else "Flat"
+        return f"{direction} estimate; interval crosses zero"
+    return CONTRAST_STATUS_LABELS[status]
+
 
 st.set_page_config(
     page_title="Open Global Liquidity",
@@ -849,10 +862,58 @@ def landing_page() -> None:
         sheets, credit creation, collateral, funding markets, and cross-border finance all matter.
 
         Open Global Liquidity turns public data into transparent, reproducible indicators. The
-        current OGLI remains deliberately **United States only**. A separate euro-area measured-
-        data pilot begins the international expansion without currency conversion or aggregation.
+        project now has two deliberately separate layers: **Global Model G** measures momentum in
+        the USD-normalized assets of five central banks, while **US OGLI Models A/B/C** remain
+        higher-frequency domestic diagnostics. Model G is global central-bank liquidity—not yet a
+        complete measure of global credit, collateral, or shadow-bank liquidity.
         """
     )
+
+    try:
+        global_aggregate, _global_detail, global_origin = _global_data()
+    except DashboardDataError:
+        global_aggregate = pd.DataFrame()
+        global_origin = "Unavailable"
+    if not global_aggregate.empty:
+        global_latest = global_aggregate.iloc[-1]
+        indexed = global_aggregate.dropna(subset=["global_cb_index"])
+        global_index_latest = indexed.iloc[-1] if not indexed.empty else None
+        st.subheader("Latest global central-bank snapshot")
+        with st.container(horizontal=True):
+            st.metric(
+                "Five-bank assets",
+                f"${float(global_latest['total_usd_trillions']):,.1f}tn",
+                (
+                    "Unavailable"
+                    if pd.isna(global_latest["growth_yoy"])
+                    else f"{float(global_latest['growth_yoy']):+.1%} year over year"
+                ),
+                border=True,
+            )
+            if global_index_latest is not None:
+                st.metric(
+                    "Global CB momentum index",
+                    f"{float(global_index_latest['global_cb_index']):.1f}",
+                    str(global_index_latest["global_cb_regime"]),
+                    border=True,
+                )
+            st.metric(
+                "Latest balanced quarter",
+                f"{pd.Timestamp(global_latest['date']):%b %Y}",
+                "Limited by the slowest source",
+                border=True,
+            )
+            st.metric(
+                "Coverage",
+                f"{int(global_latest['component_count'])} central banks",
+                global_origin,
+                border=True,
+            )
+        st.caption(
+            "Global Model G uses Federal Reserve, Eurosystem, Bank of Japan, Bank of England, and "
+            "China central-bank assets translated into USD. Open the Global aggregate page for "
+            "the formula, composition, FX audit trail, and full history."
+        )
 
     loaded = _load_or_explain()
     if loaded is not None:
@@ -867,7 +928,7 @@ def landing_page() -> None:
             latest_model_readings(models).set_index("model_id") if models is not None else None
         )
 
-        st.subheader("Latest US liquidity snapshot")
+        st.subheader("Latest US liquidity diagnostics · Models A/B/C")
         with st.container(horizontal=True):
             if latest_models is not None and "model_b" in latest_models.index:
                 row = latest_models.loc["model_b"]
@@ -1017,14 +1078,16 @@ def landing_page() -> None:
                     "regimes. Neutral observations are excluded. This is descriptive association, "
                     "not evidence of causation or a forecast."
                 )
-                primary_statuses = set(primary_contrasts["interval_status"])
-                if primary_statuses.issubset({"inconclusive", "insufficient_sample"}):
-                    st.info(
-                        "Current evidence status: inconclusive at every estimable horizon; "
-                        "the 12-month contrast has insufficient group observations for an "
-                        "interval.",
-                        icon=":material/info:",
-                    )
+                estimable = primary_contrasts.loc[
+                    primary_contrasts["interval_status"] != "insufficient_sample"
+                ]
+                st.info(
+                    f"Uncertainty check: {len(estimable)} of {len(primary_contrasts)} primary "
+                    "horizons have estimable intervals, and none currently excludes zero. The "
+                    "point estimates remain visible; this means the sample cannot determine "
+                    "their direction precisely, not that the calculation failed.",
+                    icon=":material/info:",
+                )
                 with st.expander("Unconditional Bitcoin outcome baseline"):
                     st.caption(
                         "These figures describe all completed Bitcoin outcomes in the primary "
@@ -1560,11 +1623,7 @@ def bitcoin_research_page() -> None:
                 else "Unavailable"
             )
             st.metric("Welch 95% interval", interval_value, border=True)
-            st.metric(
-                "Interval reading",
-                CONTRAST_STATUS_LABELS[str(contrast_row["interval_status"])],
-                border=True,
-            )
+            st.metric("Evidence status", _contrast_evidence_label(contrast_row), border=True)
     else:
         with st.container(horizontal=True):
             st.metric("Observations", f"{len(selected):,}", border=True)
@@ -1595,8 +1654,8 @@ def bitcoin_research_page() -> None:
         contrast_history["ci_error_minus"] = (
             contrast_history["mean_return_spread"] - contrast_history["spread_ci_lower"]
         )
-        contrast_history["interval_reading"] = contrast_history["interval_status"].map(
-            CONTRAST_STATUS_LABELS
+        contrast_history["evidence_status"] = contrast_history.apply(
+            _contrast_evidence_label, axis=1
         )
         contrast_figure = px.line(
             contrast_history,
@@ -1626,7 +1685,7 @@ def bitcoin_research_page() -> None:
                     "mean_return_spread",
                     "spread_ci_lower",
                     "spread_ci_upper",
-                    "interval_reading",
+                    "evidence_status",
                 ]
             ],
             width="stretch",
@@ -1650,7 +1709,7 @@ def bitcoin_research_page() -> None:
                 ),
                 "spread_ci_lower": st.column_config.NumberColumn("95% CI lower", format="percent"),
                 "spread_ci_upper": st.column_config.NumberColumn("95% CI upper", format="percent"),
-                "interval_reading": st.column_config.TextColumn("Interval reading"),
+                "evidence_status": st.column_config.TextColumn("Evidence status"),
             },
         )
         st.caption(
@@ -1659,6 +1718,50 @@ def bitcoin_research_page() -> None:
             "Neutral observations are excluded. Error bars are classical Welch intervals and "
             "do not adjust for serial dependence, multiple comparisons, or data revisions."
         )
+        with st.expander("Why are the intervals often wide—and what do all combinations show?"):
+            status_counts = contrast_summaries["interval_status"].value_counts()
+            st.markdown(
+                f"The point-in-time pilot starts in 2021. Non-overlapping sampling, longer "
+                f"forward horizons, and the expansionary/contractionary split sharply reduce "
+                f"independent observations. Across all **{len(contrast_summaries)}** predeclared "
+                f"model, lag, horizon, and sample combinations: "
+                f"**{int(status_counts.get('positive_interval', 0))}** have a positive interval "
+                f"excluding zero, **{int(status_counts.get('negative_interval', 0))}** have a "
+                "negative interval excluding zero, "
+                f"**{int(status_counts.get('inconclusive', 0))}** "
+                f"cross zero, and **{int(status_counts.get('insufficient_sample', 0))}** cannot "
+                "estimate an interval. These are robustness diagnostics, not independent tests or "
+                "a parameter-selection menu."
+            )
+            robustness = contrast_summaries.copy()
+            robustness["Evidence status"] = robustness.apply(_contrast_evidence_label, axis=1)
+            st.dataframe(
+                robustness[
+                    [
+                        "model_name",
+                        "publication_lag_weeks",
+                        "horizon_months",
+                        "sample_policy",
+                        "expansionary_observations",
+                        "contractionary_observations",
+                        "mean_return_spread",
+                        "Evidence status",
+                    ]
+                ],
+                width="stretch",
+                hide_index=True,
+                column_config={
+                    "model_name": "US liquidity model",
+                    "publication_lag_weeks": "Delay (weeks)",
+                    "horizon_months": "Horizon (months)",
+                    "sample_policy": "Sample",
+                    "expansionary_observations": "Expansionary n",
+                    "contractionary_observations": "Contractionary n",
+                    "mean_return_spread": st.column_config.NumberColumn(
+                        "Mean spread", format="percent"
+                    ),
+                },
+            )
 
     elif view == "Across horizons":
         horizon_summary = regime_summaries.loc[
@@ -3273,6 +3376,8 @@ def global_aggregate_page() -> None:
         return
 
     latest = aggregate.iloc[-1]
+    latest_index_rows = aggregate.dropna(subset=["global_cb_index"])
+    latest_index = latest_index_rows.iloc[-1] if not latest_index_rows.empty else None
     latest_date = pd.Timestamp(latest["date"])
     latest_detail = detail.loc[detail["date"] == latest_date].copy()
     latest_detail["share"] = (
@@ -3299,6 +3404,50 @@ def global_aggregate_page() -> None:
         st.metric("Latest balanced quarter", f"{latest_date:%b %Y}", border=True)
         st.metric(
             "Coverage", f"{int(latest['component_count'])} central banks", origin, border=True
+        )
+
+    st.subheader("Global Model G — central-bank assets momentum")
+    if latest_index is None:
+        st.info(
+            "The expanding normalization does not yet have the configured 20 quarterly growth "
+            "observations.",
+            icon=":material/history:",
+        )
+    else:
+        with st.container(horizontal=True):
+            st.metric(
+                "Global CB momentum index",
+                f"{float(latest_index['global_cb_index']):.1f}",
+                str(latest_index["global_cb_regime"]),
+                border=True,
+            )
+            st.metric(
+                "Momentum score",
+                f"{float(latest_index['global_cb_momentum_score']):+.2f}",
+                "Expanding z-score",
+                border=True,
+            )
+            st.metric(
+                "Latest indexed quarter",
+                f"{pd.Timestamp(latest_index['date']):%b %Y}",
+                "Five-bank balanced panel",
+                border=True,
+            )
+        index_figure = px.line(
+            latest_index_rows,
+            x="date",
+            y="global_cb_index",
+            title="Global central-bank balance-sheet momentum · non-look-ahead normalization",
+            labels={"date": "Quarter end", "global_cb_index": "0-100 index"},
+        )
+        index_figure.add_hline(y=50, line_dash="dot", line_color="gray")
+        index_figure.update_yaxes(range=[0, 100])
+        index_figure.update_traces(line={"width": 2.7, "color": "#7C3AED"})
+        st.plotly_chart(index_figure, width="stretch", config={"displaylogo": False})
+        st.caption(
+            "60% expanding z-score of one-quarter annualized growth + 40% expanding z-score of "
+            "four-quarter growth, mapped through the standard normal CDF. Around 50 is neutral "
+            "relative to information available through that quarter. Weights are assumptions."
         )
 
     figure = px.line(
@@ -3336,7 +3485,8 @@ def global_aggregate_page() -> None:
     st.plotly_chart(contribution_chart, width="stretch", config={"displaylogo": False})
 
     st.warning(
-        "This is a current-vintage nominal USD balance-sheet aggregate, not OGLI. Changes reflect "
+        "Model G is a global central-bank balance-sheet model, not a complete global OGLI. "
+        "Changes reflect "
         "both native balance-sheet movements and exchange-rate translation. The balanced panel is "
         "quarterly and stops at the least-current component—currently the lagged Bank of England "
         "series. Publication lags and historical revisions are not yet modeled.",
@@ -3660,8 +3810,10 @@ def research_guide_page() -> None:
 
         The **Central banks** page still rebases each native-currency series independently to 100.
         The separate **Global aggregate** page converts five total-asset stocks with four public
-        H.10 exchange rates and sums only balanced quarters. That aggregation is a declared model
-        assumption, not OGLI, and historical publication lags are not yet reconstructed.
+        H.10 exchange rates and sums only balanced quarters. It also reports Global Model G, an
+        expanding-normalized central-bank momentum index. The aggregation and momentum weights are
+        declared assumptions; it is not a complete global OGLI, and historical publication lags
+        are not yet reconstructed.
 
         **Primary documentation and broader context**
 
