@@ -274,7 +274,7 @@ intraday release timestamps or exact trade availability. Instead, it reports pre
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
 
-The publication commands together write twenty-two Git-versioned Parquet
+The publication commands together write twenty-nine Git-versioned Parquet
 artifacts plus a JSON provenance manifest:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
@@ -314,6 +314,8 @@ artifacts plus a JSON provenance manifest:
 - `data/reference/us_point_in_time_bitcoin_contrasts_snapshot.parquet` — predeclared directional
   regime comparisons reporting expansionary and contractionary Bitcoin outcomes, their arithmetic
   mean spread, group sample sizes, and a descriptive Welch interval.
+- Seven international files contain the ECB, BOJ, BoE, BIS China, global FX, balanced global
+  component-detail, and Global Model G aggregate/index snapshots.
 - `data/reference/dashboard_snapshot_manifest.json` — generation time, pipeline version, source
   commit, row/date coverage, and SHA-256 digest for every published Parquet file.
 
@@ -326,9 +328,9 @@ mode and source retrieval time.
 
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
-environment, downloads fresh FRED, ALFRED, Coin Metrics, and World Bank observations, regenerates
-the twenty-two public Parquet snapshots and provenance manifest, and runs formatting, linting, and
-offline tests. Only successful runs can commit changed
+environment, downloads fresh FRED, ALFRED, Coin Metrics, World Bank, ECB, BOJ, BoE, and BIS
+observations, regenerates the twenty-nine public Parquet snapshots and provenance manifest, and
+runs formatting, linting, and offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 
 The workflow requires a repository Actions secret named `FRED_API_KEY` and **Read and write**
