@@ -365,6 +365,48 @@ US:
       source: "Board of Governors of the Federal Reserve System (US), H.15"
       source_url: "https://fred.stlouisfed.org/series/DGS10"
 
+    treasury_yield_2y_collateral:
+      classification: measured_data
+      provider: fred
+      series_id: DGS2
+      component: treasury_yield_2y_collateral
+      title: "2-Year Treasury Constant Maturity Rate"
+      description: "Daily yield used only in the curve-wide realized-volatility alternative."
+      unit: "Percent"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2018-04-03"
+      source: "Board of Governors of the Federal Reserve System (US), H.15"
+      source_url: "https://fred.stlouisfed.org/series/DGS2"
+
+    treasury_yield_5y_collateral:
+      classification: measured_data
+      provider: fred
+      series_id: DGS5
+      component: treasury_yield_5y_collateral
+      title: "5-Year Treasury Constant Maturity Rate"
+      description: "Daily yield used only in the curve-wide realized-volatility alternative."
+      unit: "Percent"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2018-04-03"
+      source: "Board of Governors of the Federal Reserve System (US), H.15"
+      source_url: "https://fred.stlouisfed.org/series/DGS5"
+
+    treasury_yield_30y_collateral:
+      classification: measured_data
+      provider: fred
+      series_id: DGS30
+      component: treasury_yield_30y_collateral
+      title: "30-Year Treasury Constant Maturity Rate"
+      description: "Daily yield used only in the curve-wide realized-volatility alternative."
+      unit: "Percent"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2018-04-03"
+      source: "Board of Governors of the Federal Reserve System (US), H.15"
+      source_url: "https://fred.stlouisfed.org/series/DGS30"
+
 FX:
   exchange_rates:
     usd_per_euro:

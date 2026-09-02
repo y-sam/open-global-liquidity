@@ -1416,7 +1416,14 @@ def load_collateral_conditions(path: Path) -> pd.DataFrame:
     missing = sorted(required - set(frame.columns))
     if missing:
         raise DashboardDataError("Collateral conditions are missing: " + ", ".join(missing))
-    result = frame[list(required)].copy()
+    curve_columns = [
+        "treasury_volatility_2y_bps",
+        "treasury_volatility_5y_bps",
+        "treasury_volatility_10y_bps",
+        "treasury_volatility_30y_bps",
+        "treasury_volatility_curve_bps",
+    ]
+    result = frame[[*required, *[column for column in curve_columns if column in frame]]].copy()
     result["date"] = pd.to_datetime(result["date"], errors="coerce")
     result["retrieved_at"] = pd.to_datetime(result["retrieved_at"], errors="coerce", utc=True)
     if (

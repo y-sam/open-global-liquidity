@@ -138,6 +138,11 @@ underlying each benchmark, displayed as monthly medians. These volumes cover the
 to calculate each New York Fed reference rate; they are not total repo-market size. They remain
 measured context and do not alter the frozen collateral score.
 
+The curve-volatility diagnostic calculates the same 21-observation annualized standard deviation
+of daily yield changes independently for 2-, 5-, 10-, and 30-year constant-maturity Treasuries,
+then takes their unweighted mean. This curve composite is a declared alternative for robustness
+analysis; the frozen production score continues to use only its original 10-year proxy.
+
 ## Research boundaries
 
 The project will keep three categories separate:

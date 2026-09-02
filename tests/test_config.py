@@ -8,7 +8,7 @@ from open_global_liquidity.config import ConfigurationError, load_model_config, 
 def test_load_walcl_config() -> None:
     definitions = load_series_config(Path("config/series.yaml"))
 
-    assert len(definitions) == 35
+    assert len(definitions) == 38
     by_id = {definition.series_id: definition for definition in definitions}
     assert set(by_id) == {
         "WALCL",
@@ -45,6 +45,8 @@ def test_load_walcl_config() -> None:
         "TGCRRATE",
         "TGCRVOLUME",
         "DFF",
+        "DGS5",
+        "DGS30",
     }
     walcl = by_id["WALCL"]
     assert walcl.series_id == "WALCL"
@@ -97,6 +99,9 @@ def test_load_walcl_config() -> None:
         "tri_party_general_collateral_volume",
         "effective_federal_funds_rate",
         "treasury_yield_10y_collateral",
+        "treasury_yield_2y_collateral",
+        "treasury_yield_5y_collateral",
+        "treasury_yield_30y_collateral",
     }
 
 

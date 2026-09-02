@@ -40,6 +40,9 @@ def _source(periods: int = 72) -> pd.DataFrame:
                         "treasury_yield_10y_collateral",
                         3.0 + 0.02 * np.sin(index + day_index),
                     ),
+                    (day, "treasury_yield_2y_collateral", 2.5 + 0.03 * np.sin(index + day_index)),
+                    (day, "treasury_yield_5y_collateral", 2.8 + 0.025 * np.sin(index + day_index)),
+                    (day, "treasury_yield_30y_collateral", 3.4 + 0.015 * np.sin(index + day_index)),
                 ]
             )
     return pd.DataFrame(rows, columns=["date", "component", "value"]).assign(
@@ -67,6 +70,7 @@ def test_collateral_score_is_bounded_and_non_look_ahead() -> None:
     assert valid["collateral_conditions_index"].between(0, 100).all()
     assert (result["private_collateral_proxy_millions"] > 0).all()
     assert set(result["normalization_mode"]) == {"expanding"}
+    assert result["treasury_volatility_curve_bps"].notna().any()
 
     changed = source.copy()
     last_date = changed["date"].max()

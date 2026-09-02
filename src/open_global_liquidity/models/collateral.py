@@ -305,6 +305,29 @@ def calculate_collateral_conditions(
     result = result.merge(funding_monthly, on="date", how="left", validate="one_to_one")
     result = result.merge(volatility_monthly, on="date", how="left", validate="one_to_one")
 
+    curve_components = {
+        "treasury_yield_2y_collateral": "treasury_volatility_2y_bps",
+        "treasury_yield_5y_collateral": "treasury_volatility_5y_bps",
+        "treasury_yield_10y_collateral": "treasury_volatility_10y_bps",
+        "treasury_yield_30y_collateral": "treasury_volatility_30y_bps",
+    }
+    if set(curve_components).issubset(frame["component"]):
+        curve_monthly = result[["date"]].copy()
+        for component, output_column in curve_components.items():
+            tenor = _component_series(frame, component, "yield")
+            tenor[output_column] = tenor["yield"].diff().mul(100).rolling(
+                config.volatility_window,
+                min_periods=config.volatility_min_observations,
+            ).std(ddof=0) * np.sqrt(config.volatility_annualization_factor)
+            tenor["date"] = tenor["date"].dt.to_period("M").dt.to_timestamp("M")
+            monthly = tenor.groupby("date", as_index=False).last()[["date", output_column]]
+            curve_monthly = curve_monthly.merge(monthly, on="date", how="left")
+        curve_columns = list(curve_components.values())
+        curve_monthly["treasury_volatility_curve_bps"] = curve_monthly[curve_columns].mean(
+            axis=1, skipna=False
+        )
+        result = result.merge(curve_monthly, on="date", how="left", validate="one_to_one")
+
     for item in config.components:
         z_column = f"z_{item.name}"
         result[z_column] = historical_zscore(

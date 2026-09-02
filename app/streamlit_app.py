@@ -4099,6 +4099,34 @@ def collateral_conditions_page() -> None:
     component_chart.add_hline(y=0, line_dash="dot", line_color="gray")
     st.plotly_chart(component_chart, width="stretch", config={"displaylogo": False})
 
+    curve_columns = {
+        "treasury_volatility_2y_bps": "2-year",
+        "treasury_volatility_5y_bps": "5-year",
+        "treasury_volatility_10y_bps": "10-year",
+        "treasury_volatility_30y_bps": "30-year",
+        "treasury_volatility_curve_bps": "Equal-weight curve composite",
+    }
+    if set(curve_columns).issubset(data.columns):
+        curve = (
+            data[["date", *curve_columns]]
+            .rename(columns=curve_columns)
+            .melt("date", var_name="tenor", value_name="volatility_bps")
+        )
+        curve_chart = px.line(
+            curve,
+            x="date",
+            y="volatility_bps",
+            color="tenor",
+            title="Realized Treasury yield volatility across the curve",
+            labels={"date": "Month end", "volatility_bps": "Annualized basis points", "tenor": ""},
+        )
+        st.plotly_chart(curve_chart, width="stretch", config={"displaylogo": False})
+        st.caption(
+            "The curve composite is the unweighted mean of separately calculated 2-, 5-, 10-, "
+            "and 30-year realized-yield volatilities. It is an alternative diagnostic; the "
+            "frozen score continues to use the 10-year series."
+        )
+
     st.subheader("Frozen-model validation against subsequent Bitcoin returns")
     st.caption(
         "The collateral formula and weights were fixed before this comparison. The primary "
