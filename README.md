@@ -127,6 +127,12 @@ signs. The score does not observe haircuts, collateral reuse, dealer capacity, s
 or collateral velocity. It is not the MOVE Index, an observed liquidity multiplier, or a Howell/
 CrossBorder formula, and no market outcome was used to select its parameters.
 
+The v0.4b composition view separately downloads the MSPD marketable rows for bills, notes, bonds,
+Treasury Inflation-Protected Securities, and floating-rate notes. It presents their par values and
+shares as measured supply context. The five classes are not assigned different collateral-quality
+weights, and composition does not change the frozen 40/30/30 score. Federal Financing Bank
+securities are excluded from this display and are not one of the five selected Treasury classes.
+
 ## Research boundaries
 
 The project will keep three categories separate:

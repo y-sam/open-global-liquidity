@@ -17,6 +17,8 @@ release is tagged.
   transformations, and unimplemented haircut/reuse concepts.
 - Frozen-model Bitcoin validation with predeclared timing sensitivities, overlapping and
   non-overlapping samples, Fisher intervals, and a deterministic moving-block bootstrap.
+- Added measured MSPD composition for Treasury bills, notes, bonds, TIPS, and floating-rate notes.
+  These series are displayed as supply context and do not alter the frozen collateral score.
 
 ### Research boundary
 

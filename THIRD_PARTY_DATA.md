@@ -104,6 +104,10 @@ this category as debt held outside the United States Government and notes that i
 Reserve Banks. Open Global Liquidity subtracts separately measured Fed Treasury holdings only in a
 derived model-assumption layer; it does not alter the source observation.
 
+The v0.4b composition view also obtains the exact `Marketable` rows for Bills, Notes, Bonds,
+Treasury Inflation-Protected Securities, and Floating Rate Notes. These measured par-value stocks
+are displayed without security-class weights and are not new inputs to the collateral score.
+
 Attribution: U.S. Department of the Treasury, Bureau of the Fiscal Service, Monthly Statement of
 the Public Debt, Summary of Treasury Securities Outstanding, Total Marketable, debt held by the
 public. The Treasury source is not affiliated with and does not endorse Open Global Liquidity.

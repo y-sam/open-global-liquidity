@@ -16,6 +16,17 @@ LOGGER = logging.getLogger(__name__)
 MSPD_TABLE_1_URL = (
     "https://api.fiscaldata.treasury.gov/services/api/fiscal_service/v1/debt/mspd/mspd_table_1"
 )
+MSPD_COMPONENT_FILTERS = {
+    "marketable_treasury_debt_public": ("Total Marketable", "_"),
+    "marketable_treasury_bills_public": ("Marketable", "Bills"),
+    "marketable_treasury_notes_public": ("Marketable", "Notes"),
+    "marketable_treasury_bonds_public": ("Marketable", "Bonds"),
+    "marketable_treasury_tips_public": (
+        "Marketable",
+        "Treasury Inflation-Protected Securities",
+    ),
+    "marketable_treasury_frns_public": ("Marketable", "Floating Rate Notes"),
+}
 
 
 class TreasuryFiscalDataError(RuntimeError):
@@ -23,7 +34,7 @@ class TreasuryFiscalDataError(RuntimeError):
 
 
 class TreasuryFiscalDataProvider:
-    """Fetch the monthly MSPD Total Marketable debt-held-by-public observation.
+    """Fetch configured monthly MSPD marketable debt-held-by-public observations.
 
     The selected field is a gross par-value stock. It is measured source data, not a direct
     measure of repo-eligible collateral actually available to private intermediaries.
@@ -56,7 +67,11 @@ class TreasuryFiscalDataProvider:
         if end_date is not None and end_date < start_date:
             raise ValueError("end must be on or after start")
 
-        cache_path = self.cache_dir / "mspd_total_marketable_public.parquet"
+        if definition.component not in MSPD_COMPONENT_FILTERS:
+            raise TreasuryFiscalDataError(
+                f"Unsupported Treasury MSPD component: {definition.component}"
+            )
+        cache_path = self.cache_dir / f"mspd_{definition.component}.parquet"
         if _cache_is_fresh(cache_path, self.cache_ttl) and not force_refresh:
             cached = pd.read_parquet(cache_path)
             cached_dates = pd.to_datetime(cached.get("date"), errors="coerce")
@@ -85,10 +100,14 @@ class TreasuryFiscalDataProvider:
         return selected[STANDARD_COLUMNS].sort_values("date").reset_index(drop=True)
 
     def _download(self, definition: SeriesDefinition, start: date) -> pd.DataFrame:
+        security_type, security_class = MSPD_COMPONENT_FILTERS[definition.component]
         params = {
-            "fields": "record_date,security_type_desc,debt_held_public_mil_amt",
+            "fields": (
+                "record_date,security_type_desc,security_class_desc,debt_held_public_mil_amt"
+            ),
             "filter": (
-                f"record_date:gte:{start.isoformat()},security_type_desc:eq:Total Marketable"
+                f"record_date:gte:{start.isoformat()},security_type_desc:eq:{security_type},"
+                f"security_class_desc:eq:{security_class}"
             ),
             "sort": "record_date",
             "page[size]": "10000",
@@ -108,14 +127,21 @@ class TreasuryFiscalDataProvider:
         if not isinstance(rows, list) or not rows:
             raise TreasuryFiscalDataError("Treasury response is missing expected MSPD data")
         raw = pd.DataFrame(rows)
-        required = {"record_date", "security_type_desc", "debt_held_public_mil_amt"}
+        required = {
+            "record_date",
+            "security_type_desc",
+            "security_class_desc",
+            "debt_held_public_mil_amt",
+        }
         missing = sorted(required - set(raw.columns))
         if missing:
             raise TreasuryFiscalDataError(
                 "Treasury response is missing fields: " + ", ".join(missing)
             )
-        if set(raw["security_type_desc"]) != {"Total Marketable"}:
-            raise TreasuryFiscalDataError("Treasury response contains an unexpected security type")
+        if set(raw["security_type_desc"]) != {security_type} or set(raw["security_class_desc"]) != {
+            security_class
+        }:
+            raise TreasuryFiscalDataError("Treasury response contains an unexpected security class")
         dates = pd.to_datetime(raw["record_date"], errors="coerce")
         values = pd.to_numeric(raw["debt_held_public_mil_amt"], errors="coerce")
         if dates.isna().any() or values.isna().any() or (values < 0).any():

@@ -37,6 +37,7 @@ from dashboard_support import (  # noqa: E402
     load_boj_data,
     load_collateral_bitcoin_pairs,
     load_collateral_bitcoin_summary,
+    load_collateral_composition,
     load_collateral_conditions,
     load_dashboard_data,
     load_ecb_data,
@@ -95,6 +96,8 @@ COLLATERAL_CONDITIONS_PATH = DATA_ROOT / "processed" / "us_collateral_conditions
 COLLATERAL_CONDITIONS_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_collateral_conditions_snapshot.parquet"
 )
+COLLATERAL_SOURCE_PATH = DATA_ROOT / "processed" / "us_collateral_source.parquet"
+COLLATERAL_SOURCE_SNAPSHOT_PATH = DATA_ROOT / "reference" / "us_collateral_source_snapshot.parquet"
 COLLATERAL_BITCOIN_PAIRS_PATH = DATA_ROOT / "processed" / "us_collateral_bitcoin_pairs.parquet"
 COLLATERAL_BITCOIN_PAIRS_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_collateral_bitcoin_pairs_snapshot.parquet"
@@ -276,6 +279,12 @@ def _load_global_bitcoin_summary(path: str, modified_ns: int) -> pd.DataFrame:
 def _load_collateral_conditions(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_collateral_conditions(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_collateral_composition(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_collateral_composition(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -465,6 +474,13 @@ def _collateral_data() -> tuple[pd.DataFrame, str]:
         COLLATERAL_CONDITIONS_SNAPSHOT_PATH,
     )
     return _load_collateral_conditions(str(path), path.stat().st_mtime_ns), origin
+
+
+def _collateral_composition_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(
+        COLLATERAL_SOURCE_PATH, COLLATERAL_SOURCE_SNAPSHOT_PATH
+    )
+    return _load_collateral_composition(str(path), path.stat().st_mtime_ns), origin
 
 
 def _collateral_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
@@ -3940,6 +3956,55 @@ def collateral_conditions_page() -> None:
     index_chart.add_hline(y=50, line_dash="dot", line_color="gray")
     index_chart.update_yaxes(range=[0, 100])
     st.plotly_chart(index_chart, width="stretch", config={"displaylogo": False})
+
+    st.subheader("Marketable Treasury collateral composition")
+    try:
+        composition, composition_origin = _collateral_composition_data()
+    except DashboardDataError:
+        st.info("Treasury security-class composition is awaiting the next data refresh.")
+    else:
+        composition_labels = {
+            "marketable_treasury_bills_public": "Bills",
+            "marketable_treasury_notes_public": "Notes",
+            "marketable_treasury_bonds_public": "Bonds",
+            "marketable_treasury_tips_public": "TIPS",
+            "marketable_treasury_frns_public": "Floating-rate notes",
+        }
+        composition["security_class"] = composition["component"].map(composition_labels)
+        composition_chart = px.area(
+            composition,
+            x="date",
+            y="value_usd_trillions",
+            color="security_class",
+            title="Marketable Treasury debt held by the public · par value",
+            labels={
+                "date": "Month end",
+                "value_usd_trillions": "USD trillions",
+                "security_class": "Security class",
+            },
+        )
+        composition_chart.update_yaxes(tickprefix="$", ticksuffix="tn")
+        st.plotly_chart(composition_chart, width="stretch", config={"displaylogo": False})
+        latest_composition = composition.loc[composition["date"] == composition["date"].max()]
+        composition_total = latest_composition["value"].sum()
+        shares = latest_composition.assign(share=latest_composition["value"] / composition_total)
+        st.dataframe(
+            shares[["security_class", "value_usd_trillions", "share"]],
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "security_class": "Security class",
+                "value_usd_trillions": st.column_config.NumberColumn(
+                    "Par value", format="$%.2f tn"
+                ),
+                "share": st.column_config.NumberColumn("Share", format="percent"),
+            },
+        )
+        st.caption(
+            f"Measured MSPD composition · data mode: {composition_origin}. Federal Financing "
+            "Bank securities are excluded because they are not one of the five selected Treasury "
+            "marketable classes. Composition does not measure repo eligibility or collateral reuse."
+        )
 
     supportive = visible[
         [

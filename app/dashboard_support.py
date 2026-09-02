@@ -1431,6 +1431,35 @@ def load_collateral_conditions(path: Path) -> pd.DataFrame:
     return result.sort_values("date").reset_index(drop=True)
 
 
+def load_collateral_composition(path: Path) -> pd.DataFrame:
+    """Load the five measured MSPD marketable security classes for display."""
+    frame = _read_parquet(path, "US collateral source")
+    components = {
+        "marketable_treasury_bills_public",
+        "marketable_treasury_notes_public",
+        "marketable_treasury_bonds_public",
+        "marketable_treasury_tips_public",
+        "marketable_treasury_frns_public",
+    }
+    result = frame.loc[frame["component"].isin(components)].copy()
+    required = {"date", "component", "value", "unit", "provider", "series_id", "retrieved_at"}
+    missing = sorted(required - set(result.columns))
+    if missing:
+        raise DashboardDataError("Collateral composition is missing: " + ", ".join(missing))
+    result["date"] = pd.to_datetime(result["date"], errors="coerce")
+    result["value"] = pd.to_numeric(result["value"], errors="coerce")
+    if (
+        result.empty
+        or set(result["component"]) != components
+        or result[["date", "value"]].isna().any().any()
+        or set(result["unit"]) != {"Millions of U.S. Dollars"}
+        or (result["value"] < 0).any()
+    ):
+        raise DashboardDataError("Collateral composition contains invalid observations")
+    result["value_usd_trillions"] = result["value"] / 1_000_000
+    return result.sort_values(["date", "component"]).reset_index(drop=True)
+
+
 def load_collateral_bitcoin_pairs(path: Path) -> pd.DataFrame:
     """Load individual frozen-score/Bitcoin outcome pairs."""
     frame = _read_parquet(path, "Collateral Bitcoin pairs")

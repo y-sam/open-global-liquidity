@@ -1,3 +1,4 @@
+from dataclasses import replace
 from pathlib import Path
 
 import httpx
@@ -43,11 +44,13 @@ def test_fetch_standardizes_total_marketable_debt(tmp_path: Path) -> None:
                         {
                             "record_date": "2024-01-31",
                             "security_type_desc": "Total Marketable",
+                            "security_class_desc": "_",
                             "debt_held_public_mil_amt": "25000000.25",
                         },
                         {
                             "record_date": "2024-02-29",
                             "security_type_desc": "Total Marketable",
+                            "security_class_desc": "_",
                             "debt_held_public_mil_amt": "25200000.50",
                         },
                     ]
@@ -63,7 +66,7 @@ def test_fetch_standardizes_total_marketable_debt(tmp_path: Path) -> None:
     assert result["date"].tolist() == [pd.Timestamp("2024-02-29")]
     assert result["value"].tolist() == [25_200_000.50]
     assert result["provider"].unique().tolist() == ["U.S. Treasury Fiscal Data"]
-    assert (tmp_path / "mspd_total_marketable_public.parquet").is_file()
+    assert (tmp_path / "mspd_marketable_treasury_debt_public.parquet").is_file()
 
 
 def test_fetch_rejects_wrong_security_type(tmp_path: Path) -> None:
@@ -77,6 +80,7 @@ def test_fetch_rejects_wrong_security_type(tmp_path: Path) -> None:
                         {
                             "record_date": "2024-01-31",
                             "security_type_desc": "Marketable",
+                            "security_class_desc": "Notes",
                             "debt_held_public_mil_amt": "1",
                         }
                     ]
@@ -85,7 +89,44 @@ def test_fetch_rejects_wrong_security_type(tmp_path: Path) -> None:
         )
     )
 
-    with pytest.raises(TreasuryFiscalDataError, match="unexpected security type"):
+    with pytest.raises(TreasuryFiscalDataError, match="unexpected security class"):
         TreasuryFiscalDataProvider(cache_dir=tmp_path, client=client).fetch_definition(
             _definition()
         )
+
+
+def test_fetch_selects_exact_marketable_security_class(tmp_path: Path) -> None:
+    definition = replace(
+        _definition(),
+        name="marketable_treasury_bills_public",
+        series_id="MSPD.TABLE1.MARKETABLE.BILLS.DEBT_HELD_PUBLIC",
+        component="marketable_treasury_bills_public",
+    )
+
+    def response(request: httpx.Request) -> httpx.Response:
+        assert "security_type_desc%3Aeq%3AMarketable" in str(request.url)
+        assert "security_class_desc%3Aeq%3ABills" in str(request.url)
+        return httpx.Response(
+            200,
+            request=request,
+            json={
+                "data": [
+                    {
+                        "record_date": "2024-01-31",
+                        "security_type_desc": "Marketable",
+                        "security_class_desc": "Bills",
+                        "debt_held_public_mil_amt": "5000000",
+                    }
+                ]
+            },
+        )
+
+    provider = TreasuryFiscalDataProvider(
+        cache_dir=tmp_path,
+        client=httpx.Client(transport=httpx.MockTransport(response)),
+    )
+
+    result = provider.fetch_definition(definition)
+
+    assert result.loc[0, "component"] == "marketable_treasury_bills_public"
+    assert result.loc[0, "value"] == 5_000_000
