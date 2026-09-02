@@ -1,0 +1,66 @@
+classification: model_assumption
+name: "Open Collateral Conditions Score"
+description: >-
+  Experimental v0.4a US Treasury collateral and secured-funding conditions score. It is maintained
+  separately from Global Model G and is not Michael Howell or CrossBorder Capital's proprietary
+  liquidity multiplier.
+canonical_frequency: month_end
+start: "2018-04-30"
+alignment_policy: latest_observation_on_or_before_month_end
+max_staleness_days:
+  monthly_stock: 35
+  weekly_stock: 10
+daily_aggregation:
+  funding_spread: median
+  yield_volatility: last
+private_collateral_proxy:
+  classification: model_assumption
+  formula: "marketable_treasury_debt_public - fed_treasury_holdings"
+  description: >-
+    Gross marketable Treasury debt held by the public includes Federal Reserve holdings. Subtracting
+    Fed Treasury securities held outright approximates the stock outside the central bank. It does
+    not observe securities lending, dealer inventories, collateral velocity, reuse, or eligibility.
+yield_volatility:
+  classification: statistical_transformation
+  source_component: treasury_yield_10y_collateral
+  change_unit: basis_points
+  rolling_observations: 21
+  min_observations: 15
+  annualization_factor: 252
+  description: >-
+    Rolling standard deviation of daily 10-year yield changes, expressed as annualized basis points.
+    It is a transparent public-data proxy for rate volatility, not the proprietary MOVE Index and
+    not an observed repo haircut.
+funding_spread:
+  classification: model_assumption
+  formula: "SOFR - effective federal funds rate"
+  unit: basis_points
+  description: >-
+    A positive secured-minus-unsecured overnight spread is treated as tighter Treasury financing.
+    Structural differences between the two markets mean the spread is an imperfect stress proxy.
+normalization:
+  classification: statistical_transformation
+  mode: expanding
+  min_periods: 24
+components:
+  collateral_supply_growth_yoy:
+    weight: 0.40
+    direction: 1
+    classification: model_assumption
+  funding_spread_bps:
+    weight: 0.30
+    direction: -1
+    classification: model_assumption
+  treasury_volatility_bps:
+    weight: 0.30
+    direction: -1
+    classification: model_assumption
+regimes:
+  - {label: "Severely constrained", max: 10}
+  - {label: "Constrained", max: 30}
+  - {label: "Below normal", max: 45}
+  - {label: "Neutral", max: 55}
+  - {label: "Above normal", max: 70}
+  - {label: "Supportive", max: 90}
+  - {label: "Highly supportive", max: 100}
+calibrated_parameters: {}

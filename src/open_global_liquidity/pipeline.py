@@ -44,6 +44,15 @@ from open_global_liquidity.data.coinmetrics import CoinMetricsError, CoinMetrics
 from open_global_liquidity.data.ecb import EcbError, EcbProvider
 from open_global_liquidity.data.fred import FredError, FredProvider
 from open_global_liquidity.data.pboc import PbocError, PbocProvider
+from open_global_liquidity.data.treasury import (
+    TreasuryFiscalDataError,
+    TreasuryFiscalDataProvider,
+)
+from open_global_liquidity.models.collateral import (
+    CollateralModelError,
+    calculate_collateral_conditions,
+    load_collateral_config,
+)
 from open_global_liquidity.models.global_central_bank import (
     GlobalAggregationError,
     calculate_global_central_bank_assets,
@@ -89,6 +98,7 @@ def run_pipeline(
     ]
     market_definitions = [item for item in definitions if item.group == "markets"]
     context_definitions = [item for item in definitions if item.group == "context"]
+    collateral_definitions = [item for item in definitions if item.group == "collateral"]
     fx_definitions = [
         item
         for item in definitions
@@ -135,6 +145,45 @@ def run_pipeline(
     output_path = output_dir / "us_fred_series.parquet"
     output.to_parquet(output_path, index=False)
     LOGGER.info("Wrote %d standardized observations to %s", len(output), output_path)
+
+    collateral_source: pd.DataFrame | None = None
+    collateral_conditions: pd.DataFrame | None = None
+    collateral_config_path = project_root / "config" / "collateral.yaml"
+    if collateral_definitions and collateral_config_path.is_file():
+        treasury_provider = TreasuryFiscalDataProvider(
+            cache_dir=project_root / "data" / "raw" / "treasury"
+        )
+        collateral_providers = {"fred": provider, "treasury": treasury_provider}
+        collateral_frames = []
+        for definition in collateral_definitions:
+            collateral_provider = collateral_providers.get(definition.provider.lower())
+            if collateral_provider is None:
+                raise RuntimeError(f"Unsupported collateral provider: {definition.provider}")
+            collateral_frames.append(
+                collateral_provider.fetch_definition(
+                    definition,
+                    start=start,
+                    end=end,
+                    force_refresh=force_refresh,
+                )
+            )
+        collateral_source = pd.concat(collateral_frames, ignore_index=True).sort_values(
+            ["series_id", "date"]
+        )
+        collateral_source_path = output_dir / "us_collateral_source.parquet"
+        collateral_source.to_parquet(collateral_source_path, index=False)
+        collateral_config = load_collateral_config(collateral_config_path)
+        collateral_conditions = calculate_collateral_conditions(
+            collateral_source,
+            collateral_config,
+        )
+        collateral_conditions_path = output_dir / "us_collateral_conditions.parquet"
+        collateral_conditions.to_parquet(collateral_conditions_path, index=False)
+        LOGGER.info(
+            "Wrote %d collateral source rows and %d monthly condition rows",
+            len(collateral_source),
+            len(collateral_conditions),
+        )
 
     ecb_output: pd.DataFrame | None = None
     if ecb_definitions:
@@ -539,6 +588,9 @@ def run_pipeline(
             snapshots["global_central_bank_bitcoin_summary_snapshot.parquet"] = (
                 global_bitcoin_summary
             )
+        if collateral_source is not None and collateral_conditions is not None:
+            snapshots["us_collateral_source_snapshot.parquet"] = collateral_source
+            snapshots["us_collateral_conditions_snapshot.parquet"] = collateral_conditions
         if pboc_output is not None:
             LOGGER.warning(
                 "PBoC observations are excluded from public snapshots pending explicit "
@@ -580,6 +632,8 @@ def run_pipeline(
         f"and {0 if pboc_output is None else len(pboc_output):,} PBoC observations "
         f"and {0 if bis_output is None else len(bis_output):,} BIS observations "
         f"and {0 if global_aggregate is None else len(global_aggregate):,} global months "
+        f"and {0 if collateral_conditions is None else len(collateral_conditions):,} "
+        "collateral-condition months "
         f"-> {output_dir}"
     )
     return output_path
@@ -632,6 +686,8 @@ def main() -> None:
         MacroContextError,
         OGLICalculationError,
         PbocError,
+        TreasuryFiscalDataError,
+        CollateralModelError,
         ProvenanceError,
         UnitConversionError,
         OSError,

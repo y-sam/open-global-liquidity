@@ -1388,3 +1388,44 @@ def load_global_bitcoin_summary(path: Path) -> pd.DataFrame:
     return result.sort_values(
         ["sample_policy", "availability_lag_months", "horizon_months"]
     ).reset_index(drop=True)
+
+
+def load_collateral_conditions(path: Path) -> pd.DataFrame:
+    """Load the package-calculated monthly v0.4a collateral-conditions pilot."""
+    frame = _read_parquet(path, "US collateral conditions")
+    required = {
+        "date",
+        "gross_marketable_collateral_millions",
+        "fed_treasury_holdings_millions",
+        "private_collateral_proxy_millions",
+        "collateral_supply_growth_yoy",
+        "funding_spread_bps",
+        "treasury_volatility_bps",
+        "z_collateral_supply_growth_yoy",
+        "z_funding_spread_bps",
+        "z_treasury_volatility_bps",
+        "collateral_conditions_score",
+        "collateral_conditions_index",
+        "collateral_regime",
+        "model_name",
+        "model_classification",
+        "normalization_mode",
+        "normalization_min_periods",
+        "retrieved_at",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Collateral conditions are missing: " + ", ".join(missing))
+    result = frame[list(required)].copy()
+    result["date"] = pd.to_datetime(result["date"], errors="coerce")
+    result["retrieved_at"] = pd.to_datetime(result["retrieved_at"], errors="coerce", utc=True)
+    if (
+        result.empty
+        or result[["date", "retrieved_at"]].isna().any().any()
+        or (result["private_collateral_proxy_millions"] <= 0).any()
+        or not result["collateral_conditions_index"].dropna().between(0, 100).all()
+        or set(result["model_classification"]) != {"model_assumption"}
+        or set(result["normalization_mode"]) != {"expanding"}
+    ):
+        raise DashboardDataError("Collateral conditions contain invalid observations or metadata")
+    return result.sort_values("date").reset_index(drop=True)

@@ -95,6 +95,34 @@ periods to calendar month-end timestamps and converts native-currency billions t
 H.10 inputs. The BIS is not affiliated with this project, and the series are not investment advice.
 The direct PBoC extraction remains local-only and is used only as a research validation source.
 
+## U.S. Treasury Fiscal Data
+
+The v0.4a collateral pilot obtains the `Total Marketable` row from table 1 of the Monthly Statement
+of the Public Debt through the keyless U.S. Treasury Fiscal Data API. It uses the
+`debt_held_public_mil_amt` field, reported monthly in millions of U.S. dollars. Treasury describes
+this category as debt held outside the United States Government and notes that it includes Federal
+Reserve Banks. Open Global Liquidity subtracts separately measured Fed Treasury holdings only in a
+derived model-assumption layer; it does not alter the source observation.
+
+Attribution: U.S. Department of the Treasury, Bureau of the Fiscal Service, Monthly Statement of
+the Public Debt, Summary of Treasury Securities Outstanding, Total Marketable, debt held by the
+public. The Treasury source is not affiliated with and does not endorse Open Global Liquidity.
+
+## New York Fed reference-rate data
+
+The v0.4a collateral pilot uses SOFR as a measured reference rate and transforms it into a monthly
+median spread over the effective federal funds rate. Under the New York Fed Terms of Use, reference
+rate content may be used, copied, distributed, and modified subject to its attribution,
+modification-labeling, pass-through, and non-endorsement conditions.
+
+Required notice: The Secured Overnight Financing Rate data are subject to the Terms of Use posted
+at newyorkfed.org. The New York Fed is not responsible for publication of the SOFR data by Open
+Global Liquidity, does not sanction or endorse this republication, and has no liability for its
+use. Open Global Liquidity is not affiliated with the New York Fed. The SOFR data include inputs
+licensed to the New York Fed by DTCC Solutions LLC; those parties have no liability for this
+material. Derived monthly spreads and collateral scores are clearly identified as Open Global
+Liquidity transformations rather than New York Fed publications.
+
 ## FRED and ALFRED
 
 The pipeline accesses FRED and ALFRED through the Federal Reserve Bank of St. Louis API. The

@@ -168,6 +168,91 @@ US:
       source: "Board of Governors of the Federal Reserve System (US), H.10"
       source_url: "https://fred.stlouisfed.org/series/DTWEXBGS"
 
+  collateral:
+    marketable_treasury_debt_public:
+      classification: measured_data
+      provider: treasury
+      series_id: MSPD.TABLE1.TOTAL_MARKETABLE.DEBT_HELD_PUBLIC
+      component: marketable_treasury_debt_public
+      title: "Total Marketable Treasury Securities Held by the Public"
+      description: >-
+        Monthly par-value stock from the Treasury Monthly Statement of the Public Debt, Total
+        Marketable row. Debt held by the public includes Federal Reserve Banks, so the model
+        subtracts separately measured Fed Treasury holdings as an explicit approximation of
+        collateral circulating outside the central bank. It does not measure collateral reuse.
+      unit: "Millions of U.S. Dollars"
+      frequency: "Monthly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2001-01-31"
+      source: "U.S. Treasury Fiscal Data, Monthly Statement of the Public Debt"
+      source_url: "https://fiscaldata.treasury.gov/datasets/monthly-statement-public-debt/"
+
+    fed_treasury_holdings:
+      classification: measured_data
+      provider: fred
+      series_id: TREAST
+      component: fed_treasury_holdings
+      title: "Assets: Securities Held Outright: U.S. Treasury Securities: All: Wednesday Level"
+      description: >-
+        Federal Reserve Treasury securities held outright. The collateral pilot subtracts this
+        stock from gross marketable debt as a transparent approximation of securities removed
+        from private circulation. Fed securities lending means the approximation is imperfect.
+      unit: "Millions of U.S. Dollars"
+      frequency: "Weekly, As of Wednesday"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2002-12-18"
+      source: "Board of Governors of the Federal Reserve System (US), H.4.1"
+      source_url: "https://fred.stlouisfed.org/series/TREAST"
+
+    secured_overnight_financing_rate:
+      classification: measured_data
+      provider: fred
+      series_id: SOFR
+      component: secured_overnight_financing_rate
+      title: "Secured Overnight Financing Rate"
+      description: >-
+        Broad transaction-based measure of the overnight cost of financing Treasury securities.
+        The model uses its spread to the effective federal funds rate as an imperfect secured
+        funding-pressure proxy, not as a direct repo haircut measure.
+      unit: "Percent"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2018-04-03"
+      source: "Federal Reserve Bank of New York, Secured Overnight Financing Rate Data"
+      source_url: "https://fred.stlouisfed.org/series/SOFR"
+
+    effective_federal_funds_rate:
+      classification: measured_data
+      provider: fred
+      series_id: DFF
+      component: effective_federal_funds_rate
+      title: "Federal Funds Effective Rate"
+      description: >-
+        Effective rate on overnight unsecured federal funds transactions. It is used only as the
+        comparison leg of the SOFR funding-spread proxy.
+      unit: "Percent"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2018-04-03"
+      source: "Federal Reserve Bank of New York"
+      source_url: "https://fred.stlouisfed.org/series/DFF"
+
+    treasury_yield_10y_collateral:
+      classification: measured_data
+      provider: fred
+      series_id: DGS10
+      component: treasury_yield_10y_collateral
+      title: "Market Yield on U.S. Treasury Securities at 10-Year Constant Maturity"
+      description: >-
+        Daily 10-year constant-maturity yield reused to calculate a transparent realized-rate-
+        volatility proxy. This is not the proprietary MOVE Index and is not a direct haircut.
+      unit: "Percent"
+      frequency: "Daily"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2018-04-03"
+      source: "Board of Governors of the Federal Reserve System (US), H.15"
+      source_url: "https://fred.stlouisfed.org/series/DGS10"
+
 FX:
   exchange_rates:
     usd_per_euro:

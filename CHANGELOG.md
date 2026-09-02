@@ -5,6 +5,22 @@ release is tagged.
 
 ## [Unreleased]
 
+### Added
+
+- Keyless U.S. Treasury Fiscal Data provider for the Monthly Statement of the Public Debt Total
+  Marketable debt-held-by-public stock.
+- Configured Federal Reserve Treasury holdings, SOFR, effective federal funds rate, and 10-year
+  Treasury yield inputs for an experimental US collateral pilot.
+- Standalone Open Collateral Conditions Score with expanding, non-look-ahead normalization and
+  configurable 40/30/30 component weights.
+- Collateral dashboard page separating measured inputs, model assumptions, statistical
+  transformations, and unimplemented haircut/reuse concepts.
+
+### Research boundary
+
+- The collateral score remains separate from Global Model G. It is not an observed liquidity
+  multiplier, does not use MOVE, and is not calibrated against Bitcoin or another asset.
+
 ## [0.3.0] — 2026-09-01
 
 ### Added

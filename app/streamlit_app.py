@@ -35,6 +35,7 @@ from dashboard_support import (  # noqa: E402
     load_bitcoin_revision_summary,
     load_boe_data,
     load_boj_data,
+    load_collateral_conditions,
     load_dashboard_data,
     load_ecb_data,
     load_global_bitcoin_pairs,
@@ -87,6 +88,10 @@ GLOBAL_BITCOIN_SUMMARY_PATH = (
 )
 GLOBAL_BITCOIN_SUMMARY_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "global_central_bank_bitcoin_summary_snapshot.parquet"
+)
+COLLATERAL_CONDITIONS_PATH = DATA_ROOT / "processed" / "us_collateral_conditions.parquet"
+COLLATERAL_CONDITIONS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_collateral_conditions_snapshot.parquet"
 )
 MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
 MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
@@ -258,6 +263,12 @@ def _load_global_bitcoin_summary(path: str, modified_ns: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def _load_collateral_conditions(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_collateral_conditions(Path(path))
+
+
+@st.cache_data(show_spinner=False)
 def _load_models(path: str, modified_ns: int) -> pd.DataFrame:
     """Cache model data until its file modification timestamp changes."""
     del modified_ns
@@ -424,6 +435,14 @@ def _global_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
         _load_global_bitcoin_summary(str(summary_path), summary_path.stat().st_mtime_ns),
         origin,
     )
+
+
+def _collateral_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(
+        COLLATERAL_CONDITIONS_PATH,
+        COLLATERAL_CONDITIONS_SNAPSHOT_PATH,
+    )
+    return _load_collateral_conditions(str(path), path.stat().st_mtime_ns), origin
 
 
 def _model_data() -> tuple[pd.DataFrame, str] | None:
@@ -3802,6 +3821,145 @@ def global_aggregate_page() -> None:
         )
 
 
+def collateral_conditions_page() -> None:
+    """Present the standalone v0.4a US collateral and secured-funding pilot."""
+    st.title("Collateral conditions")
+    st.caption(
+        "Experimental US Treasury collateral and secured-funding conditions · maintained "
+        "separately from Global Model G"
+    )
+    try:
+        data, origin = _collateral_data()
+    except DashboardDataError:
+        st.info(
+            "The v0.4a collateral snapshot has not been generated in this environment. The "
+            "Treasury source is keyless; the existing FRED key covers the remaining inputs.",
+            icon=":material/account_balance:",
+        )
+        st.code(
+            "uv run python -m open_global_liquidity.pipeline --publish-dashboard-snapshot",
+            language="zsh",
+        )
+        return
+
+    indexed = data.dropna(subset=["collateral_conditions_index"])
+    if indexed.empty:
+        st.warning("The expanding normalization does not yet have 24 usable monthly observations.")
+        return
+    latest = indexed.iloc[-1]
+    with st.container(horizontal=True):
+        st.metric(
+            "Collateral conditions",
+            f"{float(latest['collateral_conditions_index']):.1f}",
+            str(latest["collateral_regime"]),
+            border=True,
+        )
+        st.metric(
+            "Private collateral proxy",
+            f"${float(latest['private_collateral_proxy_millions']) / 1_000_000:,.1f}tn",
+            f"{float(latest['collateral_supply_growth_yoy']):+.1%} year over year",
+            border=True,
+        )
+        st.metric(
+            "SOFR minus EFFR",
+            f"{float(latest['funding_spread_bps']):+.1f} bp",
+            "Higher is treated as tighter",
+            border=True,
+        )
+        st.metric(
+            "10-year yield volatility",
+            f"{float(latest['treasury_volatility_bps']):.1f} bp",
+            "21-observation annualized proxy",
+            border=True,
+        )
+
+    with st.sidebar:
+        st.header("Collateral controls")
+        history = st.segmented_control(
+            "History",
+            ["3 years", "5 years", "All"],
+            default="5 years",
+            key="collateral_history",
+        )
+        st.caption(f"Data mode: {origin}")
+        st.caption("Frequency: monthly")
+        st.caption("Normalization: expanding, 24 observations")
+    visible = indexed
+    if history != "All":
+        years = 3 if history == "3 years" else 5
+        visible = indexed.loc[
+            indexed["date"] >= indexed["date"].max() - timedelta(days=years * 365)
+        ]
+
+    index_chart = px.line(
+        visible,
+        x="date",
+        y="collateral_conditions_index",
+        title="Open Collateral Conditions Score",
+        labels={"date": "Month end", "collateral_conditions_index": "0-100 score"},
+    )
+    index_chart.update_traces(line={"width": 2.7, "color": "#0EA5E9"})
+    index_chart.add_hline(y=50, line_dash="dot", line_color="gray")
+    index_chart.update_yaxes(range=[0, 100])
+    st.plotly_chart(index_chart, width="stretch", config={"displaylogo": False})
+
+    supportive = visible[
+        [
+            "date",
+            "z_collateral_supply_growth_yoy",
+            "z_funding_spread_bps",
+            "z_treasury_volatility_bps",
+        ]
+    ].copy()
+    supportive["z_funding_spread_bps"] *= -1
+    supportive["z_treasury_volatility_bps"] *= -1
+    supportive = supportive.rename(
+        columns={
+            "z_collateral_supply_growth_yoy": "Collateral supply growth",
+            "z_funding_spread_bps": "Secured funding conditions",
+            "z_treasury_volatility_bps": "Rate-volatility conditions",
+        }
+    ).melt("date", var_name="component", value_name="supportive_zscore")
+    component_chart = px.line(
+        supportive,
+        x="date",
+        y="supportive_zscore",
+        color="component",
+        title="Standardized component signals · positive means more supportive",
+        labels={"date": "Month end", "supportive_zscore": "Expanding z-score", "component": ""},
+    )
+    component_chart.add_hline(y=0, line_dash="dot", line_color="gray")
+    st.plotly_chart(component_chart, width="stretch", config={"displaylogo": False})
+
+    st.subheader("Transparent v0.4a formula")
+    st.latex(
+        r"C_t = 0.40z(\Delta_{12m}\,PrivateCollateral)"
+        r" - 0.30z(SOFR-EFFR) - 0.30z(RealizedYieldVolatility)"
+    )
+    st.latex(r"CollateralIndex_t = 100\,\Phi(C_t)")
+    st.markdown(
+        "**Measured data:** Treasury MSPD marketable debt held by the public; Fed Treasury "
+        "holdings; SOFR; effective federal funds rate; and the 10-year Treasury yield.\n\n"
+        "**Model assumptions:** subtracting Fed holdings, interpreting supply growth as "
+        "supportive, treating wider funding spreads and higher volatility as constraining, and "
+        "the 40/30/30 weights.\n\n"
+        "**Calibrated parameters:** none. Bitcoin and other asset outcomes were not used to choose "
+        "the weights."
+    )
+    st.warning(
+        "This score does not observe repo haircuts, collateral reuse, dealer balance-sheet "
+        "capacity, securities lending, or collateral velocity. It is not yet multiplied into "
+        "Model G and must not be interpreted as a complete liquidity multiplier.",
+        icon=":material/warning:",
+    )
+    st.caption(
+        "The Secured Overnight Financing Rate data are subject to the Terms of Use posted at "
+        "newyorkfed.org. The New York Fed is not responsible for publication of the SOFR data by "
+        "Open Global Liquidity, does not sanction or endorse this republication, and has no "
+        "liability for its use. Open Global Liquidity is not affiliated with the New York Fed."
+    )
+
+
 def research_guide_page() -> None:
     st.title("Research guide")
     st.markdown(
@@ -4147,6 +4305,12 @@ global_aggregate_data_page = st.Page(
     icon=":material/currency_exchange:",
     url_path="global-aggregate",
 )
+collateral_data_page = st.Page(
+    collateral_conditions_page,
+    title="Collateral conditions",
+    icon=":material/account_balance_wallet:",
+    url_path="collateral-conditions",
+)
 markets_index_page = st.Page(
     markets_page,
     title="Liquidity vs markets",
@@ -4184,6 +4348,7 @@ navigation = st.navigation(
         vintage_page,
         bitcoin_page,
         markets_index_page,
+        collateral_data_page,
         data_page,
         central_bank_data_page,
         global_aggregate_data_page,

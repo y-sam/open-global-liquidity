@@ -1,7 +1,8 @@
 # Open Global Liquidity
 
 **Current release:** v0.3.0 — currency normalization, global central-bank aggregation, and Global
-Model G. See the [changelog](CHANGELOG.md),
+Model G. **Current development milestone:** v0.4a US collateral-conditions pilot. See the
+[changelog](CHANGELOG.md),
 [citation metadata](CITATION.cff), and [release checklist](RELEASE_CHECKLIST.md). Project code is
 licensed under Apache-2.0; bundled and downloaded third-party data remain subject to their
 respective terms.
@@ -20,7 +21,7 @@ Original project code is licensed under the [Apache License 2.0](LICENSE). This 
 not relicense third-party observations, derived snapshots, source metadata, names, or trademarks.
 See [Third-party data terms](THIRD_PARTY_DATA.md) before redistributing bundled data artifacts.
 
-## Current scope: v0.3
+## Current scope: v0.4a development
 
 The repository provides an auditable US data-ingestion path, experimental OGLI momentum index, and
 Streamlit dashboard. It
@@ -115,6 +116,16 @@ workspaces. Its Bitcoin comparisons use the same monthly five-bank panel and are
 current-vintage: the displayed availability delay is an explicit assumption because historical BIS
 release vintages have not yet been reconstructed. The US/Fed alternatives retain their separate
 weekly and ALFRED point-in-time research policies.
+
+The v0.4a **Open Collateral Conditions Score** is a separate US research pilot and is not yet an
+input to Model G. It uses Treasury Fiscal Data's monthly Total Marketable debt-held-by-public stock,
+subtracts Federal Reserve Treasury holdings as an approximation of securities outside the central
+bank, and combines its annual growth with the SOFR-minus-EFFR spread and a public 10-year-yield
+realized-volatility proxy. All three signals use expanding normalization; the assumed weights are
+40%, 30%, and 30%, respectively. Higher funding spreads and yield volatility enter with negative
+signs. The score does not observe haircuts, collateral reuse, dealer capacity, securities lending,
+or collateral velocity. It is not the MOVE Index, an observed liquidity multiplier, or a Howell/
+CrossBorder formula, and no market outcome was used to select its parameters.
 
 ## Research boundaries
 
@@ -286,7 +297,7 @@ intraday release timestamps or exact trade availability. Instead, it reports pre
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
 
-The publication commands together write thirty-two Git-versioned Parquet
+The publication commands together write thirty-four Git-versioned Parquet
 artifacts plus a JSON provenance manifest:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
@@ -308,6 +319,10 @@ artifacts plus a JSON provenance manifest:
 - `data/reference/us_macro_context_weekly_snapshot.parquet` — Wednesday-aligned context data.
 - `data/reference/us_macro_context_indicators_snapshot.parquet` — yields, curve slope, and broad
   dollar index for dashboard presentation.
+- `data/reference/us_collateral_source_snapshot.parquet` — measured Treasury, Fed holdings,
+  secured-funding, policy-rate, and Treasury-yield inputs for the collateral pilot.
+- `data/reference/us_collateral_conditions_snapshot.parquet` — monthly derived private-collateral
+  proxy, normalized components, score, index, regimes, and model classifications.
 - `data/reference/us_point_in_time_comparison_snapshot.parquet` — derived monthly vintage/current
   OGLI comparisons; raw ALFRED observations remain excluded.
 - `data/reference/us_point_in_time_market_series_snapshot.parquet` — standardized public Bitcoin,
@@ -409,6 +424,7 @@ directory, and verifies that the public snapshots still render the landing-page 
 - `config/series.yaml` — measured-series definitions and source metadata.
 - `config/model.yaml` — classified weekly-alignment and model assumptions.
 - `config/global_aggregation.yaml` — v0.3 currency, frequency, staleness, and coverage assumptions.
+- `config/collateral.yaml` — v0.4a collateral formula, weights, normalization, and regime assumptions.
 - `src/open_global_liquidity/config.py` — validated configuration loading.
 - `src/open_global_liquidity/data/fred.py` — FRED network, error handling, cache, and standardization.
 - `src/open_global_liquidity/data/coinmetrics.py` — no-key Coin Metrics community ingestion and
@@ -423,11 +439,15 @@ directory, and verifies that the public snapshots still render the landing-page 
   unit validation, monthly Total Assets extraction, and local cache.
 - `src/open_global_liquidity/data/bis.py` — keyless BIS SDMX ingestion with exact-key, currency,
   and unit validation for five redistributable central-bank series.
+- `src/open_global_liquidity/data/treasury.py` — keyless Treasury Fiscal Data MSPD ingestion and
+  local caching.
 - `src/open_global_liquidity/transforms/` — unit conversion, alignment, growth, and z-scores.
 - `src/open_global_liquidity/models/us_liquidity.py` — configurable Model A/B/C calculations.
 - `src/open_global_liquidity/models/ogli.py` — composite momentum, normal-CDF mapping, and regimes.
 - `src/open_global_liquidity/models/global_central_bank.py` — balanced-month FX conversion,
   source/FX lineage, and transparent central-bank asset summation.
+- `src/open_global_liquidity/models/collateral.py` — standalone US collateral-conditions model;
+  it is not currently an input to Global Model G.
 - `src/open_global_liquidity/analysis/lead_lag.py` — market returns and signal/outcome alignment.
 - `src/open_global_liquidity/analysis/correlations.py` — full-sample and rolling correlations.
 - `src/open_global_liquidity/analysis/bootstrap.py` — deterministic moving-block correlation

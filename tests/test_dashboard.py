@@ -5,6 +5,8 @@ from pathlib import Path
 
 import pandas as pd
 import pytest
+from streamlit.testing.v1 import AppTest
+from streamlit.util import calc_hash
 
 from open_global_liquidity.dashboard import (
     DashboardDataError,
@@ -590,3 +592,52 @@ def test_bitcoin_snapshot_loader_rejects_impossible_path_statistic(tmp_path: Pat
 
     with pytest.raises(support.DashboardDataError, match="impossible path statistics"):
         support.load_bitcoin_outcomes(invalid_path)
+
+
+def test_load_collateral_conditions_preserves_auditable_model_metadata(tmp_path: Path) -> None:
+    support_path = Path(__file__).resolve().parents[1] / "app" / "dashboard_support.py"
+    spec = importlib.util.spec_from_file_location("dashboard_support_collateral_test", support_path)
+    assert spec is not None and spec.loader is not None
+    support = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(support)
+    path = tmp_path / "collateral.parquet"
+    pd.DataFrame(
+        {
+            "date": pd.to_datetime(["2024-01-31", "2024-02-29"]),
+            "gross_marketable_collateral_millions": [26_000_000.0, 26_200_000.0],
+            "fed_treasury_holdings_millions": [5_000_000.0, 4_950_000.0],
+            "private_collateral_proxy_millions": [21_000_000.0, 21_250_000.0],
+            "collateral_supply_growth_yoy": [0.05, 0.06],
+            "funding_spread_bps": [1.0, 2.0],
+            "treasury_volatility_bps": [90.0, 95.0],
+            "z_collateral_supply_growth_yoy": [0.2, 0.3],
+            "z_funding_spread_bps": [-0.1, 0.1],
+            "z_treasury_volatility_bps": [0.0, 0.2],
+            "collateral_conditions_score": [0.11, 0.03],
+            "collateral_conditions_index": [54.38, 51.20],
+            "collateral_regime": ["Neutral", "Neutral"],
+            "model_name": ["Open Collateral Conditions Score"] * 2,
+            "model_classification": ["model_assumption"] * 2,
+            "normalization_mode": ["expanding"] * 2,
+            "normalization_min_periods": [24, 24],
+            "retrieved_at": [pd.Timestamp("2024-03-01", tz=UTC)] * 2,
+        }
+    ).to_parquet(path, index=False)
+
+    loaded = support.load_collateral_conditions(path)
+
+    assert loaded["date"].tolist() == list(pd.to_datetime(["2024-01-31", "2024-02-29"]))
+    assert loaded["collateral_conditions_index"].tolist() == [54.38, 51.20]
+    assert set(loaded["model_classification"]) == {"model_assumption"}
+
+
+def test_collateral_page_degrades_cleanly_without_snapshot(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("OGLI_DATA_ROOT", str(tmp_path / "data"))
+    app_path = Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py"
+    app = AppTest.from_file(app_path, default_timeout=20)
+    app._page_hash = calc_hash("collateral-conditions")
+    app.run()
+
+    assert not app.exception
+    assert app.title[0].value == "Collateral conditions"
+    assert any("has not been generated" in message.value for message in app.info)

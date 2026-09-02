@@ -21,12 +21,14 @@ def test_release_metadata_separates_code_and_data_licenses() -> None:
 
     assert metadata["project"]["license"] == "Apache-2.0"
     assert metadata["project"]["version"] == __version__
-    assert __version__ == "0.3.0"
+    assert __version__ == "0.4.0.dev0"
     assert PROJECT_ROOT.joinpath("LICENSE").is_file()
     data_terms = PROJECT_ROOT.joinpath("THIRD_PARTY_DATA.md").read_text(encoding="utf-8")
     assert "does not grant rights in third-party observations" in data_terms
     assert "Attribution-NonCommercial 4.0 International" in data_terms
     assert "RRPONTSYD" in data_terms
+    assert "Monthly Statement" in data_terms and "Public Debt" in data_terms
+    assert "Secured Overnight Financing Rate data are subject" in data_terms
 
 
 def test_citation_metadata_matches_release() -> None:

@@ -8,7 +8,7 @@ from open_global_liquidity.config import ConfigurationError, load_model_config, 
 def test_load_walcl_config() -> None:
     definitions = load_series_config(Path("config/series.yaml"))
 
-    assert len(definitions) == 22
+    assert len(definitions) == 27
     by_id = {definition.series_id: definition for definition in definitions}
     assert set(by_id) == {
         "WALCL",
@@ -33,6 +33,10 @@ def test_load_walcl_config() -> None:
         "DEXJPUS",
         "DEXUSUK",
         "DEXCHUS",
+        "MSPD.TABLE1.TOTAL_MARKETABLE.DEBT_HELD_PUBLIC",
+        "TREAST",
+        "SOFR",
+        "DFF",
     }
     walcl = by_id["WALCL"]
     assert walcl.series_id == "WALCL"
@@ -68,6 +72,16 @@ def test_load_walcl_config() -> None:
     assert china.unit == "Billions of Chinese Yuan"
     assert by_id["DEXUSEU"].group == "exchange_rates"
     assert by_id["DEXJPUS"].unit == "Japanese Yen to One U.S. Dollar"
+    collateral_components = {
+        definition.component for definition in definitions if definition.group == "collateral"
+    }
+    assert collateral_components == {
+        "marketable_treasury_debt_public",
+        "fed_treasury_holdings",
+        "secured_overnight_financing_rate",
+        "effective_federal_funds_rate",
+        "treasury_yield_10y_collateral",
+    }
 
 
 def test_config_rejects_missing_fields(tmp_path: Path) -> None:
