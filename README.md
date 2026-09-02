@@ -133,6 +133,11 @@ shares as measured supply context. The five classes are not assigned different c
 weights, and composition does not change the frozen 40/30/30 score. Federal Financing Bank
 securities are excluded from this display and are not one of the five selected Treasury classes.
 
+The repo-context view adds daily SOFR, TGCR, and BGCR benchmark rates and the transaction volumes
+underlying each benchmark, displayed as monthly medians. These volumes cover the transactions used
+to calculate each New York Fed reference rate; they are not total repo-market size. They remain
+measured context and do not alter the frozen collateral score.
+
 ## Research boundaries
 
 The project will keep three categories separate:

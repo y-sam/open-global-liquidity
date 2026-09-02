@@ -56,6 +56,7 @@ from dashboard_support import (  # noqa: E402
     load_point_in_time_comparison,
     load_point_in_time_market_pairs,
     load_point_in_time_market_summary,
+    load_repo_context,
     load_snapshot_manifest,
     prepare_global_index_display,
     resolve_dashboard_data_path,
@@ -288,6 +289,12 @@ def _load_collateral_composition(path: str, modified_ns: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def _load_repo_context(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_repo_context(Path(path))
+
+
+@st.cache_data(show_spinner=False)
 def _load_collateral_bitcoin_pairs(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_collateral_bitcoin_pairs(Path(path))
@@ -481,6 +488,13 @@ def _collateral_composition_data() -> tuple[pd.DataFrame, str]:
         COLLATERAL_SOURCE_PATH, COLLATERAL_SOURCE_SNAPSHOT_PATH
     )
     return _load_collateral_composition(str(path), path.stat().st_mtime_ns), origin
+
+
+def _repo_context_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(
+        COLLATERAL_SOURCE_PATH, COLLATERAL_SOURCE_SNAPSHOT_PATH
+    )
+    return _load_repo_context(str(path), path.stat().st_mtime_ns), origin
 
 
 def _collateral_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
@@ -4004,6 +4018,59 @@ def collateral_conditions_page() -> None:
             f"Measured MSPD composition · data mode: {composition_origin}. Federal Financing "
             "Bank securities are excluded because they are not one of the five selected Treasury "
             "marketable classes. Composition does not measure repo eligibility or collateral reuse."
+        )
+
+    st.subheader("Treasury repo market context")
+    try:
+        repo, repo_origin = _repo_context_data()
+    except DashboardDataError:
+        st.info("SOFR, TGCR, and BGCR rate-and-volume context is awaiting the next data refresh.")
+    else:
+        repo["month"] = repo["date"].dt.to_period("M").dt.to_timestamp("M")
+        repo_monthly = repo.groupby(["month", "component"], as_index=False)["value"].median()
+        rate_labels = {
+            "secured_overnight_financing_rate": "SOFR",
+            "tri_party_general_collateral_rate": "TGCR",
+            "broad_general_collateral_rate": "BGCR",
+        }
+        volume_labels = {
+            "secured_overnight_financing_volume": "SOFR volume",
+            "tri_party_general_collateral_volume": "TGCR volume",
+            "broad_general_collateral_volume": "BGCR volume",
+        }
+        rates = repo_monthly.loc[repo_monthly["component"].isin(rate_labels)].copy()
+        rates["series"] = rates["component"].map(rate_labels)
+        volumes = repo_monthly.loc[repo_monthly["component"].isin(volume_labels)].copy()
+        volumes["series"] = volumes["component"].map(volume_labels)
+        left, right = st.columns(2)
+        left.plotly_chart(
+            px.line(
+                rates,
+                x="month",
+                y="value",
+                color="series",
+                title="Monthly median rates",
+                labels={"month": "Month", "value": "Percent", "series": ""},
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+        right.plotly_chart(
+            px.line(
+                volumes,
+                x="month",
+                y="value",
+                color="series",
+                title="Monthly median volumes",
+                labels={"month": "Month", "value": "USD billions", "series": ""},
+            ),
+            width="stretch",
+            config={"displaylogo": False},
+        )
+        st.caption(
+            f"Measured New York Fed reference-rate context · data mode: {repo_origin}. Volumes "
+            "describe transactions underlying each benchmark and are not total repo-market size. "
+            "These series do not yet enter the collateral score."
         )
 
     supportive = visible[

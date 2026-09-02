@@ -119,6 +119,10 @@ median spread over the effective federal funds rate. Under the New York Fed Term
 rate content may be used, copied, distributed, and modified subject to its attribution,
 modification-labeling, pass-through, and non-endorsement conditions.
 
+The v0.4b repo-context view also displays SOFR, TGCR, and BGCR benchmark rates and their published
+underlying transaction volumes. Open Global Liquidity transforms daily observations to monthly
+medians for display and does not describe those volumes as the total repo market.
+
 Required notice: The Secured Overnight Financing Rate data are subject to the Terms of Use posted
 at newyorkfed.org. The New York Fed is not responsible for publication of the SOFR data by Open
 Global Liquidity, does not sanction or endorse this republication, and has no liability for its

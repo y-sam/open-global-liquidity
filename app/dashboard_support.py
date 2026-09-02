@@ -1460,6 +1460,25 @@ def load_collateral_composition(path: Path) -> pd.DataFrame:
     return result.sort_values(["date", "component"]).reset_index(drop=True)
 
 
+def load_repo_context(path: Path) -> pd.DataFrame:
+    """Load measured New York Fed Treasury-repo rates and volumes."""
+    frame = _read_parquet(path, "US collateral source")
+    components = {
+        "secured_overnight_financing_rate",
+        "secured_overnight_financing_volume",
+        "tri_party_general_collateral_rate",
+        "tri_party_general_collateral_volume",
+        "broad_general_collateral_rate",
+        "broad_general_collateral_volume",
+    }
+    result = frame.loc[frame["component"].isin(components)].copy()
+    if result.empty or set(result["component"]) != components:
+        raise DashboardDataError("Repo context is missing one or more measured series")
+    result["date"] = pd.to_datetime(result["date"], errors="coerce")
+    result["value"] = pd.to_numeric(result["value"], errors="coerce")
+    return result.dropna(subset=["date", "value"]).sort_values(["component", "date"])
+
+
 def load_collateral_bitcoin_pairs(path: Path) -> pd.DataFrame:
     """Load individual frozen-score/Bitcoin outcome pairs."""
     frame = _read_parquet(path, "Collateral Bitcoin pairs")

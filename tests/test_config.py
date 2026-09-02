@@ -8,7 +8,7 @@ from open_global_liquidity.config import ConfigurationError, load_model_config, 
 def test_load_walcl_config() -> None:
     definitions = load_series_config(Path("config/series.yaml"))
 
-    assert len(definitions) == 32
+    assert len(definitions) == 37
     by_id = {definition.series_id: definition for definition in definitions}
     assert set(by_id) == {
         "WALCL",
@@ -41,6 +41,11 @@ def test_load_walcl_config() -> None:
         "MSPD.TABLE1.MARKETABLE.FRNS.DEBT_HELD_PUBLIC",
         "TREAST",
         "SOFR",
+        "SOFRVOL",
+        "TGCRRATE",
+        "TGCRVOLUME",
+        "BGCRRATE",
+        "BGCRVOLUME",
         "DFF",
     }
     walcl = by_id["WALCL"]
@@ -89,6 +94,11 @@ def test_load_walcl_config() -> None:
         "marketable_treasury_frns_public",
         "fed_treasury_holdings",
         "secured_overnight_financing_rate",
+        "secured_overnight_financing_volume",
+        "tri_party_general_collateral_rate",
+        "tri_party_general_collateral_volume",
+        "broad_general_collateral_rate",
+        "broad_general_collateral_volume",
         "effective_federal_funds_rate",
         "treasury_yield_10y_collateral",
     }
