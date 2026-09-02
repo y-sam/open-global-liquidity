@@ -185,8 +185,13 @@ def calculate_collateral_conditions(
     frame = source.copy()
     frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
     frame["value"] = pd.to_numeric(frame["value"], errors="coerce")
-    if frame[["date", "value"]].isna().any().any():
-        raise CollateralModelError("Collateral source contains invalid dates or values")
+    if frame["date"].isna().any():
+        raise CollateralModelError("Collateral source contains invalid dates")
+    # FRED preserves unavailable daily observations as nulls. Omit them before as-of and rolling
+    # calculations rather than interpolating; declared staleness rules still govern carry-forward.
+    frame = frame.dropna(subset=["value"]).copy()
+    if frame.empty or expected - set(frame["component"]):
+        raise CollateralModelError("Collateral source lacks usable component values")
     if frame.duplicated(["date", "component"]).any():
         raise CollateralModelError("Collateral source contains duplicate component dates")
     collateral_end = frame.loc[

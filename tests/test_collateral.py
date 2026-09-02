@@ -91,3 +91,14 @@ def test_collateral_model_rejects_missing_component() -> None:
 
     with pytest.raises(CollateralModelError, match="lacks components"):
         calculate_collateral_conditions(source, _config())
+
+
+def test_collateral_model_omits_missing_daily_observations_without_interpolation() -> None:
+    source = _source()
+    missing_row = source.loc[source["component"] == "treasury_yield_10y_collateral"].index[30]
+    source.loc[missing_row, "value"] = float("nan")
+
+    result = calculate_collateral_conditions(source, _config())
+
+    assert result["treasury_volatility_bps"].notna().any()
+    assert result["collateral_conditions_index"].notna().any()
