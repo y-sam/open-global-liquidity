@@ -333,34 +333,6 @@ US:
       source: "Federal Reserve Bank of New York"
       source_url: "https://fred.stlouisfed.org/series/TGCRVOLUME"
 
-    broad_general_collateral_rate:
-      classification: measured_data
-      provider: fred
-      series_id: BGCRRATE
-      component: broad_general_collateral_rate
-      title: "Broad General Collateral Rate"
-      description: "Overnight Treasury general-collateral repo rate broader than TGCR; context only."
-      unit: "Percent"
-      frequency: "Daily"
-      seasonal_adjustment: "Not Seasonally Adjusted"
-      start: "2018-04-03"
-      source: "Federal Reserve Bank of New York"
-      source_url: "https://fred.stlouisfed.org/series/BGCRRATE"
-
-    broad_general_collateral_volume:
-      classification: measured_data
-      provider: fred
-      series_id: BGCRVOLUME
-      component: broad_general_collateral_volume
-      title: "Broad General Collateral Rate Volume"
-      description: "Daily transaction volume underlying BGCR; measured context only."
-      unit: "Billions of U.S. Dollars"
-      frequency: "Daily"
-      seasonal_adjustment: "Not Seasonally Adjusted"
-      start: "2018-04-03"
-      source: "Federal Reserve Bank of New York"
-      source_url: "https://fred.stlouisfed.org/series/BGCRVOLUME"
-
     effective_federal_funds_rate:
       classification: measured_data
       provider: fred

@@ -19,7 +19,7 @@ release is tagged.
   non-overlapping samples, Fisher intervals, and a deterministic moving-block bootstrap.
 - Added measured MSPD composition for Treasury bills, notes, bonds, TIPS, and floating-rate notes.
   These series are displayed as supply context and do not alter the frozen collateral score.
-- Added SOFR, TGCR, and BGCR transaction volumes and benchmark rates as measured repo-market
+- Added SOFR and TGCR transaction volumes and benchmark rates as measured repo-market
   context. They remain outside the frozen score pending robustness analysis.
 
 ### Research boundary

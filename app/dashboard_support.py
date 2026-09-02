@@ -1468,8 +1468,6 @@ def load_repo_context(path: Path) -> pd.DataFrame:
         "secured_overnight_financing_volume",
         "tri_party_general_collateral_rate",
         "tri_party_general_collateral_volume",
-        "broad_general_collateral_rate",
-        "broad_general_collateral_volume",
     }
     result = frame.loc[frame["component"].isin(components)].copy()
     if result.empty or set(result["component"]) != components:

@@ -4024,19 +4024,17 @@ def collateral_conditions_page() -> None:
     try:
         repo, repo_origin = _repo_context_data()
     except DashboardDataError:
-        st.info("SOFR, TGCR, and BGCR rate-and-volume context is awaiting the next data refresh.")
+        st.info("SOFR and TGCR rate-and-volume context is awaiting the next data refresh.")
     else:
         repo["month"] = repo["date"].dt.to_period("M").dt.to_timestamp("M")
         repo_monthly = repo.groupby(["month", "component"], as_index=False)["value"].median()
         rate_labels = {
             "secured_overnight_financing_rate": "SOFR",
             "tri_party_general_collateral_rate": "TGCR",
-            "broad_general_collateral_rate": "BGCR",
         }
         volume_labels = {
             "secured_overnight_financing_volume": "SOFR volume",
             "tri_party_general_collateral_volume": "TGCR volume",
-            "broad_general_collateral_volume": "BGCR volume",
         }
         rates = repo_monthly.loc[repo_monthly["component"].isin(rate_labels)].copy()
         rates["series"] = rates["component"].map(rate_labels)
