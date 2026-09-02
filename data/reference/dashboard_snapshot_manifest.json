@@ -19,7 +19,7 @@
       ],
       "earliest_observation": "2002-01-31",
       "latest_observation": "2026-06-30",
-      "latest_retrieval": "2026-09-02T16:24:16.073296+00:00",
+      "latest_retrieval": "2026-09-02T18:09:30.540890+00:00",
       "providers": [
         "BIS"
       ],
@@ -27,7 +27,7 @@
       "series_ids": [
         "BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N"
       ],
-      "sha256": "f5dfc4f179a99dcfd4ded2291b734bd36ad39fa349c1972449a5e4c834b68942"
+      "sha256": "4d201db61c8881ed48c3034b36981be1dfd33690bb1cd21e2201712d3c9797c9"
     },
     "euro_area_ecb_series_snapshot.parquet": {
       "bytes": 11990,
@@ -47,7 +47,7 @@
       ],
       "earliest_observation": "1997-09-30",
       "latest_observation": "2026-07-31",
-      "latest_retrieval": "2026-09-02T16:23:56.394183+00:00",
+      "latest_retrieval": "2026-09-02T18:09:15.839910+00:00",
       "providers": [
         "ECB"
       ],
@@ -55,7 +55,7 @@
       "series_ids": [
         "BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E"
       ],
-      "sha256": "3875d0774a2e94f7eb8f24b32c42d11b65cf3e2fb19ced1ad52cf5e17a07ed55"
+      "sha256": "6d275b82f055e996f1294eaf359186839a2cae9346ce12128c2eec408ad3dc4f"
     },
     "global_bis_central_bank_series_snapshot.parquet": {
       "bytes": 21664,
@@ -79,7 +79,7 @@
       ],
       "earliest_observation": "2002-01-31",
       "latest_observation": "2026-07-31",
-      "latest_retrieval": "2026-09-02T16:24:16.073296+00:00",
+      "latest_retrieval": "2026-09-02T18:09:30.540890+00:00",
       "providers": [
         "BIS"
       ],
@@ -91,7 +91,7 @@
         "BIS,WS_CBTA,1.0/M.US.B.XDC.USD.N",
         "BIS,WS_CBTA,1.0/M.XM.B.XDC.EUR.N"
       ],
-      "sha256": "734a63553ab4e7003a903caadf58aed61fd36fbb129e787a4006a949a6d7ecab"
+      "sha256": "d4826ec026a6ca2eb9d5dd79528bca3cced30b30875541793bfc6df6b792ee6b"
     },
     "global_central_bank_assets_detail_snapshot.parquet": {
       "bytes": 68928,
@@ -126,7 +126,7 @@
       "earliest_observation": "2002-01-31",
       "latest_observation": "2026-06-30",
       "rows": 1470,
-      "sha256": "d5a159b2ea2567bf65768267e2da42af0604ea96ff84affa1ac1f14fbd7a8f53"
+      "sha256": "465988e0f2b2c170cf366c06194b1f72a163616453a4e1e46cd7197d6a77b825"
     },
     "global_central_bank_assets_snapshot.parquet": {
       "bytes": 37630,
@@ -241,7 +241,7 @@
       ],
       "earliest_observation": "1971-01-04",
       "latest_observation": "2026-08-28",
-      "latest_retrieval": "2026-09-02T16:24:17.573535+00:00",
+      "latest_retrieval": "2026-09-02T18:09:32.518622+00:00",
       "providers": [
         "FRED"
       ],
@@ -252,7 +252,7 @@
         "DEXUSEU",
         "DEXUSUK"
       ],
-      "sha256": "e9b969a07ca40fc690ed12d9c145442f8d6a7dfb31c7234d45c5be830718117a"
+      "sha256": "f4cf06df5bb02b7925b2537bce8d882596f990830b94f92acc7c36d8775aee1d"
     },
     "japan_boj_series_snapshot.parquet": {
       "bytes": 11024,
@@ -272,7 +272,7 @@
       ],
       "earliest_observation": "1998-04-30",
       "latest_observation": "2026-07-31",
-      "latest_retrieval": "2026-09-02T16:23:57.741316+00:00",
+      "latest_retrieval": "2026-09-02T18:09:16.594657+00:00",
       "providers": [
         "BOJ"
       ],
@@ -280,7 +280,7 @@
       "series_ids": [
         "BS01.MABJMTA"
       ],
-      "sha256": "de15d522017a7a7b8eacee4d8b83d650f6400b192a6d9cbce560c346254842e1"
+      "sha256": "3201e61c4f3ad3ae0dfc7bd34084744e43942633450e1e4d87b4783ae44a463b"
     },
     "uk_boe_series_snapshot.parquet": {
       "bytes": 6322,
@@ -300,7 +300,7 @@
       ],
       "earliest_observation": "2013-09-30",
       "latest_observation": "2025-03-31",
-      "latest_retrieval": "2026-09-02T16:23:58.711882+00:00",
+      "latest_retrieval": "2026-09-02T18:09:17.595600+00:00",
       "providers": [
         "BOE"
       ],
@@ -308,7 +308,7 @@
       "series_ids": [
         "RPQB75A"
       ],
-      "sha256": "5b4158c2c7abe8d8741aae270cea3a3d08834a25d749215f828cb20e6e240f01"
+      "sha256": "670d2e85c14ad33329c81d768981e2b753e3b57898ab3dac2b329d71f5a63b57"
     },
     "us_collateral_bitcoin_pairs_snapshot.parquet": {
       "bytes": 28166,
@@ -410,12 +410,12 @@
       ],
       "earliest_observation": "2018-04-30",
       "latest_observation": "2026-07-31",
-      "latest_retrieval": "2026-09-02T16:23:55.481175+00:00",
+      "latest_retrieval": "2026-09-02T18:09:14.141914+00:00",
       "rows": 100,
-      "sha256": "866cf513e174a3c4183b574bde2bb25540ec6b7ef59a15cf18e51ab418987575"
+      "sha256": "f2920d6290e2478911f61e2e0a82df079d93433aae144bccbfddde07ecbda9f9"
     },
     "us_collateral_source_snapshot.parquet": {
-      "bytes": 82673,
+      "bytes": 109901,
       "columns": [
         "date",
         "country",
@@ -437,16 +437,19 @@
         "marketable_treasury_notes_public",
         "marketable_treasury_tips_public",
         "secured_overnight_financing_rate",
-        "treasury_yield_10y_collateral"
+        "secured_overnight_financing_volume",
+        "treasury_yield_10y_collateral",
+        "tri_party_general_collateral_rate",
+        "tri_party_general_collateral_volume"
       ],
       "earliest_observation": "2001-01-31",
       "latest_observation": "2026-09-01",
-      "latest_retrieval": "2026-09-02T16:23:55.481175+00:00",
+      "latest_retrieval": "2026-09-02T18:09:14.141914+00:00",
       "providers": [
         "FRED",
         "U.S. Treasury Fiscal Data"
       ],
-      "rows": 10346,
+      "rows": 16934,
       "series_ids": [
         "DFF",
         "DGS10",
@@ -457,12 +460,15 @@
         "MSPD.TABLE1.MARKETABLE.TIPS.DEBT_HELD_PUBLIC",
         "MSPD.TABLE1.TOTAL_MARKETABLE.DEBT_HELD_PUBLIC",
         "SOFR",
+        "SOFRVOL",
+        "TGCRRATE",
+        "TGCRVOLUME",
         "TREAST"
       ],
-      "sha256": "127658684442b9e2adaccffe436d13cd2a1128a4262ac2b6419a3dfa2f3b5c1a"
+      "sha256": "de8f129984a38dcb1d4f19b970142e586564e5764fae7ee1c5e46b209a3986d3"
     },
     "us_fred_series_snapshot.parquet": {
-      "bytes": 89649,
+      "bytes": 89675,
       "columns": [
         "date",
         "country",
@@ -481,19 +487,19 @@
         "treasury_general_account"
       ],
       "earliest_observation": "2002-12-18",
-      "latest_observation": "2026-09-01",
-      "latest_retrieval": "2026-09-02T16:23:51.289214+00:00",
+      "latest_observation": "2026-09-02",
+      "latest_retrieval": "2026-09-02T18:09:06.795335+00:00",
       "providers": [
         "FRED"
       ],
-      "rows": 7016,
+      "rows": 7017,
       "series_ids": [
         "RRPONTSYD",
         "WALCL",
         "WDTGAL",
         "WRBWFRBL"
       ],
-      "sha256": "4e7ac852f20223611a989048a069ecc14a4a0641480485f5a96813686082ff44"
+      "sha256": "744bd3ae2f23906adda87b8b0bca05521adc7899fd392864c789b18a8a82748e"
     },
     "us_liquidity_market_comparisons_snapshot.parquet": {
       "bytes": 602066,
@@ -715,7 +721,7 @@
       ],
       "earliest_observation": "2014-01-08",
       "latest_observation": "2026-08-26",
-      "latest_retrieval": "2026-09-02T16:23:51.289214+00:00",
+      "latest_retrieval": "2026-09-02T18:09:06.795335+00:00",
       "providers": [
         "FRED"
       ],
@@ -726,7 +732,7 @@
         "WDTGAL",
         "WRBWFRBL"
       ],
-      "sha256": "5f5680b4e54b3977553781c19a1fa988d17631716d146e626dd58caaafddf4d1"
+      "sha256": "9eb3e0594fc7c2ea8253b378fe8e26f93593756237ef99b09e175743d48b2284"
     },
     "us_macro_context_indicators_snapshot.parquet": {
       "bytes": 32366,
@@ -763,7 +769,7 @@
       ],
       "earliest_observation": "2006-01-02",
       "latest_observation": "2026-08-31",
-      "latest_retrieval": "2026-09-02T16:24:23.393831+00:00",
+      "latest_retrieval": "2026-09-02T18:09:38.788095+00:00",
       "providers": [
         "FRED"
       ],
@@ -773,7 +779,7 @@
         "DGS2",
         "DTWEXBGS"
       ],
-      "sha256": "f10b687ff4f260af9de1329d8a7cdcb617d2cafe3f6b38f408ed2150e372e6ba"
+      "sha256": "62f6a36fcb1d30881aa236ebf3cdf04415e61efcd7611f949c0a21e0bd802013"
     },
     "us_macro_context_weekly_snapshot.parquet": {
       "bytes": 47445,
@@ -800,7 +806,7 @@
       ],
       "earliest_observation": "2006-01-04",
       "latest_observation": "2026-08-26",
-      "latest_retrieval": "2026-09-02T16:24:23.393831+00:00",
+      "latest_retrieval": "2026-09-02T18:09:38.788095+00:00",
       "providers": [
         "FRED"
       ],
@@ -810,7 +816,7 @@
         "DGS2",
         "DTWEXBGS"
       ],
-      "sha256": "820873e91bb1d7adc4c4ebc3e7fcab60935dff7a1f7b13a94aa8fe72422d0206"
+      "sha256": "2d7f0482ce52340edac6b9c6313a6fa352cdb184b15a4ffcfba8458cfa62ee63"
     },
     "us_market_returns_snapshot.parquet": {
       "bytes": 101706,
@@ -855,7 +861,7 @@
       ],
       "earliest_observation": "2010-07-18",
       "latest_observation": "2026-09-01",
-      "latest_retrieval": "2026-09-02T16:24:18.221430+00:00",
+      "latest_retrieval": "2026-09-02T18:09:33.212044+00:00",
       "providers": [
         "Coin Metrics"
       ],
@@ -863,7 +869,7 @@
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "cdf3a60cfea7b36a1dcecd207808fdb0db9a348b0a92538dd524af9043db4ef3"
+      "sha256": "c38b196e6f58677fd0cbb5901fb2a78dc881941c2df15198c6737ecb24c3cdb3"
     },
     "us_market_weekly_snapshot.parquet": {
       "bytes": 32315,
@@ -888,7 +894,7 @@
       ],
       "earliest_observation": "2010-07-21",
       "latest_observation": "2026-08-26",
-      "latest_retrieval": "2026-09-02T16:24:18.221430+00:00",
+      "latest_retrieval": "2026-09-02T18:09:33.212044+00:00",
       "providers": [
         "Coin Metrics"
       ],
@@ -896,7 +902,7 @@
       "series_ids": [
         "btc.PriceUSD"
       ],
-      "sha256": "d6c05aee9519cf16db20b7aca6202d3752f3fdb418babcc7db3a24182b39b746"
+      "sha256": "cbaf3c779d69756d38ebc7971bc0b095d36d3d1d3eb90f8e6ce66a41d5de78f5"
     },
     "us_ogli_snapshot.parquet": {
       "bytes": 181967,
@@ -1115,14 +1121,14 @@
         "momentum_revision",
         "comparison_policy"
       ],
-      "latest_retrieval": "2026-09-02T16:24:27.301011+00:00",
+      "latest_retrieval": "2026-09-02T18:09:43.605972+00:00",
       "model_ids": [
         "model_a",
         "model_b",
         "model_c"
       ],
       "rows": 204,
-      "sha256": "edcf5c28b5095c81b96f6b6b0eda204595c5039f625740909413a2144dfa2b50"
+      "sha256": "c9837b7ed69c793dc7c725b4119a8d342d3532399920adf2faf5fa22cd224e72"
     },
     "us_point_in_time_market_pairs_snapshot.parquet": {
       "bytes": 92915,
@@ -1195,7 +1201,7 @@
       ],
       "earliest_observation": "2006-01-02",
       "latest_observation": "2026-09-01",
-      "latest_retrieval": "2026-09-02T16:24:34.992631+00:00",
+      "latest_retrieval": "2026-09-02T18:09:51.631777+00:00",
       "providers": [
         "Coin Metrics",
         "FRED",
@@ -1207,7 +1213,7 @@
         "DTWEXBGS",
         "btc.PriceUSD"
       ],
-      "sha256": "a24176b29503d8e671126366a85a662c47a77284c39d21a4a870f826aefe068c"
+      "sha256": "28b9b6bada0372df498de4d9f0c78af7724f087ff403a4484b43b10646064a15"
     },
     "us_point_in_time_market_summary_snapshot.parquet": {
       "bytes": 12704,
@@ -1245,10 +1251,10 @@
       "sha256": "086fc8f022c2623e8d5d28163b4707e43b61ec42b960437e12532abb1b8cc8fc"
     }
   },
-  "generated_at": "2026-09-02T16:24:38.140100+00:00",
+  "generated_at": "2026-09-02T18:09:54.830267+00:00",
   "pipeline_version": "0.4.0.dev0",
   "schema_version": 1,
   "snapshot_count": 36,
-  "source_commit": "9db86dcb6460d12411d9a58b43242790a12fecd6",
+  "source_commit": "e1fb9ce86d1d4365b4758a21816e820130d49eaf",
   "working_tree_dirty": false
 }
