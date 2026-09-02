@@ -83,6 +83,8 @@ jobs:
             data/reference/global_central_bank_bitcoin_summary_snapshot.parquet \
             data/reference/us_collateral_source_snapshot.parquet \
             data/reference/us_collateral_conditions_snapshot.parquet \
+            data/reference/us_collateral_bitcoin_pairs_snapshot.parquet \
+            data/reference/us_collateral_bitcoin_summary_snapshot.parquet \
             data/reference/euro_area_ecb_series_snapshot.parquet \
             data/reference/japan_boj_series_snapshot.parquet \
             data/reference/uk_boe_series_snapshot.parquet \

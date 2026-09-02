@@ -10,6 +10,11 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
+from open_global_liquidity.analysis.collateral_markets import (
+    CollateralMarketAnalysisError,
+    build_collateral_bitcoin_pairs,
+    summarize_collateral_bitcoin_pairs,
+)
 from open_global_liquidity.analysis.context import MacroContextError, build_us_macro_context
 from open_global_liquidity.analysis.correlations import (
     add_rolling_correlations,
@@ -374,6 +379,31 @@ def run_pipeline(
 
     global_bitcoin_pairs: pd.DataFrame | None = None
     global_bitcoin_summary: pd.DataFrame | None = None
+    collateral_bitcoin_pairs: pd.DataFrame | None = None
+    collateral_bitcoin_summary: pd.DataFrame | None = None
+    if collateral_conditions is not None:
+        validation = collateral_config.bitcoin_validation
+        collateral_bitcoin_pairs = build_collateral_bitcoin_pairs(
+            collateral_conditions,
+            market_source,
+            availability_lag_months=validation.availability_lag_months,
+            forward_horizons_months=validation.forward_horizons_months,
+        )
+        collateral_bitcoin_summary = summarize_collateral_bitcoin_pairs(
+            collateral_bitcoin_pairs,
+            overlapping_min_periods=validation.overlapping_min_periods,
+            non_overlapping_min_periods=validation.non_overlapping_min_periods,
+            confidence_level=validation.confidence_level,
+            bootstrap_resamples=validation.bootstrap_resamples,
+            bootstrap_block_length=validation.bootstrap_block_length,
+            bootstrap_seed=validation.bootstrap_seed,
+        )
+        collateral_bitcoin_pairs.to_parquet(
+            output_dir / "us_collateral_bitcoin_pairs.parquet", index=False
+        )
+        collateral_bitcoin_summary.to_parquet(
+            output_dir / "us_collateral_bitcoin_summary.parquet", index=False
+        )
     if global_aggregate is not None and global_config is not None:
         global_bitcoin_pairs = build_global_bitcoin_pairs(
             global_aggregate,
@@ -591,6 +621,9 @@ def run_pipeline(
         if collateral_source is not None and collateral_conditions is not None:
             snapshots["us_collateral_source_snapshot.parquet"] = collateral_source
             snapshots["us_collateral_conditions_snapshot.parquet"] = collateral_conditions
+        if collateral_bitcoin_pairs is not None and collateral_bitcoin_summary is not None:
+            snapshots["us_collateral_bitcoin_pairs_snapshot.parquet"] = collateral_bitcoin_pairs
+            snapshots["us_collateral_bitcoin_summary_snapshot.parquet"] = collateral_bitcoin_summary
         if pboc_output is not None:
             LOGGER.warning(
                 "PBoC observations are excluded from public snapshots pending explicit "
@@ -688,6 +721,7 @@ def main() -> None:
         PbocError,
         TreasuryFiscalDataError,
         CollateralModelError,
+        CollateralMarketAnalysisError,
         ProvenanceError,
         UnitConversionError,
         OSError,

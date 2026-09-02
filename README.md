@@ -297,7 +297,7 @@ intraday release timestamps or exact trade availability. Instead, it reports pre
 The raw cache is reused for 24 hours by default. `--force-refresh` bypasses it. Generated data is
 intentionally excluded from Git because it is reproducible from the public API.
 
-The publication commands together write thirty-four Git-versioned Parquet
+The publication commands together write thirty-six Git-versioned Parquet
 artifacts plus a JSON provenance manifest:
 
 - `data/reference/us_fred_series_snapshot.parquet` — measured source observations;
@@ -323,6 +323,10 @@ artifacts plus a JSON provenance manifest:
   secured-funding, policy-rate, and Treasury-yield inputs for the collateral pilot.
 - `data/reference/us_collateral_conditions_snapshot.parquet` — monthly derived private-collateral
   proxy, normalized components, score, index, regimes, and model classifications.
+- `data/reference/us_collateral_bitcoin_pairs_snapshot.parquet` — frozen collateral scores paired
+  with subsequent Bitcoin outcomes under the declared timing assumptions.
+- `data/reference/us_collateral_bitcoin_summary_snapshot.parquet` — overlapping and
+  non-overlapping correlations, sample sizes, return summaries, and uncertainty intervals.
 - `data/reference/us_point_in_time_comparison_snapshot.parquet` — derived monthly vintage/current
   OGLI comparisons; raw ALFRED observations remain excluded.
 - `data/reference/us_point_in_time_market_series_snapshot.parquet` — standardized public Bitcoin,
@@ -523,6 +527,32 @@ threshold preserves a limited view of six-month outcomes while keeping sparser e
 and explicitly warning that small samples are fragile. A stricter investable
 backtest still requires source-specific publication timestamps and availability rules; the
 published index therefore remains clearly labeled current-vintage.
+
+### Collateral-score Bitcoin validation
+
+The v0.4a collateral formula and its 40/30/30 weights were frozen before examining Bitcoin
+outcomes. The validation uses the unbounded `collateral_conditions_score` as the signal. It
+predeclares 0-, 1-, and 2-month availability-delay assumptions and subsequent 1-, 3-, 6-, and
+12-month Bitcoin returns. The primary specification is a one-month delay, three-month forward
+return, and mechanically non-overlapping observations. The one-month delay is a conservative
+timing approximation for the mixed monthly, weekly, and daily inputs; it is not reconstructed
+release-vintage timing.
+
+Using data available through July 2026, the primary estimate has 21 observations, Pearson
+correlation `+0.24`, and a deterministic 95% circular moving-block bootstrap interval of `-0.12`
+to `+0.65`. The interval crosses zero, so the primary result is **inconclusive**, not validated as a
+forecasting relationship. A stronger positive pattern appears at six months, but the
+non-overlapping sample contains only 10 observations and changes with the assumed availability
+delay; it is therefore exploratory evidence, not a basis for integration or calibration. The
+12-month non-overlapping samples contain only five observations and deliberately suppress the
+correlation.
+
+All specifications—including weak and negative ones—remain published. Overlapping observations
+are included for sensitivity but have dependent return windows. The score uses current-vintage
+source data and does not reconstruct historical revisions or exact release timestamps. No Bitcoin
+outcome changes the score weights, normalization, or regime thresholds. On this evidence, the
+collateral score remains separate from Global Model G and must not be described as a validated
+liquidity multiplier or trading signal.
 
 ### Primary Bitcoin research specification
 

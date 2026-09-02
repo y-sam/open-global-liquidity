@@ -46,6 +46,25 @@ class CollateralConfig:
     normalization_min_periods: int
     components: tuple[CollateralComponentConfig, ...]
     regimes: tuple[tuple[str, float], ...]
+    bitcoin_validation: CollateralBitcoinValidationConfig
+
+
+@dataclass(frozen=True, slots=True)
+class CollateralBitcoinValidationConfig:
+    """Predeclared Bitcoin outcome-comparison settings for the frozen score."""
+
+    signal: str
+    availability_lag_months: tuple[int, ...]
+    forward_horizons_months: tuple[int, ...]
+    primary_availability_lag_months: int
+    primary_horizon_months: int
+    primary_sample_policy: str
+    overlapping_min_periods: int
+    non_overlapping_min_periods: int
+    confidence_level: float
+    bootstrap_resamples: int
+    bootstrap_block_length: int
+    bootstrap_seed: int
 
 
 def load_collateral_config(path: Path) -> CollateralConfig:
@@ -70,6 +89,7 @@ def load_collateral_config(path: Path) -> CollateralConfig:
         "components",
         "regimes",
         "calibrated_parameters",
+        "bitcoin_validation",
     }
     if not isinstance(raw, dict) or required - raw.keys():
         missing = sorted(required - raw.keys()) if isinstance(raw, dict) else sorted(required)
@@ -82,6 +102,32 @@ def load_collateral_config(path: Path) -> CollateralConfig:
         raise CollateralModelError("Collateral alignment policy is unsupported")
     if raw["calibrated_parameters"] != {}:
         raise CollateralModelError("v0.4a must not contain calibrated parameters")
+    validation = raw["bitcoin_validation"]
+    if (
+        not isinstance(validation, dict)
+        or validation.get("classification") != "statistical_transformation"
+    ):
+        raise CollateralModelError("Collateral Bitcoin validation configuration is malformed")
+    bootstrap = validation.get("bootstrap", {})
+    lags = tuple(int(value) for value in validation.get("availability_lag_months", []))
+    horizons = tuple(int(value) for value in validation.get("forward_horizons_months", []))
+    if (
+        validation.get("signal") != "collateral_conditions_score"
+        or not lags
+        or min(lags) < 0
+        or not horizons
+        or min(horizons) < 1
+        or validation.get("primary_sample_policy") not in {"overlapping", "non_overlapping"}
+        or int(validation.get("primary_availability_lag_months", -1)) not in lags
+        or int(validation.get("primary_horizon_months", -1)) not in horizons
+        or int(validation.get("overlapping_min_periods", 0)) < 3
+        or int(validation.get("non_overlapping_min_periods", 0)) < 3
+        or not 0 < float(validation.get("confidence_level", 0)) < 1
+        or bootstrap.get("method") != "circular_moving_block_percentile"
+        or int(bootstrap.get("resamples", 0)) < 100
+        or int(bootstrap.get("block_length_observations", 0)) < 1
+    ):
+        raise CollateralModelError("Collateral Bitcoin validation settings are invalid")
     if raw["daily_aggregation"] != {"funding_spread": "median", "yield_volatility": "last"}:
         raise CollateralModelError("Collateral daily aggregation policy is unsupported")
 
@@ -151,6 +197,20 @@ def load_collateral_config(path: Path) -> CollateralConfig:
         normalization_min_periods=min_periods,
         components=components,
         regimes=regimes,
+        bitcoin_validation=CollateralBitcoinValidationConfig(
+            signal=str(validation["signal"]),
+            availability_lag_months=lags,
+            forward_horizons_months=horizons,
+            primary_availability_lag_months=int(validation["primary_availability_lag_months"]),
+            primary_horizon_months=int(validation["primary_horizon_months"]),
+            primary_sample_policy=str(validation["primary_sample_policy"]),
+            overlapping_min_periods=int(validation["overlapping_min_periods"]),
+            non_overlapping_min_periods=int(validation["non_overlapping_min_periods"]),
+            confidence_level=float(validation["confidence_level"]),
+            bootstrap_resamples=int(bootstrap["resamples"]),
+            bootstrap_block_length=int(bootstrap["block_length_observations"]),
+            bootstrap_seed=int(bootstrap["seed"]),
+        ),
     )
 
 

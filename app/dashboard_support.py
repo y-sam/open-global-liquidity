@@ -1429,3 +1429,61 @@ def load_collateral_conditions(path: Path) -> pd.DataFrame:
     ):
         raise DashboardDataError("Collateral conditions contain invalid observations or metadata")
     return result.sort_values("date").reset_index(drop=True)
+
+
+def load_collateral_bitcoin_pairs(path: Path) -> pd.DataFrame:
+    """Load individual frozen-score/Bitcoin outcome pairs."""
+    frame = _read_parquet(path, "Collateral Bitcoin pairs")
+    required = {
+        "signal_date",
+        "signal_available_date",
+        "collateral_conditions_score",
+        "collateral_conditions_index",
+        "market_return",
+        "availability_lag_months",
+        "horizon_months",
+        "is_non_overlapping",
+        "classification",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Collateral Bitcoin pairs are missing: " + ", ".join(missing))
+    result = frame.copy()
+    for column in ("signal_date", "signal_available_date"):
+        result[column] = pd.to_datetime(result[column], errors="coerce")
+    if result.empty or result[["signal_date", "signal_available_date"]].isna().any().any():
+        raise DashboardDataError("Collateral Bitcoin pairs contain invalid observations")
+    return result.sort_values(
+        ["availability_lag_months", "horizon_months", "signal_date"]
+    ).reset_index(drop=True)
+
+
+def load_collateral_bitcoin_summary(path: Path) -> pd.DataFrame:
+    """Load documented collateral/Bitcoin validation estimates and uncertainty."""
+    frame = _read_parquet(path, "Collateral Bitcoin summary")
+    required = {
+        "availability_lag_months",
+        "horizon_months",
+        "sample_policy",
+        "observations",
+        "correlation",
+        "bootstrap_ci_lower",
+        "bootstrap_ci_upper",
+        "mean_return",
+        "median_return",
+        "positive_share",
+        "classification",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Collateral Bitcoin summary is missing: " + ", ".join(missing))
+    if (
+        frame.empty
+        or not set(frame["sample_policy"]).issubset({"overlapping", "non_overlapping"})
+        or not frame["positive_share"].between(0, 1).all()
+        or set(frame["classification"]) != {"descriptive_statistic"}
+    ):
+        raise DashboardDataError("Collateral Bitcoin summary contains invalid statistics")
+    return frame.sort_values(
+        ["sample_policy", "availability_lag_months", "horizon_months"]
+    ).reset_index(drop=True)

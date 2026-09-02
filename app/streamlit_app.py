@@ -35,6 +35,8 @@ from dashboard_support import (  # noqa: E402
     load_bitcoin_revision_summary,
     load_boe_data,
     load_boj_data,
+    load_collateral_bitcoin_pairs,
+    load_collateral_bitcoin_summary,
     load_collateral_conditions,
     load_dashboard_data,
     load_ecb_data,
@@ -92,6 +94,14 @@ GLOBAL_BITCOIN_SUMMARY_SNAPSHOT_PATH = (
 COLLATERAL_CONDITIONS_PATH = DATA_ROOT / "processed" / "us_collateral_conditions.parquet"
 COLLATERAL_CONDITIONS_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_collateral_conditions_snapshot.parquet"
+)
+COLLATERAL_BITCOIN_PAIRS_PATH = DATA_ROOT / "processed" / "us_collateral_bitcoin_pairs.parquet"
+COLLATERAL_BITCOIN_PAIRS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_collateral_bitcoin_pairs_snapshot.parquet"
+)
+COLLATERAL_BITCOIN_SUMMARY_PATH = DATA_ROOT / "processed" / "us_collateral_bitcoin_summary.parquet"
+COLLATERAL_BITCOIN_SUMMARY_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_collateral_bitcoin_summary_snapshot.parquet"
 )
 MODEL_DATA_PATH = DATA_ROOT / "processed" / "us_liquidity_models.parquet"
 MODEL_SNAPSHOT_DATA_PATH = DATA_ROOT / "reference" / "us_liquidity_models_snapshot.parquet"
@@ -269,6 +279,18 @@ def _load_collateral_conditions(path: str, modified_ns: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def _load_collateral_bitcoin_pairs(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_collateral_bitcoin_pairs(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_collateral_bitcoin_summary(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_collateral_bitcoin_summary(Path(path))
+
+
+@st.cache_data(show_spinner=False)
 def _load_models(path: str, modified_ns: int) -> pd.DataFrame:
     """Cache model data until its file modification timestamp changes."""
     del modified_ns
@@ -443,6 +465,22 @@ def _collateral_data() -> tuple[pd.DataFrame, str]:
         COLLATERAL_CONDITIONS_SNAPSHOT_PATH,
     )
     return _load_collateral_conditions(str(path), path.stat().st_mtime_ns), origin
+
+
+def _collateral_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    pairs_path, origin = resolve_dashboard_data_path(
+        COLLATERAL_BITCOIN_PAIRS_PATH, COLLATERAL_BITCOIN_PAIRS_SNAPSHOT_PATH
+    )
+    summary_path, summary_origin = resolve_dashboard_data_path(
+        COLLATERAL_BITCOIN_SUMMARY_PATH, COLLATERAL_BITCOIN_SUMMARY_SNAPSHOT_PATH
+    )
+    if summary_origin != origin:
+        raise DashboardDataError("Collateral Bitcoin pairs and summary use different data modes")
+    return (
+        _load_collateral_bitcoin_pairs(str(pairs_path), pairs_path.stat().st_mtime_ns),
+        _load_collateral_bitcoin_summary(str(summary_path), summary_path.stat().st_mtime_ns),
+        origin,
+    )
 
 
 def _model_data() -> tuple[pd.DataFrame, str] | None:
@@ -3930,6 +3968,101 @@ def collateral_conditions_page() -> None:
     )
     component_chart.add_hline(y=0, line_dash="dot", line_color="gray")
     st.plotly_chart(component_chart, width="stretch", config={"displaylogo": False})
+
+    st.subheader("Frozen-model validation against subsequent Bitcoin returns")
+    st.caption(
+        "The collateral formula and weights were fixed before this comparison. The primary "
+        "specification is a one-month availability delay, three-month forward return, and "
+        "non-overlapping observations; all alternatives remain visible as sensitivity checks."
+    )
+    try:
+        pairs, summary, validation_origin = _collateral_bitcoin_data()
+    except DashboardDataError:
+        st.info("Collateral/Bitcoin validation snapshots are awaiting the next data refresh.")
+    else:
+        with st.container(horizontal=True):
+            lag = st.selectbox(
+                "Assumed availability delay",
+                sorted(summary["availability_lag_months"].unique()),
+                index=1,
+                format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
+                key="collateral_bitcoin_lag",
+            )
+            horizon = st.selectbox(
+                "Forward horizon",
+                sorted(summary["horizon_months"].unique()),
+                index=1,
+                format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
+                key="collateral_bitcoin_horizon",
+            )
+            sample_label = st.segmented_control(
+                "Sample",
+                ["Non-overlapping", "Overlapping"],
+                default="Non-overlapping",
+                key="collateral_bitcoin_sample",
+            )
+        policy = "non_overlapping" if sample_label == "Non-overlapping" else "overlapping"
+        selected = summary.loc[
+            (summary["availability_lag_months"] == lag)
+            & (summary["horizon_months"] == horizon)
+            & (summary["sample_policy"] == policy)
+        ].iloc[0]
+        correlation = selected["correlation"]
+        with st.container(horizontal=True):
+            st.metric(
+                "Pearson correlation",
+                "Insufficient sample" if pd.isna(correlation) else f"{float(correlation):+.2f}",
+                border=True,
+            )
+            st.metric("Paired observations", f"{int(selected['observations']):,}", border=True)
+            st.metric(
+                "Median Bitcoin return", f"{float(selected['median_return']):.1%}", border=True
+            )
+            st.metric("Positive outcomes", f"{float(selected['positive_share']):.0%}", border=True)
+        visible_summary = summary.loc[
+            (summary["availability_lag_months"] == lag) & (summary["sample_policy"] == policy)
+        ].copy()
+        validation_chart = px.bar(
+            visible_summary,
+            x="horizon_months",
+            y="correlation",
+            text="correlation",
+            title="Collateral-score correlation with subsequent Bitcoin returns",
+            labels={"horizon_months": "Forward horizon (months)", "correlation": "Correlation"},
+        )
+        validation_chart.update_traces(texttemplate="%{text:+.2f}", textposition="outside")
+        validation_chart.add_hline(y=0, line_color="gray", line_width=1)
+        validation_chart.update_yaxes(range=[-1, 1])
+        st.plotly_chart(validation_chart, width="stretch", config={"displaylogo": False})
+        selected_pairs = pairs.loc[
+            (pairs["availability_lag_months"] == lag) & (pairs["horizon_months"] == horizon)
+        ]
+        if policy == "non_overlapping":
+            selected_pairs = selected_pairs.loc[selected_pairs["is_non_overlapping"]]
+        scatter = px.scatter(
+            selected_pairs,
+            x="collateral_conditions_score",
+            y="market_return",
+            hover_data={"signal_date": "|%Y-%m-%d", "collateral_regime": True},
+            title="Collateral conditions and later Bitcoin return",
+            labels={
+                "collateral_conditions_score": "Collateral conditions score",
+                "market_return": "Subsequent Bitcoin return",
+            },
+        )
+        scatter.update_yaxes(tickformat=".0%")
+        st.plotly_chart(scatter, width="stretch", config={"displaylogo": False})
+        if pd.notna(selected["bootstrap_ci_lower"]):
+            st.caption(
+                f"95% moving-block bootstrap interval: {selected['bootstrap_ci_lower']:+.2f} "
+                f"to {selected['bootstrap_ci_upper']:+.2f}. Data mode: {validation_origin}."
+            )
+        st.warning(
+            "This is current-vintage, retrospective validation with a short sample. Confidence "
+            "intervals, sample counts, and inconclusive results are retained. Correlation is not "
+            "causation or a trading signal, and no result changes the collateral model weights.",
+            icon=":material/warning:",
+        )
 
     st.subheader("Transparent v0.4a formula")
     st.latex(

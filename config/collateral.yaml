@@ -64,3 +64,22 @@ regimes:
   - {label: "Supportive", max: 90}
   - {label: "Highly supportive", max: 100}
 calibrated_parameters: {}
+bitcoin_validation:
+  classification: statistical_transformation
+  description: >-
+    Frozen-model, current-vintage comparison of the collateral conditions score with subsequent
+    Bitcoin returns. Bitcoin outcomes do not enter the score or any parameter choice.
+  signal: collateral_conditions_score
+  availability_lag_months: [0, 1, 2]
+  forward_horizons_months: [1, 3, 6, 12]
+  primary_availability_lag_months: 1
+  primary_horizon_months: 3
+  primary_sample_policy: non_overlapping
+  overlapping_min_periods: 24
+  non_overlapping_min_periods: 8
+  confidence_level: 0.95
+  bootstrap:
+    method: circular_moving_block_percentile
+    resamples: 1000
+    block_length_observations: 6
+    seed: 42

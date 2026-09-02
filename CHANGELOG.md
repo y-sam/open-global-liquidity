@@ -15,11 +15,15 @@ release is tagged.
   configurable 40/30/30 component weights.
 - Collateral dashboard page separating measured inputs, model assumptions, statistical
   transformations, and unimplemented haircut/reuse concepts.
+- Frozen-model Bitcoin validation with predeclared timing sensitivities, overlapping and
+  non-overlapping samples, Fisher intervals, and a deterministic moving-block bootstrap.
 
 ### Research boundary
 
 - The collateral score remains separate from Global Model G. It is not an observed liquidity
-  multiplier, does not use MOVE, and is not calibrated against Bitcoin or another asset.
+  multiplier, does not use MOVE, and is not calibrated against Bitcoin or another asset. The
+  primary Bitcoin estimate is documented as inconclusive: 21 observations, correlation +0.24,
+  and 95% block-bootstrap interval -0.12 to +0.65 through July 2026.
 
 ## [0.3.0] — 2026-09-01
 
