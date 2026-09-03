@@ -1292,6 +1292,46 @@ def load_cross_border_credit(path: Path) -> pd.DataFrame:
     return result.sort_values("date").reset_index(drop=True)
 
 
+def load_private_liquidity(path: Path) -> pd.DataFrame:
+    """Load the separate US bank-credit and MMF liquidity layer."""
+    frame = _read_parquet(path, "US private liquidity indicators")
+    required = {
+        "date",
+        "bank_credit_billions",
+        "bank_loans_billions",
+        "mmf_assets_millions",
+        "loan_share_of_bank_credit",
+        "bank_growth_yoy",
+        "mmf_growth_yoy",
+        "bank_momentum",
+        "mmf_momentum",
+        "private_liquidity_momentum",
+        "private_liquidity_index",
+        "signal_available_date",
+        "model_name",
+        "model_classification",
+        "calibration_status",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("US private liquidity is missing: " + ", ".join(missing))
+    result = frame.copy()
+    for column in ("date", "signal_available_date"):
+        result[column] = pd.to_datetime(result[column], errors="coerce")
+    level_columns = ["bank_credit_billions", "bank_loans_billions", "mmf_assets_millions"]
+    result = result.loc[result[level_columns].gt(0).all(axis=1)].copy()
+    if (
+        result.empty
+        or result[["date", "signal_available_date"]].isna().any().any()
+        or (result[level_columns] <= 0).any().any()
+        or not result["loan_share_of_bank_credit"].between(0, 1).all()
+        or set(result["model_classification"]) != {"model_assumption"}
+        or set(result["calibration_status"]) != {"not_calibrated"}
+    ):
+        raise DashboardDataError("US private liquidity contains invalid observations or metadata")
+    return result.sort_values("date").reset_index(drop=True)
+
+
 def prepare_global_index_display(frame: pd.DataFrame) -> pd.DataFrame:
     """Adapt Global Model G columns to the shared liquidity-index presentation schema."""
     required = {

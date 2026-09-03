@@ -71,3 +71,17 @@ def test_private_liquidity_uses_common_component_history() -> None:
     )
 
     assert result["date"].min() == pd.Timestamp("2018-03-31")
+
+
+def test_private_liquidity_excludes_zero_prehistory_without_interpolation() -> None:
+    source = _source()
+    first_mmf = source["component"].eq("money_market_fund_assets") & source["date"].eq(
+        source.loc[source["component"].eq("money_market_fund_assets"), "date"].min()
+    )
+    source.loc[first_mmf, "value"] = 0
+
+    result = calculate_private_liquidity(
+        source, load_private_liquidity_config(Path("config/private_liquidity.yaml"))
+    )
+
+    assert result["date"].min() == pd.Timestamp("2018-06-30")

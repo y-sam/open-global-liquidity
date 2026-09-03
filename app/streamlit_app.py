@@ -58,6 +58,7 @@ from dashboard_support import (  # noqa: E402
     load_point_in_time_comparison,
     load_point_in_time_market_pairs,
     load_point_in_time_market_summary,
+    load_private_liquidity,
     load_repo_context,
     load_snapshot_manifest,
     prepare_global_index_display,
@@ -98,6 +99,10 @@ GLOBAL_BITCOIN_SUMMARY_SNAPSHOT_PATH = (
 CROSS_BORDER_DATA_PATH = DATA_ROOT / "processed" / "global_cross_border_credit_indicators.parquet"
 CROSS_BORDER_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "global_cross_border_credit_indicators_snapshot.parquet"
+)
+PRIVATE_LIQUIDITY_PATH = DATA_ROOT / "processed" / "us_private_liquidity_indicators.parquet"
+PRIVATE_LIQUIDITY_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_private_liquidity_indicators_snapshot.parquet"
 )
 COLLATERAL_CONDITIONS_PATH = DATA_ROOT / "processed" / "us_collateral_conditions.parquet"
 COLLATERAL_CONDITIONS_SNAPSHOT_PATH = (
@@ -296,6 +301,12 @@ def _load_collateral_conditions(path: str, modified_ns: int) -> pd.DataFrame:
 def _load_cross_border_credit(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_cross_border_credit(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_private_liquidity(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_private_liquidity(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -500,6 +511,13 @@ def _global_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
 def _cross_border_data() -> tuple[pd.DataFrame, str]:
     path, origin = resolve_dashboard_data_path(CROSS_BORDER_DATA_PATH, CROSS_BORDER_SNAPSHOT_PATH)
     return _load_cross_border_credit(str(path), path.stat().st_mtime_ns), origin
+
+
+def _private_liquidity_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(
+        PRIVATE_LIQUIDITY_PATH, PRIVATE_LIQUIDITY_SNAPSHOT_PATH
+    )
+    return _load_private_liquidity(str(path), path.stat().st_mtime_ns), origin
 
 
 def _collateral_data() -> tuple[pd.DataFrame, str]:
@@ -3923,6 +3941,121 @@ def global_aggregate_page() -> None:
         )
 
 
+def private_liquidity_page() -> None:
+    """Present the separate US commercial-bank and money-fund liquidity layer."""
+    st.title("US private liquidity")
+    st.caption(
+        "Quarterly commercial-bank credit and money-market-fund assets · experimental, "
+        "non-calibrated, and separate from Global Model G"
+    )
+    try:
+        data, origin = _private_liquidity_data()
+    except DashboardDataError:
+        st.info("The US private-liquidity snapshot is awaiting the next data refresh.")
+        return
+    indexed = data.dropna(subset=["private_liquidity_index"])
+    if indexed.empty:
+        st.warning("The expanding normalization has insufficient quarterly history.")
+        return
+    latest = indexed.iloc[-1]
+    with st.container(horizontal=True):
+        st.metric(
+            "Private liquidity index",
+            f"{float(latest['private_liquidity_index']):.1f}",
+            "Near neutral" if 40 <= latest["private_liquidity_index"] <= 60 else "Non-neutral",
+            border=True,
+        )
+        st.metric(
+            "Commercial-bank credit",
+            f"${float(latest['bank_credit_billions']) / 1_000:,.2f}tn",
+            f"{float(latest['bank_growth_yoy']):+.1%} year over year",
+            border=True,
+        )
+        st.metric(
+            "Money-fund assets",
+            f"${float(latest['mmf_assets_millions']) / 1_000_000:,.2f}tn",
+            f"{float(latest['mmf_growth_yoy']):+.1%} year over year",
+            border=True,
+        )
+        st.metric(
+            "Loans / bank credit",
+            f"{float(latest['loan_share_of_bank_credit']):.1%}",
+            f"Assumed available {pd.Timestamp(latest['signal_available_date']):%d %b %Y}",
+            border=True,
+        )
+
+    index_chart = px.line(
+        indexed,
+        x="date",
+        y="private_liquidity_index",
+        title="Open US Private Liquidity Momentum Index",
+        labels={"date": "Quarter end", "private_liquidity_index": "0-100 index"},
+    )
+    index_chart.update_traces(line={"width": 2.7, "color": "#A855F7"})
+    index_chart.add_hline(y=50, line_dash="dot", line_color="gray")
+    index_chart.update_yaxes(range=[0, 100])
+    st.plotly_chart(index_chart, width="stretch", config={"displaylogo": False})
+
+    momentum = data[["date", "bank_momentum", "mmf_momentum"]].rename(
+        columns={"bank_momentum": "Bank credit", "mmf_momentum": "Money-market funds"}
+    )
+    momentum = momentum.melt("date", var_name="component", value_name="momentum")
+    component_chart = px.line(
+        momentum,
+        x="date",
+        y="momentum",
+        color="component",
+        title="Component momentum",
+        labels={"date": "Quarter end", "momentum": "Standardized score", "component": ""},
+    )
+    component_chart.add_hline(y=0, line_dash="dot", line_color="gray")
+    st.plotly_chart(component_chart, width="stretch", config={"displaylogo": False})
+
+    levels = data.assign(
+        bank_credit_trillions=data["bank_credit_billions"] / 1_000,
+        bank_loans_trillions=data["bank_loans_billions"] / 1_000,
+        mmf_assets_trillions=data["mmf_assets_millions"] / 1_000_000,
+    )[["date", "bank_credit_trillions", "bank_loans_trillions", "mmf_assets_trillions"]]
+    levels = levels.rename(
+        columns={
+            "bank_credit_trillions": "Total bank credit",
+            "bank_loans_trillions": "Loans and leases (inside bank credit)",
+            "mmf_assets_trillions": "Money-market-fund assets",
+        }
+    ).melt("date", var_name="component", value_name="usd_trillions")
+    level_chart = px.line(
+        levels,
+        x="date",
+        y="usd_trillions",
+        color="component",
+        title="Measured private-liquidity stocks",
+        labels={"date": "Quarter end", "usd_trillions": "USD trillions", "component": ""},
+    )
+    level_chart.update_yaxes(tickprefix="$", ticksuffix="tn")
+    st.plotly_chart(level_chart, width="stretch", config={"displaylogo": False})
+    st.info(
+        "Loans and leases are a subset of total bank credit. They are displayed for composition "
+        "only and are not added to the composite, preventing double counting.",
+        icon=":material/info:",
+    )
+    st.subheader("Methodology and limits")
+    st.latex(r"M_t = 0.50M^{BankCredit}_t + 0.50M^{MMFAssets}_t")
+    st.markdown(
+        "Each component momentum is 60% expanding z-score of quarterly annualized growth plus "
+        "40% expanding z-score of year-over-year growth. The combined score is mapped through "
+        "the normal CDF. Weights and the three-month availability lag are assumptions; calibrated "
+        "parameters are **none**."
+    )
+    st.warning(
+        "This current-vintage pilot mixes seasonally adjusted weekly H.8 bank data with unadjusted "
+        "quarterly Z.1 money-fund assets, which can be substantially revised. It does not measure "
+        "credit quality, bank capital constraints, non-bank leverage, or all shadow banking. It "
+        "is not yet part of Global Model G or a trading signal.",
+        icon=":material/warning:",
+    )
+    st.caption(f"Data mode: {origin} · Sources: Federal Reserve H.8 and Z.1 via FRED.")
+
+
 def cross_border_credit_page() -> None:
     """Present the separate BIS offshore-dollar credit momentum layer."""
     st.title("Offshore dollar credit")
@@ -4829,6 +4962,12 @@ cross_border_data_page = st.Page(
     icon=":material/language:",
     url_path="offshore-dollar-credit",
 )
+private_liquidity_data_page = st.Page(
+    private_liquidity_page,
+    title="US private liquidity",
+    icon=":material/account_balance:",
+    url_path="private-liquidity",
+)
 collateral_data_page = st.Page(
     collateral_conditions_page,
     title="Collateral conditions",
@@ -4877,6 +5016,7 @@ navigation = st.navigation(
         central_bank_data_page,
         global_aggregate_data_page,
         cross_border_data_page,
+        private_liquidity_data_page,
         euro_area_data_page,
         japan_data_page,
         uk_data_page,

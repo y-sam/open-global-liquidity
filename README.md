@@ -177,7 +177,9 @@ annualized growth momentum and 40% year-over-year momentum using expanding norma
 loans and leases are shown only as a share of total bank credit and are never added to it, avoiding
 double counting. The quarterly composite is assumed available three month-ends after quarter end
 because the Financial Accounts input is slower than weekly H.8 data. It is current-vintage,
-not calibrated, and not yet included in Global Model G.
+not calibrated, and not yet included in Global Model G. Through 2026-Q1, the measured stocks are
+`$19.38tn` of bank credit and `$8.29tn` of MMF assets; the experimental composite reads `51.4`,
+near its historical neutral point. Pre-positive MMF quarters are excluded rather than interpolated.
 
 ## Research boundaries
 

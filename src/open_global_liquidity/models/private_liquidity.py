@@ -106,6 +106,7 @@ def calculate_private_liquidity(
     result = result.merge(mmf, on="date", how="left", validate="one_to_one")
     aligned_columns = ["bank_credit_billions", "bank_loans_billions", "mmf_assets_millions"]
     result = result.dropna(subset=aligned_columns).reset_index(drop=True)
+    result = result.loc[result[aligned_columns].gt(0).all(axis=1)].reset_index(drop=True)
     if result.empty:
         raise PrivateLiquidityError("Private-liquidity alignment produced missing values")
     result["loan_share_of_bank_credit"] = (

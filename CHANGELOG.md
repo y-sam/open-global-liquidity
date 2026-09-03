@@ -44,6 +44,8 @@ release is tagged.
   assets. Loans are composition context and are not added to total bank credit.
 - Added a separate, non-calibrated quarterly US Private Liquidity Momentum Index with equal bank/
   MMF weights, expanding normalization, and a conservative three-month-end availability lag.
+- Added a US private-liquidity dashboard with component momentum, measured levels, composition,
+  assumed availability, and an explicit warning against double counting loans.
 
 ### Research boundary
 

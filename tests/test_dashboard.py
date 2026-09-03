@@ -550,6 +550,9 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     cross_border = support.load_cross_border_credit(
         snapshots / "global_cross_border_credit_indicators_snapshot.parquet"
     )
+    private_liquidity = support.load_private_liquidity(
+        snapshots / "us_private_liquidity_indicators_snapshot.parquet"
+    )
 
     assert aggregate["component_count"].eq(5).all()
     assert aggregate["classification"].eq("model_assumption").all()
@@ -562,6 +565,7 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     assert global_display["index_value"].notna().all()
     assert cross_border["offshore_dollar_credit_index"].dropna().between(0, 100).all()
     assert cross_border["provider"].eq("BIS").all()
+    assert private_liquidity["private_liquidity_index"].dropna().between(0, 100).all()
     assert len(aggregate) >= 290
     assert aggregate["date"].min() == pd.Timestamp("2002-01-31")
     assert detail.groupby("date")["central_bank"].nunique().eq(5).all()
@@ -657,3 +661,14 @@ def test_offshore_dollar_page_renders_published_snapshot() -> None:
     assert not app.exception
     assert app.title[0].value == "Offshore dollar credit"
     assert any(metric.label == "Credit momentum index" for metric in app.metric)
+
+
+def test_private_liquidity_page_renders_published_snapshot() -> None:
+    app_path = Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py"
+    app = AppTest.from_file(app_path, default_timeout=20)
+    app._page_hash = calc_hash("private-liquidity")
+    app.run()
+
+    assert not app.exception
+    assert app.title[0].value == "US private liquidity"
+    assert any(metric.label == "Private liquidity index" for metric in app.metric)
