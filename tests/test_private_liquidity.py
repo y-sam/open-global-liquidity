@@ -58,3 +58,16 @@ def test_private_liquidity_normalizes_fred_quarter_start_labels() -> None:
 
     assert result["date"].dt.is_quarter_end.all()
     assert len(result) == 24
+
+
+def test_private_liquidity_uses_common_component_history() -> None:
+    source = _source()
+    early_mmf = source.loc[source["component"] == "money_market_fund_assets"].iloc[[0]].copy()
+    early_mmf["date"] = pd.Timestamp("1970-01-01")
+    source = pd.concat([early_mmf, source], ignore_index=True)
+
+    result = calculate_private_liquidity(
+        source, load_private_liquidity_config(Path("config/private_liquidity.yaml"))
+    )
+
+    assert result["date"].min() == pd.Timestamp("2018-03-31")

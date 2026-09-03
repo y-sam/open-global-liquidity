@@ -104,12 +104,9 @@ def calculate_private_liquidity(
             tolerance=pd.Timedelta(days=config.max_bank_staleness_days),
         )
     result = result.merge(mmf, on="date", how="left", validate="one_to_one")
-    if (
-        result[["bank_credit_billions", "bank_loans_billions", "mmf_assets_millions"]]
-        .isna()
-        .any()
-        .any()
-    ):
+    aligned_columns = ["bank_credit_billions", "bank_loans_billions", "mmf_assets_millions"]
+    result = result.dropna(subset=aligned_columns).reset_index(drop=True)
+    if result.empty:
         raise PrivateLiquidityError("Private-liquidity alignment produced missing values")
     result["loan_share_of_bank_credit"] = (
         result["bank_loans_billions"] / result["bank_credit_billions"]
