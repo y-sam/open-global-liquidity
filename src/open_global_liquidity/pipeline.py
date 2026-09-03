@@ -63,6 +63,11 @@ from open_global_liquidity.models.collateral import (
     calculate_collateral_conditions,
     load_collateral_config,
 )
+from open_global_liquidity.models.cross_border import (
+    CrossBorderModelError,
+    calculate_cross_border_credit,
+    load_cross_border_config,
+)
 from open_global_liquidity.models.global_central_bank import (
     GlobalAggregationError,
     calculate_global_central_bank_assets,
@@ -130,6 +135,11 @@ def run_pipeline(
     ]
     bis_definitions = [
         item for item in definitions if item.provider.lower() == "bis" and item.group == "liquidity"
+    ]
+    bis_cross_border_definitions = [
+        item
+        for item in definitions
+        if item.provider.lower() == "bis" and item.group == "cross_border"
     ]
     if not liquidity_definitions:
         raise RuntimeError("No FRED liquidity series are configured")
@@ -278,8 +288,10 @@ def run_pipeline(
         LOGGER.info("Wrote %d standardized PBoC observations to %s", len(pboc_output), pboc_path)
 
     bis_output: pd.DataFrame | None = None
+    bis_cross_border_output: pd.DataFrame | None = None
+    cross_border_indicators: pd.DataFrame | None = None
+    bis_provider = BisProvider(cache_dir=project_root / "data" / "raw" / "bis")
     if bis_definitions:
-        bis_provider = BisProvider(cache_dir=project_root / "data" / "raw" / "bis")
         bis_output = pd.concat(
             [
                 bis_provider.fetch_definition(
@@ -298,6 +310,43 @@ def run_pipeline(
         china_bis_output = bis_output.loc[bis_output["country"] == "CN"].copy()
         china_bis_path = output_dir / "china_bis_series.parquet"
         china_bis_output.to_parquet(china_bis_path, index=False)
+
+    if bis_cross_border_definitions:
+        bis_cross_border_output = pd.concat(
+            [
+                bis_provider.fetch_definition(
+                    definition,
+                    start=start,
+                    end=end,
+                    force_refresh=force_refresh,
+                )
+                for definition in bis_cross_border_definitions
+            ],
+            ignore_index=True,
+        ).sort_values(["series_id", "date"])
+        bis_cross_border_path = output_dir / "global_bis_cross_border_credit.parquet"
+        bis_cross_border_output.to_parquet(bis_cross_border_path, index=False)
+        LOGGER.info(
+            "Wrote %d standardized BIS cross-border credit observations to %s",
+            len(bis_cross_border_output),
+            bis_cross_border_path,
+        )
+        try:
+            cross_border_config = load_cross_border_config(
+                project_root / "config" / "cross_border.yaml"
+            )
+            cross_border_indicators = calculate_cross_border_credit(
+                bis_cross_border_output, cross_border_config
+            )
+        except CrossBorderModelError as exc:
+            raise RuntimeError(f"Cross-border credit model failed: {exc}") from exc
+        cross_border_indicators_path = output_dir / "global_cross_border_credit_indicators.parquet"
+        cross_border_indicators.to_parquet(cross_border_indicators_path, index=False)
+        LOGGER.info(
+            "Wrote %d derived cross-border credit observations to %s",
+            len(cross_border_indicators),
+            cross_border_indicators_path,
+        )
 
     fx_output: pd.DataFrame | None = None
     if fx_definitions:
@@ -619,6 +668,12 @@ def run_pipeline(
             snapshots["china_bis_series_snapshot.parquet"] = bis_output.loc[
                 bis_output["country"] == "CN"
             ].copy()
+        if bis_cross_border_output is not None:
+            snapshots["global_bis_cross_border_credit_snapshot.parquet"] = bis_cross_border_output
+        if cross_border_indicators is not None:
+            snapshots["global_cross_border_credit_indicators_snapshot.parquet"] = (
+                cross_border_indicators
+            )
         if fx_output is not None:
             snapshots["global_fx_series_snapshot.parquet"] = fx_output
         if global_detail is not None and global_aggregate is not None:

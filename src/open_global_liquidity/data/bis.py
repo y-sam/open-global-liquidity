@@ -42,9 +42,8 @@ class BisError(RuntimeError):
 class BisProvider:
     """Fetch one exact BIS SDMX series and maintain a small Parquet cache.
 
-    The provider supports exact monthly domestic-currency central-bank-total-assets keys. BIS
-    reports these series with a 10^9 multiplier, so values are already billions of the configured
-    native currency. Monthly periods are represented as calendar month ends; this is a period-label
+    The provider supports exact monthly central-bank-total-assets keys and exact quarterly global
+    liquidity indicator keys. Periods are represented by calendar period ends; this is a label
     convention and not a modeled publication timestamp.
     """
 
@@ -96,18 +95,26 @@ class BisProvider:
             )
         )
         _agency, _flow, _version, key = _parse_series_id(definition.series_id)
-        key_parts = key.split(".")
-        expected_currency = key_parts[4] if len(key_parts) == 6 else ""
-        expected_unit = BIS_DOMESTIC_BILLION_UNITS.get(expected_currency)
-        if expected_unit is None or definition.unit != expected_unit:
+        if _flow == "WS_CBTA":
+            key_parts = key.split(".")
+            expected_currency = key_parts[4] if len(key_parts) == 6 else ""
+            expected_unit = BIS_DOMESTIC_BILLION_UNITS.get(expected_currency)
+            if expected_unit is None or definition.unit != expected_unit:
+                raise BisError(
+                    f"Configured unit for {definition.series_id} must be the supported domestic "
+                    f"currency billions label; received {definition.unit}"
+                )
+            expected_metadata = {("M", "XDC", expected_currency, 9)}
+        elif _flow == "WS_GLI":
+            expected_unit = "Millions of U.S. Dollars"
+            if key != "Q.USD.3P.N.A.I.B.USD" or definition.unit != expected_unit:
+                raise BisError("Only the declared BIS offshore-dollar credit key is supported")
+            expected_metadata = {("Q", "USD", "USD", 6)}
+        else:
+            raise BisError(f"Unsupported BIS dataflow: {_flow}")
+        if metadata != expected_metadata:
             raise BisError(
-                f"Configured unit for {definition.series_id} must be the supported domestic "
-                f"currency billions label; received {definition.unit}"
-            )
-        if metadata != {("M", "XDC", expected_currency, 9)}:
-            raise BisError(
-                f"BIS metadata for {definition.series_id} does not match monthly "
-                f"{expected_currency} billions: "
+                f"BIS metadata for {definition.series_id} does not match the configured unit: "
                 f"{sorted(metadata)}"
             )
 
@@ -158,7 +165,7 @@ class BisProvider:
         raw = _parse_response(response.content, series_id=series_id, expected_key=key)
         cache_path.parent.mkdir(parents=True, exist_ok=True)
         raw.to_parquet(cache_path, index=False)
-        LOGGER.info("Downloaded BIS %s: %d monthly observations", series_id, len(raw))
+        LOGGER.info("Downloaded BIS %s: %d observations", series_id, len(raw))
         return raw
 
 
@@ -171,17 +178,22 @@ def _parse_response(content: bytes, *, series_id: str, expected_key: str) -> pd.
     if series is None:
         raise BisError(f"BIS returned no series for {series_id}")
     attributes = series.attrib
-    actual_key = ".".join(
-        attributes.get(name, "")
-        for name in (
+    _agency, flow, _version, _key = _parse_series_id(series_id)
+    dimensions = (
+        ("FREQ", "REF_AREA", "COMP_METHOD", "UNIT_MEASURE", "CURRENCY", "TRANSFORMATION")
+        if flow == "WS_CBTA"
+        else (
             "FREQ",
-            "REF_AREA",
-            "COMP_METHOD",
+            "CURR_DENOM",
+            "BORROWERS_CTY",
+            "BORROWERS_SECTOR",
+            "LENDERS_SECTOR",
+            "L_POS_TYPE",
+            "L_INSTR",
             "UNIT_MEASURE",
-            "CURRENCY",
-            "TRANSFORMATION",
         )
     )
+    actual_key = ".".join(attributes.get(name, "") for name in dimensions)
     if actual_key != expected_key:
         raise BisError(f"BIS response did not contain the exact requested key {expected_key}")
     try:
@@ -193,10 +205,11 @@ def _parse_response(content: bytes, *, series_id: str, expected_key: str) -> pd.
     retrieved_at = pd.Timestamp.now(tz=UTC)
     for observation in (element for element in series if element.tag.endswith("Obs")):
         period = observation.attrib.get("TIME_PERIOD")
+        frequency = attributes.get("FREQ")
         try:
-            observation_date = pd.Period(period, freq="M").to_timestamp("M")
+            observation_date = pd.Period(period, freq=frequency).to_timestamp(frequency)
         except (TypeError, ValueError) as exc:
-            raise BisError(f"BIS returned an invalid monthly period for {series_id}") from exc
+            raise BisError(f"BIS returned an invalid period for {series_id}") from exc
         rows.append(
             {
                 "date": observation_date,
@@ -204,7 +217,7 @@ def _parse_response(content: bytes, *, series_id: str, expected_key: str) -> pd.
                 "obs_status": observation.attrib.get("OBS_STATUS"),
                 "frequency_code": attributes.get("FREQ"),
                 "unit_measure": attributes.get("UNIT_MEASURE"),
-                "currency": attributes.get("CURRENCY"),
+                "currency": attributes.get("CURRENCY") or attributes.get("CURR_DENOM"),
                 "unit_multiplier": unit_multiplier,
                 "title": attributes.get("TITLE"),
                 "retrieved_at": retrieved_at,

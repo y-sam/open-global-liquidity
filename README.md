@@ -161,6 +161,16 @@ the providers' documented normal schedules but do not reconstruct exceptional re
 timestamps, SIFMA holidays, or federal holidays. Zero, one, and two *additional* month delays remain
 available as sensitivity tests.
 
+The first v0.4 cross-border layer uses the BIS quarterly global liquidity indicator for
+US-dollar-denominated bank loans and debt securities to non-bank borrowers outside the United
+States. This is a measured stock of offshore dollar credit, not a central-bank balance sheet or a
+direct measure of FX swaps. The separate **Open Offshore Dollar Credit Momentum Index** combines
+60% of the expanding z-score of quarter-over-quarter annualized growth with 40% of the expanding
+z-score of year-over-year growth, then applies the normal CDF to produce a 0–100 index. These are
+declared model assumptions with no calibrated parameters. The layer is not yet included in Global
+Model G; each quarter is conservatively treated as available four month-ends later pending a
+historical BIS release-calendar reconstruction.
+
 ## Research boundaries
 
 The project will keep three categories separate:
@@ -359,6 +369,10 @@ artifacts plus a JSON provenance manifest:
   proxy, normalized components, score, index, regimes, and model classifications.
 - `data/reference/us_collateral_robustness_snapshot.parquet` — seven predeclared collateral-signal
   variants for weight, component, volatility-input, and normalization sensitivity.
+- `data/reference/global_bis_cross_border_credit_snapshot.parquet` — measured quarterly BIS
+  US-dollar credit to non-bank borrowers outside the United States.
+- `data/reference/global_cross_border_credit_indicators_snapshot.parquet` — transparent growth,
+  expanding-normalized momentum, availability timing, and 0–100 offshore-dollar credit index.
 - `data/reference/us_collateral_bitcoin_pairs_snapshot.parquet` — frozen collateral scores paired
   with subsequent Bitcoin outcomes under the declared timing assumptions.
 - `data/reference/us_collateral_bitcoin_summary_snapshot.parquet` — overlapping and
@@ -397,7 +411,7 @@ mode and source retrieval time.
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
 environment, downloads fresh FRED, ALFRED, Coin Metrics, World Bank, ECB, BOJ, BoE, and BIS
-observations, regenerates the thirty-seven public Parquet snapshots and provenance manifest, and
+observations, regenerates the thirty-nine public Parquet snapshots and provenance manifest, and
 runs formatting, linting, and offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 

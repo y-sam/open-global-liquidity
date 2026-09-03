@@ -10,6 +10,7 @@ from open_global_liquidity.data.base import STANDARD_COLUMNS
 from open_global_liquidity.data.bis import BisError, BisProvider
 
 SERIES_ID = "BIS,WS_CBTA,1.0/M.CN.B.XDC.CNY.N"
+GLI_SERIES_ID = "BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD"
 
 
 def _definition() -> SeriesDefinition:
@@ -47,6 +48,40 @@ def _xml(*, key: str = "M.CN.B.XDC.CNY.N", multiplier: str = "9") -> bytes:
 </message:StructureSpecificData>""".encode()
 
 
+def _gli_definition() -> SeriesDefinition:
+    return SeriesDefinition(
+        country="GLOBAL",
+        group="cross_border",
+        name="usd_credit_nonbanks_outside_us",
+        classification="measured_data",
+        provider="bis",
+        series_id=GLI_SERIES_ID,
+        component="usd_credit_nonbanks_outside_us",
+        title="US dollar credit to non-banks outside the United States",
+        description="Measured BIS global liquidity indicator",
+        unit="Millions of U.S. Dollars",
+        frequency="Quarterly, End of Period",
+        seasonal_adjustment="Not Seasonally Adjusted",
+        start=pd.Timestamp("2025-03-31").date(),
+        source="BIS",
+        source_url="https://data.bis.org/topics/GLI",
+    )
+
+
+def _gli_xml() -> bytes:
+    return b"""<?xml version="1.0" encoding="UTF-8"?>
+<message:StructureSpecificData xmlns:message="http://www.sdmx.org/resources/sdmxml/schemas/v2_1/message">
+  <message:DataSet>
+    <Series FREQ="Q" CURR_DENOM="USD" BORROWERS_CTY="3P" BORROWERS_SECTOR="N"
+      LENDERS_SECTOR="A" L_POS_TYPE="I" L_INSTR="B" UNIT_MEASURE="USD"
+      UNIT_MULT="6" TITLE="USD credit to non-banks outside the US">
+      <Obs TIME_PERIOD="2025-Q1" OBS_VALUE="13730686.529" OBS_STATUS="A" />
+      <Obs TIME_PERIOD="2025-Q2" OBS_VALUE="13975968.083" OBS_STATUS="A" />
+    </Series>
+  </message:DataSet>
+</message:StructureSpecificData>"""
+
+
 def test_fetch_definition_standardizes_exact_monthly_series(tmp_path: Path) -> None:
     def handler(request: httpx.Request) -> httpx.Response:
         assert request.url.path.endswith("/BIS/WS_CBTA/1.0/M.CN.B.XDC.CNY.N")
@@ -63,6 +98,21 @@ def test_fetch_definition_standardizes_exact_monthly_series(tmp_path: Path) -> N
     assert result["value"].tolist() == [46657.47, 47020.53]
     assert result["provider"].unique().tolist() == ["BIS"]
     assert result["unit"].unique().tolist() == ["Billions of Chinese Yuan"]
+
+
+def test_fetch_definition_standardizes_exact_quarterly_gli_series(tmp_path: Path) -> None:
+    provider = BisProvider(
+        cache_dir=tmp_path,
+        client=httpx.Client(
+            transport=httpx.MockTransport(lambda _request: httpx.Response(200, content=_gli_xml()))
+        ),
+    )
+
+    result = provider.fetch_definition(_gli_definition())
+
+    assert result["date"].tolist() == [pd.Timestamp("2025-03-31"), pd.Timestamp("2025-06-30")]
+    assert result["value"].tolist() == [13730686.529, 13975968.083]
+    assert result["unit"].unique().tolist() == ["Millions of U.S. Dollars"]
 
 
 def test_fetch_definition_uses_fresh_cache(tmp_path: Path) -> None:
@@ -105,7 +155,7 @@ def test_fetch_definition_rejects_inconsistent_unit_metadata(tmp_path: Path) -> 
     )
     provider = BisProvider(cache_dir=tmp_path, client=client)
 
-    with pytest.raises(BisError, match="does not match monthly CNY billions"):
+    with pytest.raises(BisError, match="does not match the configured unit"):
         provider.fetch_definition(_definition())
 
 

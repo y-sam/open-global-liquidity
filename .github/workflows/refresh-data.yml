@@ -76,6 +76,8 @@ jobs:
           git add \
             data/reference/china_bis_series_snapshot.parquet \
             data/reference/global_bis_central_bank_series_snapshot.parquet \
+            data/reference/global_bis_cross_border_credit_snapshot.parquet \
+            data/reference/global_cross_border_credit_indicators_snapshot.parquet \
             data/reference/global_fx_series_snapshot.parquet \
             data/reference/global_central_bank_assets_detail_snapshot.parquet \
             data/reference/global_central_bank_assets_snapshot.parquet \

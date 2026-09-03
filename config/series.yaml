@@ -615,3 +615,23 @@ CN:
       start: "2013-01-31"
       source: "People's Bank of China, Money and Banking Statistics"
       source_url: "https://www.pbc.gov.cn/diaochatongjisi/116219/116319/index.html"
+
+GLOBAL:
+  cross_border:
+    usd_credit_nonbanks_outside_us:
+      classification: measured_data
+      provider: bis
+      series_id: BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD
+      component: usd_credit_nonbanks_outside_us
+      title: "US Dollar Credit to Non-Bank Borrowers Outside the United States"
+      description: >-
+        Quarterly BIS global liquidity indicator covering US-dollar-denominated bank loans and
+        debt securities to non-bank borrowers located outside the United States. It is measured
+        offshore-dollar credit, not a central-bank balance sheet, shadow monetary base, or direct
+        measure of FX swaps.
+      unit: "Millions of U.S. Dollars"
+      frequency: "Quarterly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2000-03-31"
+      source: "Bank for International Settlements, Global liquidity indicators"
+      source_url: "https://data.bis.org/topics/GLI/BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD"

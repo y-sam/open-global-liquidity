@@ -1,0 +1,28 @@
+classification: model_assumption
+name: "Open Offshore Dollar Credit Momentum Index"
+description: >-
+  Experimental momentum index for BIS US-dollar credit to non-bank borrowers outside the United
+  States. It is a separate research layer and is not yet an input to Global Model G or OGLI.
+source_component: usd_credit_nonbanks_outside_us
+canonical_frequency: quarter_end
+availability:
+  classification: model_assumption
+  lag_months: 4
+  description: >-
+    Each quarter is treated as available four month-ends later, approximating the normal BIS GLI
+    publication schedule. Exact historical release dates and revisions are not reconstructed.
+momentum:
+  classification: model_assumption
+  qoq_annualized_weight: 0.60
+  yoy_weight: 0.40
+normalization:
+  classification: statistical_transformation
+  mode: expanding
+  min_periods: 12
+regimes:
+  - {label: "Strong contraction", max: 20}
+  - {label: "Contraction", max: 40}
+  - {label: "Neutral", max: 60}
+  - {label: "Expansion", max: 80}
+  - {label: "Strong expansion", max: 100}
+calibrated_parameters: {}

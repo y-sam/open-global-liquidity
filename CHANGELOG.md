@@ -33,6 +33,11 @@ release is tagged.
   Zero-, one-, and two-month controls now mean additional delays after all inputs are available.
 - Recorded the revised source-timed primary result through July 2026: 21 non-overlapping
   observations, correlation +0.13, and 95% block-bootstrap interval -0.23 to +0.56.
+- Added exact-key ingestion for the BIS quarterly global liquidity indicator measuring
+  US-dollar-denominated bank loans and debt securities to non-bank borrowers outside the US.
+- Added a separate, non-calibrated Offshore Dollar Credit Momentum Index using expanding
+  quarter-over-quarter and year-over-year growth normalization with an assumed four-month release
+  lag. It does not yet enter Global Model G.
 
 ### Research boundary
 

@@ -8,7 +8,12 @@ from open_global_liquidity.config import ConfigurationError, load_model_config, 
 def test_load_walcl_config() -> None:
     definitions = load_series_config(Path("config/series.yaml"))
 
-    assert len(definitions) == 38
+    assert len(definitions) == 39
+    cross_border = next(
+        item for item in definitions if item.component == "usd_credit_nonbanks_outside_us"
+    )
+    assert cross_border.group == "cross_border"
+    assert cross_border.series_id == "BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD"
     by_id = {definition.series_id: definition for definition in definitions}
     assert set(by_id) == {
         "WALCL",
@@ -29,6 +34,7 @@ def test_load_walcl_config() -> None:
         "BIS,WS_CBTA,1.0/M.XM.B.XDC.EUR.N",
         "BIS,WS_CBTA,1.0/M.JP.B.XDC.JPY.N",
         "BIS,WS_CBTA,1.0/M.GB.B.XDC.GBP.N",
+        "BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD",
         "DEXUSEU",
         "DEXJPUS",
         "DEXUSUK",
