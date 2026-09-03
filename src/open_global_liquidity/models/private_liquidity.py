@@ -83,6 +83,10 @@ def calculate_private_liquidity(
     if expected - set(frame["component"]):
         raise PrivateLiquidityError("Private-liquidity source lacks configured components")
     mmf = frame.loc[frame["component"] == "money_market_fund_assets", ["date", "value"]].copy()
+    # FRED labels Financial Accounts quarters at their first calendar day even though the source
+    # metadata describes end-of-period stocks. Convert the period label explicitly; do not shift
+    # or interpolate values between quarters.
+    mmf["date"] = mmf["date"].dt.to_period("Q").dt.to_timestamp("Q")
     mmf = mmf.rename(columns={"value": "mmf_assets_millions"}).sort_values("date")
     quarter_ends = mmf[["date"]].copy()
     result = quarter_ends

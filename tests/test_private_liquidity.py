@@ -45,3 +45,16 @@ def test_private_liquidity_rejects_missing_mmf() -> None:
         calculate_private_liquidity(
             source, load_private_liquidity_config(Path("config/private_liquidity.yaml"))
         )
+
+
+def test_private_liquidity_normalizes_fred_quarter_start_labels() -> None:
+    source = _source()
+    mmf = source["component"].eq("money_market_fund_assets")
+    source.loc[mmf, "date"] = source.loc[mmf, "date"].dt.to_period("Q").dt.start_time
+
+    result = calculate_private_liquidity(
+        source, load_private_liquidity_config(Path("config/private_liquidity.yaml"))
+    )
+
+    assert result["date"].dt.is_quarter_end.all()
+    assert len(result) == 24
