@@ -33,6 +33,13 @@ def test_private_liquidity_is_bounded_and_does_not_add_loans_twice() -> None:
     result = calculate_private_liquidity(_source(), config)
 
     assert result["private_liquidity_index"].dropna().between(0, 100).all()
+    assert set(result["private_liquidity_regime"].dropna()) <= {
+        "Strong contraction",
+        "Contraction",
+        "Neutral",
+        "Expansion",
+        "Strong expansion",
+    }
     assert result["loan_share_of_bank_credit"].between(0, 1).all()
     assert "bank_loans_billions" in result
     assert result["signal_available_date"].equals(result["date"] + pd.offsets.MonthEnd(3))
@@ -85,3 +92,12 @@ def test_private_liquidity_excludes_zero_prehistory_without_interpolation() -> N
     )
 
     assert result["date"].min() == pd.Timestamp("2018-06-30")
+
+
+def test_private_liquidity_rejects_negative_availability_lag(tmp_path: Path) -> None:
+    config_text = Path("config/private_liquidity.yaml").read_text(encoding="utf-8")
+    path = tmp_path / "private_liquidity.yaml"
+    path.write_text(config_text.replace("lag_months: 3", "lag_months: -1"), encoding="utf-8")
+
+    with pytest.raises(PrivateLiquidityError, match="configuration is invalid"):
+        load_private_liquidity_config(path)

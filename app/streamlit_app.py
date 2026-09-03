@@ -3962,7 +3962,7 @@ def private_liquidity_page() -> None:
         st.metric(
             "Private liquidity index",
             f"{float(latest['private_liquidity_index']):.1f}",
-            "Near neutral" if 40 <= latest["private_liquidity_index"] <= 60 else "Non-neutral",
+            str(latest["private_liquidity_regime"]),
             border=True,
         )
         st.metric(

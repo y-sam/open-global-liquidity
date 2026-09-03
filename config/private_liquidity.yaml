@@ -17,6 +17,14 @@ momentum:
 normalization:
   mode: expanding
   min_periods: 12
+regimes:
+  classification: model_assumption
+  thresholds:
+    - {label: "Strong contraction", max_value: 20}
+    - {label: "Contraction", max_value: 40}
+    - {label: "Neutral", max_value: 60}
+    - {label: "Expansion", max_value: 80}
+    - {label: "Strong expansion", max_value: 100}
 availability:
   classification: model_assumption
   lag_months: 3

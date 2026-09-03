@@ -1,9 +1,11 @@
 # Open Global Liquidity
 
 **Current release:** v0.3.0 — currency normalization, global central-bank aggregation, and Global
-Model G. **Current development milestone:** v0.4a US collateral-conditions pilot. See the
+Model G. **Current development milestone:** v0.4 research layers for collateral conditions,
+offshore dollar credit, and US private liquidity. See the
 [changelog](CHANGELOG.md),
-[citation metadata](CITATION.cff), and [release checklist](RELEASE_CHECKLIST.md). Project code is
+[citation metadata](CITATION.cff), [readiness audit](docs/READINESS_AUDIT.md), and
+[release checklist](RELEASE_CHECKLIST.md). Project code is
 licensed under Apache-2.0; bundled and downloaded third-party data remain subject to their
 respective terms.
 
@@ -21,7 +23,7 @@ Original project code is licensed under the [Apache License 2.0](LICENSE). This 
 not relicense third-party observations, derived snapshots, source metadata, names, or trademarks.
 See [Third-party data terms](THIRD_PARTY_DATA.md) before redistributing bundled data artifacts.
 
-## Current scope: v0.4a development
+## Current scope: v0.4 development
 
 The repository provides an auditable US data-ingestion path, experimental OGLI momentum index, and
 Streamlit dashboard. It
@@ -493,6 +495,8 @@ directory, and verifies that the public snapshots still render the landing-page 
 - `config/model.yaml` — classified weekly-alignment and model assumptions.
 - `config/global_aggregation.yaml` — v0.3 currency, frequency, staleness, and coverage assumptions.
 - `config/collateral.yaml` — v0.4a collateral formula, weights, normalization, and regime assumptions.
+- `config/cross_border.yaml` — offshore-dollar credit momentum and availability assumptions.
+- `config/private_liquidity.yaml` — bank/MMF weights, normalization, regimes, and availability lag.
 - `src/open_global_liquidity/config.py` — validated configuration loading.
 - `src/open_global_liquidity/data/fred.py` — FRED network, error handling, cache, and standardization.
 - `src/open_global_liquidity/data/coinmetrics.py` — no-key Coin Metrics community ingestion and
@@ -516,6 +520,10 @@ directory, and verifies that the public snapshots still render the landing-page 
   source/FX lineage, and transparent central-bank asset summation.
 - `src/open_global_liquidity/models/collateral.py` — standalone US collateral-conditions model;
   it is not currently an input to Global Model G.
+- `src/open_global_liquidity/models/cross_border.py` — standalone BIS offshore-dollar credit
+  momentum layer.
+- `src/open_global_liquidity/models/private_liquidity.py` — standalone US bank-credit/MMF
+  momentum layer with explicit protection against double counting loans.
 - `src/open_global_liquidity/analysis/lead_lag.py` — market returns and signal/outcome alignment.
 - `src/open_global_liquidity/analysis/correlations.py` — full-sample and rolling correlations.
 - `src/open_global_liquidity/analysis/bootstrap.py` — deterministic moving-block correlation
@@ -666,10 +674,14 @@ secured. v0.2 completes the first global-central-bank measured-data layer with s
 Reserve, ECB, BOJ, BoE, and local-only PBoC total-assets series plus a non-aggregated indexed
 comparison. v0.3 now adds explicit FX normalization, a balanced monthly central-bank asset
 aggregate, its expanding-normalized global momentum index, and a current-vintage Bitcoin
-comparison under explicit availability-delay sensitivity assumptions. Exact point-in-time
-publication-lag reconstruction for the global panel remains unfinished. Later increments may add
-collateral and repo proxies, shadow monetary base concepts, BIS cross-border
-credit, and explicitly labeled public benchmark calibration.
+comparison under explicit availability-delay sensitivity assumptions. v0.4 development now adds
+three deliberately separate research layers: US collateral conditions, BIS offshore-dollar credit,
+and US bank/MMF private liquidity. They are not silently folded into Global Model G because their
+economic coverage, frequency, release timing, and empirical validation differ. Exact point-in-time
+publication-lag reconstruction for the global panel remains unfinished. The next research increment
+is to validate the offshore-dollar and private-liquidity layers against Bitcoin under predeclared
+timing policies before testing a broader composite. Shadow monetary base concepts and explicitly
+labeled public benchmark calibration remain later work.
 
 ## Limitations and disclaimer
 

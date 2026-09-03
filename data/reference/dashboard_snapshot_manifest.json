@@ -1357,7 +1357,7 @@
       "sha256": "086fc8f022c2623e8d5d28163b4707e43b61ec42b960437e12532abb1b8cc8fc"
     },
     "us_private_liquidity_indicators_snapshot.parquet": {
-      "bytes": 52405,
+      "bytes": 53219,
       "columns": [
         "date",
         "bank_credit_billions_source_date",
@@ -1378,6 +1378,7 @@
         "mmf_momentum",
         "private_liquidity_momentum",
         "private_liquidity_index",
+        "private_liquidity_regime",
         "signal_available_date",
         "model_name",
         "model_classification",
@@ -1386,7 +1387,7 @@
       "earliest_observation": "1974-03-31",
       "latest_observation": "2026-03-31",
       "rows": 209,
-      "sha256": "eb53ce197e08c3a36f08837fb8d6ede6038443f317fb1c479619978e5935002c"
+      "sha256": "e37ee95eac6e354e3e718462401b232e51ca9a79d0800f6bf5342e6cc07f95bb"
     },
     "us_private_liquidity_source_snapshot.parquet": {
       "bytes": 84965,
@@ -1421,10 +1422,10 @@
       "sha256": "70d393fd0415cff3d71e9540d484950eb80cae1b33a79089d9a90b0bdfd755a6"
     }
   },
-  "generated_at": "2026-09-03T14:14:26.735762+00:00",
+  "generated_at": "2026-09-03T15:34:20.799721+00:00",
   "pipeline_version": "0.4.0.dev0",
   "schema_version": 1,
   "snapshot_count": 41,
-  "source_commit": "4c9c60431591b149c96e957168872ad37a5d50ff",
-  "working_tree_dirty": false
+  "source_commit": "31449c11561016548d8530a4d2b2b4924c25262d",
+  "working_tree_dirty": true
 }

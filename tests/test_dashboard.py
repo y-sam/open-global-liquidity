@@ -566,6 +566,13 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     assert cross_border["offshore_dollar_credit_index"].dropna().between(0, 100).all()
     assert cross_border["provider"].eq("BIS").all()
     assert private_liquidity["private_liquidity_index"].dropna().between(0, 100).all()
+    assert (
+        private_liquidity.loc[
+            private_liquidity["private_liquidity_index"].notna(), "private_liquidity_regime"
+        ]
+        .notna()
+        .all()
+    )
     assert len(aggregate) >= 290
     assert aggregate["date"].min() == pd.Timestamp("2002-01-31")
     assert detail.groupby("date")["central_bank"].nunique().eq(5).all()

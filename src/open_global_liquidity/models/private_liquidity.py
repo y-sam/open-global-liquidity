@@ -3,13 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from itertools import pairwise
 from pathlib import Path
 
 import numpy as np
 import pandas as pd
 import yaml
 
-from open_global_liquidity.models.ogli import momentum_to_ogli
+from open_global_liquidity.config import RegimeThreshold
+from open_global_liquidity.models.ogli import classify_ogli, momentum_to_ogli
 from open_global_liquidity.transforms.normalize import historical_zscore
 
 
@@ -26,6 +28,7 @@ class PrivateLiquidityConfig:
     qoq_weight: float
     yoy_weight: float
     min_periods: int
+    regimes: tuple[RegimeThreshold, ...]
     availability_lag_months: int
 
 
@@ -36,6 +39,7 @@ def load_private_liquidity_config(path: Path) -> PrivateLiquidityConfig:
         components = raw["components"]
         momentum = raw["momentum"]
         normalization = raw["normalization"]
+        regimes_raw = raw["regimes"]
         availability = raw["availability"]
     except (OSError, KeyError, TypeError, yaml.YAMLError) as exc:
         raise PrivateLiquidityError(f"Could not load private-liquidity config: {exc}") from exc
@@ -44,6 +48,11 @@ def load_private_liquidity_config(path: Path) -> PrivateLiquidityConfig:
         float(components["money_market_fund_assets"]["weight"]),
     )
     momentum_weights = (float(momentum["qoq_annualized_weight"]), float(momentum["yoy_weight"]))
+    regimes = tuple(
+        RegimeThreshold(label=str(item["label"]), max_value=float(item["max_value"]))
+        for item in regimes_raw["thresholds"]
+    )
+    regime_limits = tuple(item.max_value for item in regimes)
     if (
         raw.get("classification") != "model_assumption"
         or raw.get("canonical_frequency") != "quarter_end"
@@ -53,7 +62,14 @@ def load_private_liquidity_config(path: Path) -> PrivateLiquidityConfig:
         or not np.isclose(sum(momentum_weights), 1)
         or normalization.get("mode") != "expanding"
         or int(normalization.get("min_periods", 0)) < 8
+        or regimes_raw.get("classification") != "model_assumption"
+        or not regimes
+        or regime_limits[-1] != 100
+        or any(left >= right for left, right in pairwise(regime_limits))
         or availability.get("classification") != "model_assumption"
+        or int(availability.get("lag_months", -1)) < 0
+        or int(raw.get("max_bank_staleness_days", 0)) < 1
+        or any(weight < 0 for weight in (*component_weights, *momentum_weights))
     ):
         raise PrivateLiquidityError("Private-liquidity configuration is invalid")
     return PrivateLiquidityConfig(
@@ -64,6 +80,7 @@ def load_private_liquidity_config(path: Path) -> PrivateLiquidityConfig:
         qoq_weight=momentum_weights[0],
         yoy_weight=momentum_weights[1],
         min_periods=int(normalization["min_periods"]),
+        regimes=regimes,
         availability_lag_months=int(availability["lag_months"]),
     )
 
@@ -129,6 +146,9 @@ def calculate_private_liquidity(
         config.bank_weight * result["bank_momentum"] + config.mmf_weight * result["mmf_momentum"]
     )
     result["private_liquidity_index"] = momentum_to_ogli(result["private_liquidity_momentum"])
+    result["private_liquidity_regime"] = result["private_liquidity_index"].map(
+        lambda value: classify_ogli(value, config.regimes)
+    )
     result["signal_available_date"] = result["date"] + pd.offsets.MonthEnd(
         config.availability_lag_months
     )

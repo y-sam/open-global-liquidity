@@ -1307,6 +1307,7 @@ def load_private_liquidity(path: Path) -> pd.DataFrame:
         "mmf_momentum",
         "private_liquidity_momentum",
         "private_liquidity_index",
+        "private_liquidity_regime",
         "signal_available_date",
         "model_name",
         "model_classification",
@@ -1327,6 +1328,9 @@ def load_private_liquidity(path: Path) -> pd.DataFrame:
         or not result["loan_share_of_bank_credit"].between(0, 1).all()
         or set(result["model_classification"]) != {"model_assumption"}
         or set(result["calibration_status"]) != {"not_calibrated"}
+        or result.loc[result["private_liquidity_index"].notna(), "private_liquidity_regime"]
+        .isna()
+        .any()
     ):
         raise DashboardDataError("US private liquidity contains invalid observations or metadata")
     return result.sort_values("date").reset_index(drop=True)
