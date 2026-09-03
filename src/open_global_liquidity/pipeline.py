@@ -74,6 +74,11 @@ from open_global_liquidity.models.global_central_bank import (
     load_global_aggregation_config,
 )
 from open_global_liquidity.models.ogli import OGLICalculationError, calculate_ogli
+from open_global_liquidity.models.private_liquidity import (
+    PrivateLiquidityError,
+    calculate_private_liquidity,
+    load_private_liquidity_config,
+)
 from open_global_liquidity.models.us_liquidity import (
     LiquidityModelError,
     calculate_us_liquidity_models,
@@ -114,6 +119,9 @@ def run_pipeline(
     market_definitions = [item for item in definitions if item.group == "markets"]
     context_definitions = [item for item in definitions if item.group == "context"]
     collateral_definitions = [item for item in definitions if item.group == "collateral"]
+    private_liquidity_definitions = [
+        item for item in definitions if item.group == "private_liquidity"
+    ]
     fx_definitions = [
         item
         for item in definitions
@@ -165,6 +173,37 @@ def run_pipeline(
     output_path = output_dir / "us_fred_series.parquet"
     output.to_parquet(output_path, index=False)
     LOGGER.info("Wrote %d standardized observations to %s", len(output), output_path)
+
+    private_liquidity_source: pd.DataFrame | None = None
+    private_liquidity_indicators: pd.DataFrame | None = None
+    if private_liquidity_definitions:
+        private_liquidity_source = pd.concat(
+            [
+                provider.fetch_definition(
+                    definition,
+                    start=start,
+                    end=end,
+                    force_refresh=force_refresh,
+                )
+                for definition in private_liquidity_definitions
+            ],
+            ignore_index=True,
+        ).sort_values(["series_id", "date"])
+        private_liquidity_source.to_parquet(
+            output_dir / "us_private_liquidity_source.parquet", index=False
+        )
+        try:
+            private_config = load_private_liquidity_config(
+                project_root / "config" / "private_liquidity.yaml"
+            )
+            private_liquidity_indicators = calculate_private_liquidity(
+                private_liquidity_source, private_config
+            )
+        except PrivateLiquidityError as exc:
+            raise RuntimeError(f"Private-liquidity model failed: {exc}") from exc
+        private_liquidity_indicators.to_parquet(
+            output_dir / "us_private_liquidity_indicators.parquet", index=False
+        )
 
     collateral_source: pd.DataFrame | None = None
     collateral_conditions: pd.DataFrame | None = None
@@ -688,6 +727,11 @@ def run_pipeline(
             snapshots["us_collateral_source_snapshot.parquet"] = collateral_source
             snapshots["us_collateral_conditions_snapshot.parquet"] = collateral_conditions
             snapshots["us_collateral_robustness_snapshot.parquet"] = collateral_robustness
+        if private_liquidity_source is not None and private_liquidity_indicators is not None:
+            snapshots["us_private_liquidity_source_snapshot.parquet"] = private_liquidity_source
+            snapshots["us_private_liquidity_indicators_snapshot.parquet"] = (
+                private_liquidity_indicators
+            )
         if collateral_bitcoin_pairs is not None and collateral_bitcoin_summary is not None:
             snapshots["us_collateral_bitcoin_pairs_snapshot.parquet"] = collateral_bitcoin_pairs
             snapshots["us_collateral_bitcoin_summary_snapshot.parquet"] = collateral_bitcoin_summary

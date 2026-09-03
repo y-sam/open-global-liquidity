@@ -1,0 +1,26 @@
+classification: model_assumption
+name: "Open US Private Liquidity Momentum Index"
+description: >-
+  Experimental quarterly momentum composite of total US commercial-bank credit and money-market-
+  fund assets. Loans and leases are composition context and are not added to total bank credit.
+canonical_frequency: quarter_end
+alignment_policy: latest_observation_on_or_before_quarter_end
+max_bank_staleness_days: 10
+components:
+  bank_credit:
+    weight: 0.50
+  money_market_fund_assets:
+    weight: 0.50
+momentum:
+  qoq_annualized_weight: 0.60
+  yoy_weight: 0.40
+normalization:
+  mode: expanding
+  min_periods: 12
+availability:
+  classification: model_assumption
+  lag_months: 3
+  description: >-
+    The quarterly composite is treated as available three month-ends after quarter end, reflecting
+    the slower Financial Accounts input. Exact historical release timestamps are not reconstructed.
+calibrated_parameters: {}

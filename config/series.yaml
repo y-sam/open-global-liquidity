@@ -83,6 +83,55 @@ US:
       source: "Board of Governors of the Federal Reserve System (US), H.4.1"
       source_url: "https://fred.stlouisfed.org/series/WRBWFRBL"
 
+  private_liquidity:
+    bank_credit:
+      classification: measured_data
+      provider: fred
+      series_id: TOTBKCR
+      component: bank_credit
+      title: "Bank Credit, All Commercial Banks"
+      description: >-
+        Weekly seasonally adjusted total bank credit from the Federal Reserve H.8 release. It
+        includes loans and leases plus securities and is used as the commercial-bank component.
+      unit: "Billions of U.S. Dollars"
+      frequency: "Weekly, Ending Wednesday"
+      seasonal_adjustment: "Seasonally Adjusted"
+      start: "1973-01-03"
+      source: "Board of Governors of the Federal Reserve System (US), H.8"
+      source_url: "https://fred.stlouisfed.org/series/TOTBKCR"
+
+    bank_loans_and_leases:
+      classification: measured_data
+      provider: fred
+      series_id: TOTLL
+      component: bank_loans_and_leases
+      title: "Loans and Leases in Bank Credit, All Commercial Banks"
+      description: >-
+        Weekly seasonally adjusted loans and leases within total bank credit. It is displayed as
+        composition context and is not added to total bank credit, which would double count it.
+      unit: "Billions of U.S. Dollars"
+      frequency: "Weekly, Ending Wednesday"
+      seasonal_adjustment: "Seasonally Adjusted"
+      start: "1973-01-03"
+      source: "Board of Governors of the Federal Reserve System (US), H.8"
+      source_url: "https://fred.stlouisfed.org/series/TOTLL"
+
+    money_market_fund_assets:
+      classification: measured_data
+      provider: fred
+      series_id: MMMFFAQ027S
+      component: money_market_fund_assets
+      title: "Money Market Funds; Total Financial Assets, Level"
+      description: >-
+        Quarterly end-of-period money-market-fund total financial assets from the Financial
+        Accounts. The current-vintage series may undergo major data and structural revisions.
+      unit: "Millions of U.S. Dollars"
+      frequency: "Quarterly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "1945-12-31"
+      source: "Board of Governors of the Federal Reserve System (US), Z.1"
+      source_url: "https://fred.stlouisfed.org/series/MMMFFAQ027S"
+
   markets:
     bitcoin:
       classification: measured_data

@@ -40,6 +40,10 @@ release is tagged.
   lag. It does not yet enter Global Model G.
 - Added an Offshore dollar credit dashboard with measured stock, momentum, growth, assumed
   availability, formulas, exact BIS-series link, and explicit coverage limitations.
+- Added measured H.8 total bank credit and loans-and-leases series plus Z.1 money-market-fund
+  assets. Loans are composition context and are not added to total bank credit.
+- Added a separate, non-calibrated quarterly US Private Liquidity Momentum Index with equal bank/
+  MMF weights, expanding normalization, and a conservative three-month-end availability lag.
 
 ### Research boundary
 
