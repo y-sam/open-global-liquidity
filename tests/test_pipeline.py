@@ -5,7 +5,14 @@ from pathlib import Path
 import pandas as pd
 
 from open_global_liquidity.data.base import STANDARD_COLUMNS
-from open_global_liquidity.pipeline import run_pipeline
+from open_global_liquidity.pipeline import build_parser, run_pipeline
+
+
+def test_private_pboc_ingestion_is_explicitly_opt_in() -> None:
+    parser = build_parser()
+
+    assert parser.parse_args([]).include_private_pboc is False
+    assert parser.parse_args(["--include-private-pboc"]).include_private_pboc is True
 
 
 def _write_test_config(project_root: Path) -> None:
@@ -252,7 +259,11 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     monkeypatch.setattr("open_global_liquidity.pipeline.BoeProvider.fetch_definition", fake_fetch)
     monkeypatch.setattr("open_global_liquidity.pipeline.PbocProvider.fetch_definition", fake_fetch)
 
-    output_path = run_pipeline(project_root=tmp_path, publish_dashboard_snapshot=True)
+    output_path = run_pipeline(
+        project_root=tmp_path,
+        publish_dashboard_snapshot=True,
+        include_private_pboc=True,
+    )
     source = pd.read_parquet(output_path)
     ecb_source = pd.read_parquet(tmp_path / "data" / "processed" / "euro_area_ecb_series.parquet")
     boj_source = pd.read_parquet(tmp_path / "data" / "processed" / "japan_boj_series.parquet")

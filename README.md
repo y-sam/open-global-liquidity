@@ -1,6 +1,6 @@
 # Open Global Liquidity
 
-**Current release:** v0.4.0 — stable research preview with Global Model G and separate collateral,
+**Current release:** v0.4.1 — stable research preview with Global Model G and separate collateral,
 offshore-dollar-credit, and US private-liquidity research layers. See the
 [changelog](CHANGELOG.md),
 [citation metadata](CITATION.cff), [readiness audit](docs/READINESS_AUDIT.md), and
@@ -22,7 +22,7 @@ Original project code is licensed under the [Apache License 2.0](LICENSE). This 
 not relicense third-party observations, derived snapshots, source metadata, names, or trademarks.
 See [Third-party data terms](THIRD_PARTY_DATA.md) before redistributing bundled data artifacts.
 
-## Current scope: v0.4.0 stable research preview
+## Current scope: v0.4.1 stable research preview
 
 The repository provides an auditable US data-ingestion path, experimental OGLI momentum index, and
 Streamlit dashboard. It
@@ -98,6 +98,11 @@ The public China series is now the BIS monthly Central Bank Total Assets series
 explicit permitted-use terms subject to attribution and non-misleading presentation. The direct
 PBoC `Total Assets` extraction remains available locally as a private validation source and is not
 redistributed.
+
+The normal and hosted pipelines intentionally skip direct PBoC archive extraction. Maintainers may
+run it locally with `--include-private-pboc`; this opt-in source is never added to public snapshots.
+Global Model G continues to use the redistributable BIS-spliced China series whether or not the
+private validation source is fetched.
 
 The **Central banks** dashboard page compares cumulative changes by rebasing each available
 native-currency series independently to 100. This is a display transformation—not currency

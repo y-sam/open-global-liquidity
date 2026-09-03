@@ -8,7 +8,7 @@ authors:
   - family-names: "Sampaio"
     given-names: "Yuri"
     email: "ysmp@proton.me"
-version: 0.4.0
+version: 0.4.1
 date-released: 2026-09-03
 license: Apache-2.0
 repository-code: "https://github.com/y-sam/open-global-liquidity"

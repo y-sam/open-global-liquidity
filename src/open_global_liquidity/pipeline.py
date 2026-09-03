@@ -106,8 +106,14 @@ def run_pipeline(
     end: str | None = None,
     force_refresh: bool = False,
     publish_dashboard_snapshot: bool = False,
+    include_private_pboc: bool = False,
 ) -> Path:
-    """Fetch measured data and write source, weekly-aligned, and model Parquet outputs."""
+    """Fetch measured data and write source, aligned, model, and optional snapshot outputs.
+
+    Direct PBoC table extraction is an explicit local-only validation step because it is not
+    redistributed and its archive URLs can change. The public pipeline uses the BIS-spliced China
+    series and skips the private PBoC source unless ``include_private_pboc`` is requested.
+    """
     load_dotenv(project_root / ".env")
     definitions = load_series_config(project_root / "config" / "series.yaml")
     model_config = load_model_config(project_root / "config" / "model.yaml")
@@ -308,7 +314,7 @@ def run_pipeline(
         LOGGER.info("Wrote %d standardized BoE observations to %s", len(boe_output), boe_path)
 
     pboc_output: pd.DataFrame | None = None
-    if pboc_definitions:
+    if pboc_definitions and include_private_pboc:
         pboc_provider = PbocProvider(cache_dir=project_root / "data" / "raw" / "pboc")
         pboc_output = pd.concat(
             [
@@ -798,6 +804,11 @@ def build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Also write the Git-versioned public snapshots used by hosted dashboards",
     )
+    parser.add_argument(
+        "--include-private-pboc",
+        action="store_true",
+        help="Also fetch the non-redistributed direct PBoC validation source for local research",
+    )
     return parser
 
 
@@ -811,6 +822,7 @@ def main() -> None:
             end=args.end,
             force_refresh=args.force_refresh,
             publish_dashboard_snapshot=args.publish_dashboard_snapshot,
+            include_private_pboc=args.include_private_pboc,
         )
     except (
         BisError,

@@ -1,5 +1,12 @@
 # Release checklist
 
+## v0.4.1 production-refresh fix
+
+- [x] The public refresh uses the redistributable BIS-spliced China series.
+- [x] Direct PBoC archive extraction remains available as an explicit local-only opt-in.
+- [x] A broken historical PBoC archive URL can no longer block public snapshot refreshes.
+- [x] The complete local and GitHub verification suites pass before tagging.
+
 ## v0.4.0 stable research preview
 
 - [x] The five-central-bank USD aggregate and Global Model G remain unchanged and explicitly

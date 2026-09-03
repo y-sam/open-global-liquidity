@@ -5,6 +5,14 @@ release is tagged.
 
 ## [Unreleased]
 
+## [0.4.1] — 2026-09-03
+
+### Fixed
+
+- Made the fragile, non-redistributed direct PBoC archive extraction explicitly local and opt-in
+  with `--include-private-pboc`. Public refreshes continue to use the BIS-spliced China series and
+  no longer fail when a historical PBoC archive URL changes.
+
 ## [0.4.0] — 2026-09-03
 
 ### Added
@@ -174,7 +182,8 @@ release is tagged.
 The historical `v0.1.0` tag predates the finalized code license, citation metadata, and release
 audit. It is retained unchanged for reproducibility and is superseded by v0.1.1.
 
-[Unreleased]: https://github.com/y-sam/open-global-liquidity/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/y-sam/open-global-liquidity/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.4.1
 [0.4.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.4.0
 [0.3.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.3.0
 [0.2.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.2.0
