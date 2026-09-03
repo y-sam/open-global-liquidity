@@ -4216,8 +4216,9 @@ def collateral_conditions_page() -> None:
     st.subheader("Frozen-model validation against subsequent Bitcoin returns")
     st.caption(
         "The collateral formula and weights were fixed before this comparison. The primary "
-        "specification is a one-month availability delay, three-month forward return, and "
-        "non-overlapping observations; all alternatives remain visible as sensitivity checks."
+        "specification uses the source-specific availability date with no additional delay, a "
+        "three-month forward return, and non-overlapping observations; one- and two-month "
+        "additional delays remain visible as sensitivity checks."
     )
     try:
         pairs, summary, validation_origin = _collateral_bitcoin_data()
@@ -4226,10 +4227,14 @@ def collateral_conditions_page() -> None:
     else:
         with st.container(horizontal=True):
             lag = st.selectbox(
-                "Assumed availability delay",
+                "Additional timing delay",
                 sorted(summary["availability_lag_months"].unique()),
-                index=1,
-                format_func=lambda value: f"{value} month{'s' if value != 1 else ''}",
+                index=0,
+                format_func=lambda value: (
+                    "No additional delay"
+                    if value == 0
+                    else f"{value} additional month{'s' if value != 1 else ''}"
+                ),
                 key="collateral_bitcoin_lag",
             )
             horizon = st.selectbox(
@@ -4287,7 +4292,11 @@ def collateral_conditions_page() -> None:
             selected_pairs,
             x="collateral_conditions_score",
             y="market_return",
-            hover_data={"signal_date": "|%Y-%m-%d", "collateral_regime": True},
+            hover_data={
+                "signal_date": "|%Y-%m-%d",
+                "source_available_date": "|%Y-%m-%d",
+                "collateral_regime": True,
+            },
             title="Collateral conditions and later Bitcoin return",
             labels={
                 "collateral_conditions_score": "Collateral conditions score",

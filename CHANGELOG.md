@@ -28,6 +28,9 @@ release is tagged.
   was declared without inspecting Bitcoin outcomes and does not alter the frozen baseline.
 - Documented the first signal-agreement result through July 2026: implementation variants track
   the baseline closely, while deleting an economic component causes materially larger divergence.
+- Replaced the collateral study's blanket primary delay with source-specific assumed availability
+  dates based on normal MSPD, H.4.1, New York Fed reference-rate, and Treasury-yield schedules.
+  Zero-, one-, and two-month controls now mean additional delays after all inputs are available.
 
 ### Research boundary
 

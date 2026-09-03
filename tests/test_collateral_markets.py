@@ -8,7 +8,7 @@ from open_global_liquidity.analysis.collateral_markets import (
 
 def _collateral(periods: int = 48) -> pd.DataFrame:
     dates = pd.date_range("2020-01-31", periods=periods, freq="ME")
-    return pd.DataFrame(
+    result = pd.DataFrame(
         {
             "date": dates,
             "collateral_conditions_score": [index / 20 - 1 for index in range(periods)],
@@ -17,6 +17,8 @@ def _collateral(periods: int = 48) -> pd.DataFrame:
             "model_name": ["Open Collateral Conditions Score"] * periods,
         }
     )
+    result["signal_available_date"] = result["date"] + pd.offsets.BDay(4)
+    return result
 
 
 def _bitcoin() -> pd.DataFrame:
@@ -50,7 +52,10 @@ def test_collateral_bitcoin_validation_keeps_timing_and_uncertainty_explicit() -
     )
 
     delayed = pairs.loc[pairs["availability_lag_months"] == 1].iloc[0]
-    assert delayed["signal_available_date"] == delayed["signal_date"] + pd.DateOffset(months=1)
+    assert delayed["source_available_date"] == delayed["signal_date"] + pd.offsets.BDay(4)
+    assert delayed["signal_available_date"] == delayed["source_available_date"] + pd.DateOffset(
+        months=1
+    )
     assert set(summary["sample_policy"]) == {"overlapping", "non_overlapping"}
     available = summary.dropna(subset=["correlation"])
     assert available["bootstrap_valid_resamples"].eq(100).all()

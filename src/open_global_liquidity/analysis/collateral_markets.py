@@ -18,6 +18,7 @@ class CollateralMarketAnalysisError(ValueError):
 
 PAIR_COLUMNS = [
     "signal_date",
+    "source_available_date",
     "signal_available_date",
     "model_id",
     "model_name",
@@ -73,6 +74,7 @@ def build_collateral_bitcoin_pairs(
     """Pair the frozen monthly collateral score with strictly subsequent Bitcoin returns."""
     signal_columns = {
         "date",
+        "signal_available_date",
         "collateral_conditions_score",
         "collateral_conditions_index",
         "collateral_regime",
@@ -103,7 +105,12 @@ def build_collateral_bitcoin_pairs(
         for horizon in horizons:
             candidates = signals.copy()
             candidates["signal_date"] = candidates["date"]
-            candidates["signal_available_date"] = candidates["date"] + pd.DateOffset(months=lag)
+            candidates["source_available_date"] = pd.to_datetime(
+                candidates["signal_available_date"]
+            )
+            candidates["signal_available_date"] = candidates[
+                "source_available_date"
+            ] + pd.DateOffset(months=lag)
             candidates["end_target_date"] = candidates["signal_available_date"] + pd.DateOffset(
                 months=horizon
             )
@@ -142,7 +149,7 @@ def build_collateral_bitcoin_pairs(
             candidates["market_return"] = candidates["end_value"] / candidates["start_value"] - 1
             candidates["is_non_overlapping"] = False
             candidates.loc[candidates.index[::horizon], "is_non_overlapping"] = True
-            candidates["timing_classification"] = "model_assumption"
+            candidates["timing_classification"] = "source_specific_model_assumption"
             candidates["classification"] = "statistical_transformation"
             frames.append(candidates)
     if not frames:

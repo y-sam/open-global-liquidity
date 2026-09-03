@@ -153,6 +153,14 @@ Leave-one-component-out variants differ by `12.0` to `15.2` points on average; t
 stable to the tested implementation choices but materially dependent on retaining all three
 economic components. These are in-sample signal-agreement diagnostics, not forecast validation.
 
+The collateral signal also carries a source-specific assumed availability date. MSPD is delayed to
+the fourth weekday business day after month-end; H.4.1 holdings, SOFR/EFFR observations, and daily
+Treasury yields are delayed by one weekday business day from their source observation. The signal
+is considered available only when all required components are available. These policies reflect
+the providers' documented normal schedules but do not reconstruct exceptional releases, exact
+timestamps, SIFMA holidays, or federal holidays. Zero, one, and two *additional* month delays remain
+available as sensitivity tests.
+
 ## Research boundaries
 
 The project will keep three categories separate:
@@ -559,12 +567,12 @@ published index therefore remains clearly labeled current-vintage.
 ### Collateral-score Bitcoin validation
 
 The v0.4a collateral formula and its 40/30/30 weights were frozen before examining Bitcoin
-outcomes. The validation uses the unbounded `collateral_conditions_score` as the signal. It
-predeclares 0-, 1-, and 2-month availability-delay assumptions and subsequent 1-, 3-, 6-, and
-12-month Bitcoin returns. The primary specification is a one-month delay, three-month forward
-return, and mechanically non-overlapping observations. The one-month delay is a conservative
-timing approximation for the mixed monthly, weekly, and daily inputs; it is not reconstructed
-release-vintage timing.
+outcomes. The validation uses the unbounded `collateral_conditions_score` as the signal. It starts
+market outcomes at the source-specific assumed availability date and tests zero, one, and two
+additional month delays plus subsequent 1-, 3-, 6-, and 12-month Bitcoin returns. The primary
+specification uses no additional delay, a three-month forward return, and mechanically
+non-overlapping observations. The timing policy is more granular than a blanket monthly lag but is
+not a reconstruction of exact release timestamps or data vintages.
 
 Using data available through July 2026, the primary estimate has 21 observations, Pearson
 correlation `+0.24`, and a deterministic 95% circular moving-block bootstrap interval of `-0.12`

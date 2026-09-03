@@ -59,6 +59,11 @@ def test_config_separates_assumptions_from_calibration() -> None:
     assert config.normalization_mode == "expanding"
     assert sum(item.weight for item in config.components) == pytest.approx(1.0)
     assert {item.direction for item in config.components} == {-1, 1}
+    assert config.bitcoin_validation.primary_availability_lag_months == 0
+    assert (
+        config.source_availability_business_days["marketable_treasury_debt_public_business_days"]
+        == 4
+    )
 
 
 def test_collateral_score_is_bounded_and_non_look_ahead() -> None:
@@ -71,6 +76,8 @@ def test_collateral_score_is_bounded_and_non_look_ahead() -> None:
     assert (result["private_collateral_proxy_millions"] > 0).all()
     assert set(result["normalization_mode"]) == {"expanding"}
     assert result["treasury_volatility_curve_bps"].notna().any()
+    assert result["signal_available_date"].equals(result["date"] + pd.offsets.BDay(4))
+    assert set(result["availability_classification"]) == {"model_assumption"}
 
     changed = source.copy()
     last_date = changed["date"].max()

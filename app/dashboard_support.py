@@ -1515,6 +1515,7 @@ def load_collateral_bitcoin_pairs(path: Path) -> pd.DataFrame:
     frame = _read_parquet(path, "Collateral Bitcoin pairs")
     required = {
         "signal_date",
+        "source_available_date",
         "signal_available_date",
         "collateral_conditions_score",
         "collateral_conditions_index",
@@ -1528,7 +1529,7 @@ def load_collateral_bitcoin_pairs(path: Path) -> pd.DataFrame:
     if missing:
         raise DashboardDataError("Collateral Bitcoin pairs are missing: " + ", ".join(missing))
     result = frame.copy()
-    for column in ("signal_date", "signal_available_date"):
+    for column in ("signal_date", "source_available_date", "signal_available_date"):
         result[column] = pd.to_datetime(result[column], errors="coerce")
     if result.empty or result[["signal_date", "signal_available_date"]].isna().any().any():
         raise DashboardDataError("Collateral Bitcoin pairs contain invalid observations")

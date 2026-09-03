@@ -7,6 +7,19 @@ description: >-
 canonical_frequency: month_end
 start: "2018-04-30"
 alignment_policy: latest_observation_on_or_before_month_end
+source_availability:
+  classification: model_assumption
+  calendar: weekday_business_day_approximation
+  marketable_treasury_debt_public_business_days: 4
+  fed_treasury_holdings_business_days: 1
+  funding_rates_business_days: 1
+  treasury_yields_business_days: 1
+  description: >-
+    MSPD is normally published on the fourth business day of the following month. H.4.1 normally
+    publishes Wednesday balances on Thursday. SOFR and EFFR are normally available the next
+    business day, and Treasury closing yields are conservatively delayed one business day. The
+    implementation uses weekday business days and does not reconstruct historical holiday or
+    exceptional-release calendars.
 max_staleness_days:
   monthly_stock: 35
   weekly_stock: 10
@@ -72,7 +85,7 @@ bitcoin_validation:
   signal: collateral_conditions_score
   availability_lag_months: [0, 1, 2]
   forward_horizons_months: [1, 3, 6, 12]
-  primary_availability_lag_months: 1
+  primary_availability_lag_months: 0
   primary_horizon_months: 3
   primary_sample_policy: non_overlapping
   overlapping_min_periods: 24

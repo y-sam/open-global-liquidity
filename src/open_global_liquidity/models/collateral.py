@@ -37,6 +37,7 @@ class CollateralConfig:
     name: str
     description: str
     start: date
+    source_availability_business_days: dict[str, int]
     monthly_stock_staleness_days: int
     weekly_stock_staleness_days: int
     volatility_window: int
@@ -80,6 +81,7 @@ def load_collateral_config(path: Path) -> CollateralConfig:
         "canonical_frequency",
         "start",
         "alignment_policy",
+        "source_availability",
         "max_staleness_days",
         "daily_aggregation",
         "private_collateral_proxy",
@@ -134,8 +136,24 @@ def load_collateral_config(path: Path) -> CollateralConfig:
     volatility = raw["yield_volatility"]
     normalization = raw["normalization"]
     staleness = raw["max_staleness_days"]
-    if not all(isinstance(item, dict) for item in (volatility, normalization, staleness)):
+    availability = raw["source_availability"]
+    if not all(
+        isinstance(item, dict) for item in (volatility, normalization, staleness, availability)
+    ):
         raise CollateralModelError("Collateral nested configuration is malformed")
+    availability_keys = {
+        "marketable_treasury_debt_public_business_days",
+        "fed_treasury_holdings_business_days",
+        "funding_rates_business_days",
+        "treasury_yields_business_days",
+    }
+    availability_days = {key: int(availability.get(key, -1)) for key in availability_keys}
+    if (
+        availability.get("classification") != "model_assumption"
+        or availability.get("calendar") != "weekday_business_day_approximation"
+        or min(availability_days.values()) < 0
+    ):
+        raise CollateralModelError("Collateral source-availability policy is invalid")
     component_raw = raw["components"]
     if not isinstance(component_raw, dict) or not component_raw:
         raise CollateralModelError("Collateral components must be a non-empty mapping")
@@ -188,6 +206,7 @@ def load_collateral_config(path: Path) -> CollateralConfig:
         name=str(raw["name"]),
         description=str(raw["description"]),
         start=start,
+        source_availability_business_days=availability_days,
         monthly_stock_staleness_days=monthly_staleness,
         weekly_stock_staleness_days=weekly_staleness,
         volatility_window=volatility_window,
@@ -290,17 +309,22 @@ def calculate_collateral_conditions(
     effr = _component_series(frame, "effective_federal_funds_rate", "effr")
     funding = sofr.merge(effr, on="date", how="inner", validate="one_to_one")
     funding["funding_spread_bps"] = (funding["sofr"] - funding["effr"]) * 100
+    funding["funding_rates_source_date"] = funding["date"]
     funding["date"] = funding["date"].dt.to_period("M").dt.to_timestamp("M")
-    funding_monthly = funding.groupby("date", as_index=False)["funding_spread_bps"].median()
+    funding_monthly = funding.groupby("date", as_index=False).agg(
+        funding_spread_bps=("funding_spread_bps", "median"),
+        funding_rates_source_date=("funding_rates_source_date", "max"),
+    )
 
     yields = _component_series(frame, "treasury_yield_10y_collateral", "yield_10y")
     yields["treasury_volatility_bps"] = yields["yield_10y"].diff().mul(100).rolling(
         config.volatility_window,
         min_periods=config.volatility_min_observations,
     ).std(ddof=0) * np.sqrt(config.volatility_annualization_factor)
+    yields["treasury_yields_source_date"] = yields["date"]
     yields["date"] = yields["date"].dt.to_period("M").dt.to_timestamp("M")
     volatility_monthly = yields.groupby("date", as_index=False).last()[
-        ["date", "treasury_volatility_bps"]
+        ["date", "treasury_volatility_bps", "treasury_yields_source_date"]
     ]
     result = result.merge(funding_monthly, on="date", how="left", validate="one_to_one")
     result = result.merge(volatility_monthly, on="date", how="left", validate="one_to_one")
@@ -346,6 +370,22 @@ def calculate_collateral_conditions(
         axis=1, min_count=len(contribution_columns)
     )
     result["collateral_conditions_index"] = momentum_to_ogli(result["collateral_conditions_score"])
+    availability_columns = {
+        "gross_marketable_collateral_millions_source_date": (
+            "marketable_treasury_debt_public_business_days"
+        ),
+        "fed_treasury_holdings_millions_source_date": "fed_treasury_holdings_business_days",
+        "funding_rates_source_date": "funding_rates_business_days",
+        "treasury_yields_source_date": "treasury_yields_business_days",
+    }
+    available_dates = pd.DataFrame(index=result.index)
+    for source_column, config_key in availability_columns.items():
+        available_dates[source_column] = pd.to_datetime(result[source_column]) + pd.offsets.BDay(
+            config.source_availability_business_days[config_key]
+        )
+    result["signal_available_date"] = available_dates.max(axis=1, skipna=False)
+    result["availability_classification"] = "model_assumption"
+    result["availability_calendar"] = "weekday_business_day_approximation"
     result["collateral_regime"] = result["collateral_conditions_index"].map(
         lambda value: (
             None
