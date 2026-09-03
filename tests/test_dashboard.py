@@ -547,6 +547,9 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     global_summary = support.load_global_bitcoin_summary(
         snapshots / "global_central_bank_bitcoin_summary_snapshot.parquet"
     )
+    cross_border = support.load_cross_border_credit(
+        snapshots / "global_cross_border_credit_indicators_snapshot.parquet"
+    )
 
     assert aggregate["component_count"].eq(5).all()
     assert aggregate["classification"].eq("model_assumption").all()
@@ -557,6 +560,8 @@ def test_loads_published_global_aggregate_snapshots() -> None:
         aggregate.loc[aggregate["global_cb_index"].notna(), "growth_yoy"]
     )
     assert global_display["index_value"].notna().all()
+    assert cross_border["offshore_dollar_credit_index"].dropna().between(0, 100).all()
+    assert cross_border["provider"].eq("BIS").all()
     assert len(aggregate) >= 290
     assert aggregate["date"].min() == pd.Timestamp("2002-01-31")
     assert detail.groupby("date")["central_bank"].nunique().eq(5).all()
@@ -641,3 +646,14 @@ def test_collateral_page_degrades_cleanly_without_snapshot(monkeypatch, tmp_path
     assert not app.exception
     assert app.title[0].value == "Collateral conditions"
     assert any("has not been generated" in message.value for message in app.info)
+
+
+def test_offshore_dollar_page_renders_published_snapshot() -> None:
+    app_path = Path(__file__).resolve().parents[1] / "app" / "streamlit_app.py"
+    app = AppTest.from_file(app_path, default_timeout=20)
+    app._page_hash = calc_hash("offshore-dollar-credit")
+    app.run()
+
+    assert not app.exception
+    assert app.title[0].value == "Offshore dollar credit"
+    assert any(metric.label == "Credit momentum index" for metric in app.metric)

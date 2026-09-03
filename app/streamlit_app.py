@@ -40,6 +40,7 @@ from dashboard_support import (  # noqa: E402
     load_collateral_composition,
     load_collateral_conditions,
     load_collateral_robustness,
+    load_cross_border_credit,
     load_dashboard_data,
     load_ecb_data,
     load_global_bitcoin_pairs,
@@ -93,6 +94,10 @@ GLOBAL_BITCOIN_SUMMARY_PATH = (
 )
 GLOBAL_BITCOIN_SUMMARY_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "global_central_bank_bitcoin_summary_snapshot.parquet"
+)
+CROSS_BORDER_DATA_PATH = DATA_ROOT / "processed" / "global_cross_border_credit_indicators.parquet"
+CROSS_BORDER_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "global_cross_border_credit_indicators_snapshot.parquet"
 )
 COLLATERAL_CONDITIONS_PATH = DATA_ROOT / "processed" / "us_collateral_conditions.parquet"
 COLLATERAL_CONDITIONS_SNAPSHOT_PATH = (
@@ -285,6 +290,12 @@ def _load_global_bitcoin_summary(path: str, modified_ns: int) -> pd.DataFrame:
 def _load_collateral_conditions(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_collateral_conditions(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_cross_border_credit(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_cross_border_credit(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -484,6 +495,11 @@ def _global_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
         _load_global_bitcoin_summary(str(summary_path), summary_path.stat().st_mtime_ns),
         origin,
     )
+
+
+def _cross_border_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(CROSS_BORDER_DATA_PATH, CROSS_BORDER_SNAPSHOT_PATH)
+    return _load_cross_border_credit(str(path), path.stat().st_mtime_ns), origin
 
 
 def _collateral_data() -> tuple[pd.DataFrame, str]:
@@ -3907,6 +3923,122 @@ def global_aggregate_page() -> None:
         )
 
 
+def cross_border_credit_page() -> None:
+    """Present the separate BIS offshore-dollar credit momentum layer."""
+    st.title("Offshore dollar credit")
+    st.caption(
+        "Quarterly BIS global liquidity indicator · US-dollar bank loans and debt securities "
+        "to non-bank borrowers outside the United States"
+    )
+    try:
+        data, origin = _cross_border_data()
+    except DashboardDataError:
+        st.info(
+            "The offshore-dollar credit snapshot has not been generated in this environment.",
+            icon=":material/public:",
+        )
+        st.code(
+            "uv run python -m open_global_liquidity.pipeline --publish-dashboard-snapshot",
+            language="zsh",
+        )
+        return
+    indexed = data.dropna(subset=["offshore_dollar_credit_index"])
+    if indexed.empty:
+        st.warning("The expanding normalization has insufficient quarterly history.")
+        return
+    latest = indexed.iloc[-1]
+    with st.container(horizontal=True):
+        st.metric(
+            "Offshore dollar credit",
+            f"${float(latest['usd_credit_nonbanks_outside_us_millions']) / 1_000_000:,.2f}tn",
+            f"{float(latest['growth_12m_yoy']):+.1%} year over year",
+            border=True,
+        )
+        st.metric(
+            "Credit momentum index",
+            f"{float(latest['offshore_dollar_credit_index']):.1f}",
+            str(latest["regime"]),
+            border=True,
+        )
+        st.metric(
+            "Quarterly annualized growth",
+            f"{float(latest['growth_qoq_annualized']):+.1%}",
+            border=True,
+        )
+        st.metric(
+            "Assumed available",
+            f"{pd.Timestamp(latest['signal_available_date']):%d %b %Y}",
+            f"Data mode: {origin}",
+            border=True,
+        )
+
+    index_chart = px.line(
+        indexed,
+        x="date",
+        y="offshore_dollar_credit_index",
+        title="Open Offshore Dollar Credit Momentum Index",
+        labels={"date": "Quarter end", "offshore_dollar_credit_index": "0-100 index"},
+    )
+    index_chart.update_traces(line={"width": 2.7, "color": "#14B8A6"})
+    index_chart.add_hline(y=50, line_dash="dot", line_color="gray")
+    index_chart.update_yaxes(range=[0, 100])
+    st.plotly_chart(index_chart, width="stretch", config={"displaylogo": False})
+
+    level = data.assign(usd_trillions=data["usd_credit_nonbanks_outside_us_millions"] / 1_000_000)
+    level_chart = px.line(
+        level,
+        x="date",
+        y="usd_trillions",
+        title="Measured US-dollar credit stock outside the United States",
+        labels={"date": "Quarter end", "usd_trillions": "USD trillions"},
+    )
+    level_chart.update_traces(line={"width": 2.5, "color": "#2563EB"})
+    level_chart.update_yaxes(tickprefix="$", ticksuffix="tn")
+    st.plotly_chart(level_chart, width="stretch", config={"displaylogo": False})
+
+    growth = data[["date", "growth_qoq_annualized", "growth_12m_yoy"]].rename(
+        columns={
+            "growth_qoq_annualized": "Quarter-over-quarter annualized",
+            "growth_12m_yoy": "Year over year",
+        }
+    )
+    growth = growth.melt("date", var_name="measure", value_name="growth")
+    growth_chart = px.line(
+        growth,
+        x="date",
+        y="growth",
+        color="measure",
+        title="Offshore dollar credit growth",
+        labels={"date": "Quarter end", "growth": "Growth rate", "measure": ""},
+    )
+    growth_chart.add_hline(y=0, line_dash="dot", line_color="gray")
+    growth_chart.update_yaxes(tickformat=".0%")
+    st.plotly_chart(growth_chart, width="stretch", config={"displaylogo": False})
+
+    st.subheader("Transparent methodology")
+    st.latex(r"M_t = 0.60z(g^{QoQ,ann}_t) + 0.40z(g^{YoY}_t)")
+    st.latex(r"OffshoreDollarIndex_t = 100\,\Phi(M_t)")
+    st.markdown(
+        "**Measured data:** BIS quarterly US-dollar credit—bank loans plus debt securities—to "
+        "non-bank borrowers outside the United States.\n\n"
+        "**Model assumptions:** the 60/40 momentum weights, expanding 12-quarter minimum, regime "
+        "thresholds, and four-month-end assumed publication lag.\n\n"
+        "**Calibrated parameters:** none. The model was not fitted to Bitcoin or another asset."
+    )
+    st.warning(
+        "This layer does not measure FX swaps, derivatives, collateral reuse, credit quality, or "
+        "all offshore-dollar liabilities. Quarterly positions may be revised. It remains separate "
+        "from Global Model G pending point-in-time validation and must not be read as a trading "
+        "signal or CrossBorder Capital's proprietary GLI.",
+        icon=":material/warning:",
+    )
+    st.link_button(
+        "Review the exact BIS series",
+        "https://data.bis.org/topics/GLI/BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD",
+        icon=":material/open_in_new:",
+    )
+
+
 def collateral_conditions_page() -> None:
     """Present the standalone v0.4a US collateral and secured-funding pilot."""
     st.title("Collateral conditions")
@@ -4691,6 +4823,12 @@ global_aggregate_data_page = st.Page(
     icon=":material/currency_exchange:",
     url_path="global-aggregate",
 )
+cross_border_data_page = st.Page(
+    cross_border_credit_page,
+    title="Offshore dollar credit",
+    icon=":material/language:",
+    url_path="offshore-dollar-credit",
+)
 collateral_data_page = st.Page(
     collateral_conditions_page,
     title="Collateral conditions",
@@ -4738,6 +4876,7 @@ navigation = st.navigation(
         data_page,
         central_bank_data_page,
         global_aggregate_data_page,
+        cross_border_data_page,
         euro_area_data_page,
         japan_data_page,
         uk_data_page,

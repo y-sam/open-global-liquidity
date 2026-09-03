@@ -1252,6 +1252,46 @@ def load_global_central_bank_aggregate(path: Path) -> pd.DataFrame:
     return result.sort_values("date").reset_index(drop=True)
 
 
+def load_cross_border_credit(path: Path) -> pd.DataFrame:
+    """Load the separate BIS offshore-dollar credit momentum layer."""
+    frame = _read_parquet(path, "Cross-border credit indicators")
+    required = {
+        "date",
+        "usd_credit_nonbanks_outside_us_millions",
+        "growth_qoq_annualized",
+        "growth_12m_yoy",
+        "momentum_score",
+        "offshore_dollar_credit_index",
+        "regime",
+        "signal_available_date",
+        "provider",
+        "series_id",
+        "model_name",
+        "model_classification",
+        "normalization_classification",
+        "availability_classification",
+        "calibration_status",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Cross-border credit is missing: " + ", ".join(missing))
+    result = frame.copy()
+    result["date"] = pd.to_datetime(result["date"], errors="coerce")
+    result["signal_available_date"] = pd.to_datetime(
+        result["signal_available_date"], errors="coerce"
+    )
+    if (
+        result.empty
+        or result[["date", "signal_available_date"]].isna().any().any()
+        or (result["usd_credit_nonbanks_outside_us_millions"] <= 0).any()
+        or set(result["provider"]) != {"BIS"}
+        or set(result["model_classification"]) != {"model_assumption"}
+        or set(result["calibration_status"]) != {"not_calibrated"}
+    ):
+        raise DashboardDataError("Cross-border credit contains invalid observations or metadata")
+    return result.sort_values("date").reset_index(drop=True)
+
+
 def prepare_global_index_display(frame: pd.DataFrame) -> pd.DataFrame:
     """Adapt Global Model G columns to the shared liquidity-index presentation schema."""
     required = {

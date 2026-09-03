@@ -38,6 +38,8 @@ release is tagged.
 - Added a separate, non-calibrated Offshore Dollar Credit Momentum Index using expanding
   quarter-over-quarter and year-over-year growth normalization with an assumed four-month release
   lag. It does not yet enter Global Model G.
+- Added an Offshore dollar credit dashboard with measured stock, momentum, growth, assumed
+  availability, formulas, exact BIS-series link, and explicit coverage limitations.
 
 ### Research boundary
 
