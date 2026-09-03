@@ -143,6 +143,11 @@ of daily yield changes independently for 2-, 5-, 10-, and 30-year constant-matur
 then takes their unweighted mean. This curve composite is a declared alternative for robustness
 analysis; the frozen production score continues to use only its original 10-year proxy.
 
+The collateral robustness laboratory publishes seven specifications declared without reference to
+Bitcoin or another asset outcome: the frozen baseline, equal absolute weights, curve volatility,
+three leave-one-component-out variants, and a 36-month rolling-normalization variant. They are
+model-assumption sensitivity tests, not candidate models ranked or optimized by asset correlation.
+
 ## Research boundaries
 
 The project will keep three categories separate:
@@ -339,6 +344,8 @@ artifacts plus a JSON provenance manifest:
   secured-funding, policy-rate, and Treasury-yield inputs for the collateral pilot.
 - `data/reference/us_collateral_conditions_snapshot.parquet` — monthly derived private-collateral
   proxy, normalized components, score, index, regimes, and model classifications.
+- `data/reference/us_collateral_robustness_snapshot.parquet` — seven predeclared collateral-signal
+  variants for weight, component, volatility-input, and normalization sensitivity.
 - `data/reference/us_collateral_bitcoin_pairs_snapshot.parquet` — frozen collateral scores paired
   with subsequent Bitcoin outcomes under the declared timing assumptions.
 - `data/reference/us_collateral_bitcoin_summary_snapshot.parquet` — overlapping and
@@ -377,7 +384,7 @@ mode and source retrieval time.
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
 environment, downloads fresh FRED, ALFRED, Coin Metrics, World Bank, ECB, BOJ, BoE, and BIS
-observations, regenerates the thirty-two public Parquet snapshots and provenance manifest, and
+observations, regenerates the thirty-seven public Parquet snapshots and provenance manifest, and
 runs formatting, linting, and offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 

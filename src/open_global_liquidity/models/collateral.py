@@ -327,6 +327,11 @@ def calculate_collateral_conditions(
             axis=1, skipna=False
         )
         result = result.merge(curve_monthly, on="date", how="left", validate="one_to_one")
+        result["z_treasury_volatility_curve_bps"] = historical_zscore(
+            result["treasury_volatility_curve_bps"],
+            mode="expanding",
+            min_periods=config.normalization_min_periods,
+        )
 
     for item in config.components:
         z_column = f"z_{item.name}"

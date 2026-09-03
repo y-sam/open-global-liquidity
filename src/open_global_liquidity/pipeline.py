@@ -15,6 +15,11 @@ from open_global_liquidity.analysis.collateral_markets import (
     build_collateral_bitcoin_pairs,
     summarize_collateral_bitcoin_pairs,
 )
+from open_global_liquidity.analysis.collateral_robustness import (
+    CollateralRobustnessError,
+    calculate_robustness_signals,
+    load_robustness_config,
+)
 from open_global_liquidity.analysis.context import MacroContextError, build_us_macro_context
 from open_global_liquidity.analysis.correlations import (
     add_rolling_correlations,
@@ -184,6 +189,12 @@ def run_pipeline(
         )
         collateral_conditions_path = output_dir / "us_collateral_conditions.parquet"
         collateral_conditions.to_parquet(collateral_conditions_path, index=False)
+        collateral_robustness = calculate_robustness_signals(
+            collateral_conditions, load_robustness_config(collateral_config_path)
+        )
+        collateral_robustness.to_parquet(
+            output_dir / "us_collateral_robustness.parquet", index=False
+        )
         LOGGER.info(
             "Wrote %d collateral source rows and %d monthly condition rows",
             len(collateral_source),
@@ -621,6 +632,7 @@ def run_pipeline(
         if collateral_source is not None and collateral_conditions is not None:
             snapshots["us_collateral_source_snapshot.parquet"] = collateral_source
             snapshots["us_collateral_conditions_snapshot.parquet"] = collateral_conditions
+            snapshots["us_collateral_robustness_snapshot.parquet"] = collateral_robustness
         if collateral_bitcoin_pairs is not None and collateral_bitcoin_summary is not None:
             snapshots["us_collateral_bitcoin_pairs_snapshot.parquet"] = collateral_bitcoin_pairs
             snapshots["us_collateral_bitcoin_summary_snapshot.parquet"] = collateral_bitcoin_summary
@@ -722,6 +734,7 @@ def main() -> None:
         TreasuryFiscalDataError,
         CollateralModelError,
         CollateralMarketAnalysisError,
+        CollateralRobustnessError,
         ProvenanceError,
         UnitConversionError,
         OSError,

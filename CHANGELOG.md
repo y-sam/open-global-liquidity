@@ -23,6 +23,9 @@ release is tagged.
   context. They remain outside the frozen score pending robustness analysis.
 - Added 2-, 5-, and 30-year Treasury yields and an equal-weight 2/5/10/30-year realized-volatility
   composite as an alternative diagnostic. The frozen score still uses its original 10-year input.
+- Added a seven-specification collateral robustness laboratory covering alternative weights,
+  curve volatility, leave-one-component-out tests, and 36-month rolling normalization. The grid
+  was declared without inspecting Bitcoin outcomes and does not alter the frozen baseline.
 
 ### Research boundary
 

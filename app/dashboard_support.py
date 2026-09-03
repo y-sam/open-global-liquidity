@@ -1484,6 +1484,32 @@ def load_repo_context(path: Path) -> pd.DataFrame:
     return result.dropna(subset=["date", "value"]).sort_values(["component", "date"])
 
 
+def load_collateral_robustness(path: Path) -> pd.DataFrame:
+    """Load the predeclared collateral signal-robustness grid."""
+    frame = _read_parquet(path, "Collateral robustness")
+    required = {
+        "date",
+        "model_id",
+        "model_name",
+        "robustness_score",
+        "robustness_index",
+        "normalization",
+        "volatility_input",
+        "classification",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Collateral robustness is missing: " + ", ".join(missing))
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    if (
+        frame.empty
+        or frame["date"].isna().any()
+        or set(frame["classification"]) != {"model_assumption"}
+    ):
+        raise DashboardDataError("Collateral robustness contains invalid metadata")
+    return frame.sort_values(["model_id", "date"]).reset_index(drop=True)
+
+
 def load_collateral_bitcoin_pairs(path: Path) -> pd.DataFrame:
     """Load individual frozen-score/Bitcoin outcome pairs."""
     frame = _read_parquet(path, "Collateral Bitcoin pairs")

@@ -39,6 +39,7 @@ from dashboard_support import (  # noqa: E402
     load_collateral_bitcoin_summary,
     load_collateral_composition,
     load_collateral_conditions,
+    load_collateral_robustness,
     load_dashboard_data,
     load_ecb_data,
     load_global_bitcoin_pairs,
@@ -99,6 +100,10 @@ COLLATERAL_CONDITIONS_SNAPSHOT_PATH = (
 )
 COLLATERAL_SOURCE_PATH = DATA_ROOT / "processed" / "us_collateral_source.parquet"
 COLLATERAL_SOURCE_SNAPSHOT_PATH = DATA_ROOT / "reference" / "us_collateral_source_snapshot.parquet"
+COLLATERAL_ROBUSTNESS_PATH = DATA_ROOT / "processed" / "us_collateral_robustness.parquet"
+COLLATERAL_ROBUSTNESS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "us_collateral_robustness_snapshot.parquet"
+)
 COLLATERAL_BITCOIN_PAIRS_PATH = DATA_ROOT / "processed" / "us_collateral_bitcoin_pairs.parquet"
 COLLATERAL_BITCOIN_PAIRS_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_collateral_bitcoin_pairs_snapshot.parquet"
@@ -292,6 +297,12 @@ def _load_collateral_composition(path: str, modified_ns: int) -> pd.DataFrame:
 def _load_repo_context(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_repo_context(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_collateral_robustness(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_collateral_robustness(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -495,6 +506,13 @@ def _repo_context_data() -> tuple[pd.DataFrame, str]:
         COLLATERAL_SOURCE_PATH, COLLATERAL_SOURCE_SNAPSHOT_PATH
     )
     return _load_repo_context(str(path), path.stat().st_mtime_ns), origin
+
+
+def _collateral_robustness_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(
+        COLLATERAL_ROBUSTNESS_PATH, COLLATERAL_ROBUSTNESS_SNAPSHOT_PATH
+    )
+    return _load_collateral_robustness(str(path), path.stat().st_mtime_ns), origin
 
 
 def _collateral_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
@@ -4125,6 +4143,74 @@ def collateral_conditions_page() -> None:
             "The curve composite is the unweighted mean of separately calculated 2-, 5-, 10-, "
             "and 30-year realized-yield volatilities. It is an alternative diagnostic; the "
             "frozen score continues to use the 10-year series."
+        )
+
+    st.subheader("Collateral signal robustness laboratory")
+    st.caption(
+        "Seven specifications were declared before examining Bitcoin outcomes. This section "
+        "tests whether the collateral signal itself is stable under alternative weights, curve "
+        "volatility, component exclusions, and a rolling normalization window."
+    )
+    try:
+        robustness, robustness_origin = _collateral_robustness_data()
+    except DashboardDataError:
+        st.info("Collateral robustness results are awaiting the next data refresh.")
+    else:
+        robustness_visible = robustness
+        if history != "All":
+            years = 3 if history == "3 years" else 5
+            robustness_visible = robustness.loc[
+                robustness["date"] >= robustness["date"].max() - timedelta(days=years * 365)
+            ]
+        robustness_chart = px.line(
+            robustness_visible,
+            x="date",
+            y="robustness_index",
+            color="model_name",
+            title="Predeclared collateral-index variants",
+            labels={
+                "date": "Month end",
+                "robustness_index": "0-100 index",
+                "model_name": "Specification",
+            },
+        )
+        robustness_chart.add_hline(y=50, line_dash="dot", line_color="gray")
+        robustness_chart.update_yaxes(range=[0, 100])
+        st.plotly_chart(robustness_chart, width="stretch", config={"displaylogo": False})
+
+        latest_robustness = robustness.loc[robustness["date"] == robustness["date"].max()].copy()
+        baseline_latest = latest_robustness.loc[
+            latest_robustness["model_id"] == "baseline", "robustness_index"
+        ].iloc[0]
+        latest_robustness["difference_from_baseline"] = (
+            latest_robustness["robustness_index"] - baseline_latest
+        )
+        st.dataframe(
+            latest_robustness[
+                [
+                    "model_name",
+                    "robustness_index",
+                    "difference_from_baseline",
+                    "normalization",
+                    "volatility_input",
+                ]
+            ],
+            hide_index=True,
+            width="stretch",
+            column_config={
+                "model_name": "Specification",
+                "robustness_index": st.column_config.NumberColumn("Latest index", format="%.1f"),
+                "difference_from_baseline": st.column_config.NumberColumn(
+                    "Difference vs baseline", format="%+.1f"
+                ),
+                "normalization": "Normalization",
+                "volatility_input": "Volatility input",
+            },
+        )
+        st.caption(
+            f"Model-assumption sensitivity · data mode: {robustness_origin}. These alternatives "
+            "are diagnostics, not optimized models. Bitcoin returns were not used to define, "
+            "select, or rank them."
         )
 
     st.subheader("Frozen-model validation against subsequent Bitcoin returns")

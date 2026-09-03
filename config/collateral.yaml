@@ -83,3 +83,15 @@ bitcoin_validation:
     resamples: 1000
     block_length_observations: 6
     seed: 42
+robustness:
+  classification: model_assumption
+  rolling_window_months: 36
+  rolling_min_periods: 24
+  variants:
+    baseline: {weights: [0.40, -0.30, -0.30], volatility: ten_year, normalization: expanding}
+    equal_weight: {weights: [0.333333, -0.333333, -0.333334], volatility: ten_year, normalization: expanding}
+    curve_volatility: {weights: [0.40, -0.30, -0.30], volatility: curve, normalization: expanding}
+    without_supply: {weights: [0.0, -0.50, -0.50], volatility: ten_year, normalization: expanding}
+    without_funding: {weights: [0.571429, 0.0, -0.428571], volatility: ten_year, normalization: expanding}
+    without_volatility: {weights: [0.571429, -0.428571, 0.0], volatility: ten_year, normalization: expanding}
+    rolling_36m: {weights: [0.40, -0.30, -0.30], volatility: ten_year, normalization: rolling}
