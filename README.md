@@ -1,8 +1,7 @@
 # Open Global Liquidity
 
-**Current release:** v0.3.0 — currency normalization, global central-bank aggregation, and Global
-Model G. **Current development milestone:** v0.4 research layers for collateral conditions,
-offshore dollar credit, and US private liquidity. See the
+**Current release:** v0.4.0 — stable research preview with Global Model G and separate collateral,
+offshore-dollar-credit, and US private-liquidity research layers. See the
 [changelog](CHANGELOG.md),
 [citation metadata](CITATION.cff), [readiness audit](docs/READINESS_AUDIT.md), and
 [release checklist](RELEASE_CHECKLIST.md). Project code is
@@ -23,7 +22,7 @@ Original project code is licensed under the [Apache License 2.0](LICENSE). This 
 not relicense third-party observations, derived snapshots, source metadata, names, or trademarks.
 See [Third-party data terms](THIRD_PARTY_DATA.md) before redistributing bundled data artifacts.
 
-## Current scope: v0.4 development
+## Current scope: v0.4.0 stable research preview
 
 The repository provides an auditable US data-ingestion path, experimental OGLI momentum index, and
 Streamlit dashboard. It
@@ -70,6 +69,11 @@ Model B is a common public-market proxy, not a Michael Howell or CrossBorder Cap
 Model C uses reserve balances directly; TGA and RRP are not subtracted again because their effects
 are already reflected in reserves and another subtraction could double count those drains.
 The default OGLI uses expanding, non-look-ahead z-scores with a 104-observation minimum history.
+
+The v0.4.0 methodology is frozen for an initial two-to-three-publication evaluation period. Routine
+data refreshes may extend observations, but Model G inputs, weights, normalization, regime
+thresholds, and the declared Bitcoin research specifications should not change without a new
+versioned methodological decision.
 
 The v0.2a expansion pilot also downloads the ECB series
 [`BSI.M.U2.N.C.T00.A.1.Z5.0000.Z01.E`](https://data.ecb.europa.eu/data/concepts/statistical-balance-sheet),

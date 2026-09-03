@@ -5,6 +5,8 @@ release is tagged.
 
 ## [Unreleased]
 
+## [0.4.0] — 2026-09-03
+
 ### Added
 
 - Keyless U.S. Treasury Fiscal Data provider for the Monthly Statement of the Public Debt Total
@@ -172,7 +174,8 @@ release is tagged.
 The historical `v0.1.0` tag predates the finalized code license, citation metadata, and release
 audit. It is retained unchanged for reproducibility and is superseded by v0.1.1.
 
-[Unreleased]: https://github.com/y-sam/open-global-liquidity/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/y-sam/open-global-liquidity/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.4.0
 [0.3.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.3.0
 [0.2.0]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.2.0
 [0.1.1]: https://github.com/y-sam/open-global-liquidity/releases/tag/v0.1.1

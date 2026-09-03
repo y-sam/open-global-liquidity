@@ -21,7 +21,7 @@ def test_release_metadata_separates_code_and_data_licenses() -> None:
 
     assert metadata["project"]["license"] == "Apache-2.0"
     assert metadata["project"]["version"] == __version__
-    assert __version__ == "0.4.0.dev0"
+    assert __version__ == "0.4.0"
     assert PROJECT_ROOT.joinpath("LICENSE").is_file()
     data_terms = PROJECT_ROOT.joinpath("THIRD_PARTY_DATA.md").read_text(encoding="utf-8")
     assert "does not grant rights in third-party observations" in data_terms
@@ -35,8 +35,8 @@ def test_citation_metadata_matches_release() -> None:
     citation = yaml.safe_load(PROJECT_ROOT.joinpath("CITATION.cff").read_text(encoding="utf-8"))
 
     assert citation["cff-version"] == "1.2.0"
-    assert citation["version"] == "0.3.0"
-    assert str(citation["date-released"]) == "2026-09-01"
+    assert citation["version"] == "0.4.0"
+    assert str(citation["date-released"]) == "2026-09-03"
     assert citation["license"] == "Apache-2.0"
     assert citation["authors"] == [
         {

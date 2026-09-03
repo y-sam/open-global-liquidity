@@ -42,3 +42,7 @@ Engineering and public reproducibility are strong for a research prototype. The 
 gap is economic breadth validated with point-in-time information, not dashboard polish. The next
 highest-value work is therefore a frozen offshore-dollar/private-liquidity validation study, followed
 by an explicitly experimental broader composite only if the evidence and data timing support it.
+
+The v0.4.0 release is designated a stable research preview. Its methodology is frozen for an
+initial two-to-three-publication evaluation period. Scheduled observations may update normally;
+methodological changes require an explicit versioned decision and changelog entry.

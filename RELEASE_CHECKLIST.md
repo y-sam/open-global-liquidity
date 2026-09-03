@@ -1,5 +1,21 @@
 # Release checklist
 
+## v0.4.0 stable research preview
+
+- [x] The five-central-bank USD aggregate and Global Model G remain unchanged and explicitly
+      limited to central-bank balance-sheet momentum.
+- [x] Collateral conditions, BIS offshore-dollar credit, and US bank/MMF private liquidity are
+      published as separate, non-calibrated research layers rather than silently added to Model G.
+- [x] Collateral robustness, source-specific timing, Bitcoin comparison, and inconclusive primary
+      result are documented without promoting the collateral score into the main index.
+- [x] Private-liquidity loans are treated as composition within bank credit and are not double
+      counted.
+- [x] All public Parquet files are recorded in the provenance manifest with matching SHA-256 hashes.
+- [x] The package, dashboard fallback paths, and public snapshots pass the complete offline suite.
+- [x] Version metadata, citation metadata, changelog, README, and readiness audit identify v0.4.0.
+- [x] Methodology is frozen for an initial two-to-three-publication evaluation period; deferred
+      research is tracked separately.
+
 ## v0.3.0 global aggregation milestone
 
 - [x] Five exact BIS central-bank total-assets series and four H.10 FX inputs are configured with
