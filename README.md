@@ -574,10 +574,12 @@ specification uses no additional delay, a three-month forward return, and mechan
 non-overlapping observations. The timing policy is more granular than a blanket monthly lag but is
 not a reconstruction of exact release timestamps or data vintages.
 
-Using data available through July 2026, the primary estimate has 21 observations, Pearson
-correlation `+0.24`, and a deterministic 95% circular moving-block bootstrap interval of `-0.12`
-to `+0.65`. The interval crosses zero, so the primary result is **inconclusive**, not validated as a
-forecasting relationship. A stronger positive pattern appears at six months, but the
+Using data available through July 2026, the source-timed primary estimate has 21 observations,
+Pearson correlation `+0.13`, and a deterministic 95% circular moving-block bootstrap interval of
+`-0.23` to `+0.56`. The interval crosses zero, so the primary result is **inconclusive**, not
+validated as a forecasting relationship. The assumed source availability occurs 4–6 calendar days
+after month-end in this sample (median 6 days). A stronger positive pattern appears at six months,
+but the
 non-overlapping sample contains only 10 observations and changes with the assumed availability
 delay; it is therefore exploratory evidence, not a basis for integration or calibration. The
 12-month non-overlapping samples contain only five observations and deliberately suppress the

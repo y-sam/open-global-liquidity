@@ -31,13 +31,15 @@ release is tagged.
 - Replaced the collateral study's blanket primary delay with source-specific assumed availability
   dates based on normal MSPD, H.4.1, New York Fed reference-rate, and Treasury-yield schedules.
   Zero-, one-, and two-month controls now mean additional delays after all inputs are available.
+- Recorded the revised source-timed primary result through July 2026: 21 non-overlapping
+  observations, correlation +0.13, and 95% block-bootstrap interval -0.23 to +0.56.
 
 ### Research boundary
 
 - The collateral score remains separate from Global Model G. It is not an observed liquidity
   multiplier, does not use MOVE, and is not calibrated against Bitcoin or another asset. The
-  primary Bitcoin estimate is documented as inconclusive: 21 observations, correlation +0.24,
-  and 95% block-bootstrap interval -0.12 to +0.65 through July 2026.
+  primary Bitcoin estimate is documented as inconclusive: 21 observations, correlation +0.13,
+  and 95% block-bootstrap interval -0.23 to +0.56 through July 2026.
 
 ## [0.3.0] — 2026-09-01
 
