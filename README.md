@@ -147,6 +147,11 @@ The collateral robustness laboratory publishes seven specifications declared wit
 Bitcoin or another asset outcome: the frozen baseline, equal absolute weights, curve volatility,
 three leave-one-component-out variants, and a 36-month rolling-normalization variant. They are
 model-assumption sensitivity tests, not candidate models ranked or optimized by asset correlation.
+Through July 2026, the equal-weight, curve-volatility, and rolling-normalization variants correlate
+`0.97` to `0.99` with the baseline and differ from it by an average `2.0` to `3.9` index points.
+Leave-one-component-out variants differ by `12.0` to `15.2` points on average; the result is thus
+stable to the tested implementation choices but materially dependent on retaining all three
+economic components. These are in-sample signal-agreement diagnostics, not forecast validation.
 
 ## Research boundaries
 

@@ -26,6 +26,8 @@ release is tagged.
 - Added a seven-specification collateral robustness laboratory covering alternative weights,
   curve volatility, leave-one-component-out tests, and 36-month rolling normalization. The grid
   was declared without inspecting Bitcoin outcomes and does not alter the frozen baseline.
+- Documented the first signal-agreement result through July 2026: implementation variants track
+  the baseline closely, while deleting an economic component causes materially larger divergence.
 
 ### Research boundary
 
