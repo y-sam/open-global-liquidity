@@ -30,7 +30,7 @@
       "sha256": "ad1f65739b94f9573e22dfd9fbfa2c078aa8de3f07d96e61f370c20356f32ab6"
     },
     "data_quality_inventory_snapshot.parquet": {
-      "bytes": 8636,
+      "bytes": 8681,
       "columns": [
         "filename",
         "rows",
@@ -43,8 +43,8 @@
         "metadata_status",
         "classification"
       ],
-      "rows": 46,
-      "sha256": "b166a63f54d61dc776b9a835ba04cb0e1e42a431760c67d3638783598ed7927f"
+      "rows": 47,
+      "sha256": "beee438c37c481f43d389430f546fad55a909ff71371e6bff86b8bd13ff6eabf"
     },
     "euro_area_ecb_series_snapshot.parquet": {
       "bytes": 11990,
@@ -223,7 +223,7 @@
       "sha256": "71a46dca7322cf0a11899b6a9f54db3e7695b06e8fa103b7125046b499b1f360"
     },
     "global_bis_cross_border_credit_snapshot.parquet": {
-      "bytes": 7875,
+      "bytes": 10142,
       "columns": [
         "date",
         "country",
@@ -236,19 +236,23 @@
         "retrieved_at"
       ],
       "components": [
+        "eur_credit_nonbanks_outside_euro_area",
+        "jpy_credit_nonbanks_outside_japan",
         "usd_credit_nonbanks_outside_us"
       ],
       "earliest_observation": "2000-03-31",
       "latest_observation": "2026-03-31",
-      "latest_retrieval": "2026-09-04T15:48:08.024340+00:00",
+      "latest_retrieval": "2026-09-04T16:15:15.926589+00:00",
       "providers": [
         "BIS"
       ],
-      "rows": 105,
+      "rows": 315,
       "series_ids": [
+        "BIS,WS_GLI,1.0/Q.EUR.3P.N.A.I.B.EUR",
+        "BIS,WS_GLI,1.0/Q.JPY.3P.N.A.I.B.JPY",
         "BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD"
       ],
-      "sha256": "52c7e9363f1f6aee3eff2affba3695cd2d252d15bf76ba357da3ec3edbcc8a30"
+      "sha256": "d0d9a6521b32e05d519ad5b987a2d488e8033dbb4dd5609099a191c5529ee34b"
     },
     "global_central_bank_assets_detail_snapshot.parquet": {
       "bytes": 68928,
@@ -410,6 +414,43 @@
         "BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD"
       ],
       "sha256": "f5da001d02d35c0978e55d270d36ba42c0875078f9e61e1501fa8fea1ad65f79"
+    },
+    "global_foreign_currency_credit_context_snapshot.parquet": {
+      "bytes": 20117,
+      "columns": [
+        "date",
+        "country",
+        "provider",
+        "series_id",
+        "component",
+        "value",
+        "unit",
+        "frequency",
+        "retrieved_at",
+        "growth_yoy",
+        "rebased_index",
+        "signal_available_date",
+        "model_role",
+        "classification"
+      ],
+      "components": [
+        "eur_credit_nonbanks_outside_euro_area",
+        "jpy_credit_nonbanks_outside_japan",
+        "usd_credit_nonbanks_outside_us"
+      ],
+      "earliest_observation": "2000-03-31",
+      "latest_observation": "2026-03-31",
+      "latest_retrieval": "2026-09-04T16:15:15.926589+00:00",
+      "providers": [
+        "BIS"
+      ],
+      "rows": 315,
+      "series_ids": [
+        "BIS,WS_GLI,1.0/Q.EUR.3P.N.A.I.B.EUR",
+        "BIS,WS_GLI,1.0/Q.JPY.3P.N.A.I.B.JPY",
+        "BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD"
+      ],
+      "sha256": "862d8a6eab31e1929a2e6ae6791ba2f86f16dac2092fa3f74a48820d0f862cbc"
     },
     "global_fx_series_snapshot.parquet": {
       "bytes": 379267,
@@ -1598,10 +1639,10 @@
       "sha256": "0cb575ddb97277572c12cb6d251de1fc767aa24145d6a0d4e2dd6cbdb6bde96f"
     }
   },
-  "generated_at": "2026-09-04T16:11:28.055494+00:00",
+  "generated_at": "2026-09-04T16:16:58.110746+00:00",
   "pipeline_version": "0.4.1",
   "schema_version": 1,
-  "snapshot_count": 47,
-  "source_commit": "02e98d6ff84398c4cc0d5861411b83a3036ee5dc",
+  "snapshot_count": 48,
+  "source_commit": "1d676e9cdc4ff0415821475baf844be2a0184ea4",
   "working_tree_dirty": true
 }

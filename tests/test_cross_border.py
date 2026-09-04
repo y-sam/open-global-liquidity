@@ -6,6 +6,7 @@ import pytest
 from open_global_liquidity.models.cross_border import (
     CrossBorderModelError,
     calculate_cross_border_credit,
+    calculate_foreign_currency_credit_context,
     load_cross_border_config,
 )
 
@@ -48,3 +49,24 @@ def test_cross_border_rejects_duplicate_periods() -> None:
         calculate_cross_border_credit(
             source, load_cross_border_config(Path("config/cross_border.yaml"))
         )
+
+
+def test_foreign_currency_context_does_not_sum_native_currency_levels() -> None:
+    source = pd.concat(
+        [
+            _source()
+            .assign(component=component)
+            .pipe(lambda frame, multiplier=scale: frame.assign(value=frame["value"] * multiplier))
+            for component, scale in (
+                ("usd_credit_nonbanks_outside_us", 1.0),
+                ("eur_credit_nonbanks_outside_euro_area", 2.0),
+                ("jpy_credit_nonbanks_outside_japan", 3.0),
+            )
+        ],
+        ignore_index=True,
+    )
+    result = calculate_foreign_currency_credit_context(source)
+    assert result["component"].nunique() == 3
+    assert result.groupby("component")["rebased_index"].first().eq(100).all()
+    assert result["model_role"].eq("context_only_not_model_input").all()
+    assert "combined_value" not in result.columns

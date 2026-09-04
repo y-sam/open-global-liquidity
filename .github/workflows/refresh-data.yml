@@ -78,6 +78,7 @@ jobs:
             data/reference/global_auxiliary_bitcoin_summary_snapshot.parquet \
             data/reference/global_availability_registry_snapshot.parquet \
             data/reference/global_cross_border_credit_indicators_snapshot.parquet \
+            data/reference/global_foreign_currency_credit_context_snapshot.parquet \
             data/reference/global_fx_series_snapshot.parquet \
             data/reference/global_central_bank_assets_detail_snapshot.parquet \
             data/reference/global_central_bank_assets_snapshot.parquet \

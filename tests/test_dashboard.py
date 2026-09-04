@@ -550,6 +550,9 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     cross_border = support.load_cross_border_credit(
         snapshots / "global_cross_border_credit_indicators_snapshot.parquet"
     )
+    currency_context = support.load_foreign_currency_credit_context(
+        snapshots / "global_foreign_currency_credit_context_snapshot.parquet"
+    )
     auxiliary_pairs = support.load_auxiliary_bitcoin_pairs(
         snapshots / "global_auxiliary_bitcoin_pairs_snapshot.parquet"
     )
@@ -581,6 +584,8 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     assert global_display["index_value"].notna().all()
     assert cross_border["offshore_dollar_credit_index"].dropna().between(0, 100).all()
     assert cross_border["provider"].eq("BIS").all()
+    assert currency_context["component"].nunique() == 3
+    assert currency_context["model_role"].eq("context_only_not_model_input").all()
     assert set(auxiliary_pairs["model_id"]) == {
         "offshore_dollar_credit",
         "us_private_liquidity",

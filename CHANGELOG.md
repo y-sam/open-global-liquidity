@@ -25,6 +25,8 @@ release is tagged.
   note plus signal, contribution, and metadata exports from provenance-tracked snapshots.
 - Added a formal data-quality dashboard and generated inventory covering per-snapshot row/column
   counts, date coverage, retrieval metadata, null cells, duplicates, and metadata limitations.
+- Added official BIS euro and yen credit to non-bank borrowers outside their currency areas as
+  native-unit, separately rebased robustness context; neither enters Model G or Model H.
 
 ### Research boundary
 
@@ -35,6 +37,8 @@ release is tagged.
   reduce look-ahead risk but do not constitute a genuine historical point-in-time reconstruction.
 - Model H weights are economic assumptions rather than a response to the now-known auxiliary
   validation results. Model G remains unchanged, and collateral conditions remain separate.
+- Foreign-currency credit levels are never summed across USD, EUR, and JPY. The new euro and yen
+  series are measured context with explicit BIS attribution, not new fitted model components.
 
 ## [0.4.1] — 2026-09-03
 

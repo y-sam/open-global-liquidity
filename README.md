@@ -182,6 +182,13 @@ declared model assumptions with no calibrated parameters. The layer is not yet i
 Model G; each quarter is conservatively treated as available four month-ends later pending a
 historical BIS release-calendar reconstruction.
 
+Two additional measured BIS series provide reserve-currency breadth: euro credit to non-bank
+borrowers outside the euro area and yen credit to non-bank borrowers outside Japan. The dashboard
+rebases each native-currency stock independently to 100 for comparison. It never sums USD, EUR,
+and JPY nominal amounts, and these context series do not alter Model G or Model H. BIS permits
+reuse of its statistics with attribution and without implying endorsement; the project retains
+that attribution and limitation in the dashboard.
+
 The separate **Open US Private Liquidity Momentum Index** combines commercial-bank credit and
 money-market-fund assets at equal assumed weights. Each component combines 60% quarterly
 annualized growth momentum and 40% year-over-year momentum using expanding normalization. H.8
@@ -433,6 +440,8 @@ artifacts plus a JSON provenance manifest:
   US-dollar credit to non-bank borrowers outside the United States.
 - `data/reference/global_cross_border_credit_indicators_snapshot.parquet` — transparent growth,
   expanding-normalized momentum, availability timing, and 0–100 offshore-dollar credit index.
+- `data/reference/global_foreign_currency_credit_context_snapshot.parquet` — BIS USD, EUR, and JPY
+  credit to non-banks outside each currency area, compared only through native-unit rebased levels.
 - `data/reference/us_private_liquidity_source_snapshot.parquet` — measured H.8 bank credit and
   loans plus quarterly Z.1 money-market-fund assets.
 - `data/reference/us_private_liquidity_indicators_snapshot.parquet` — aligned quarterly component
@@ -487,7 +496,7 @@ mode and source retrieval time.
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
 environment, downloads fresh FRED, ALFRED, Coin Metrics, World Bank, ECB, BOJ, BoE, and BIS
-observations, regenerates the forty-seven public Parquet snapshots and provenance manifest, and
+observations, regenerates the forty-eight public Parquet snapshots and provenance manifest, and
 runs formatting, linting, and offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 

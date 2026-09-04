@@ -106,10 +106,16 @@ class BisProvider:
                 )
             expected_metadata = {("M", "XDC", expected_currency, 9)}
         elif _flow == "WS_GLI":
-            expected_unit = "Millions of U.S. Dollars"
-            if key != "Q.USD.3P.N.A.I.B.USD" or definition.unit != expected_unit:
-                raise BisError("Only the declared BIS offshore-dollar credit key is supported")
-            expected_metadata = {("Q", "USD", "USD", 6)}
+            supported = {
+                "Q.USD.3P.N.A.I.B.USD": "Millions of U.S. Dollars",
+                "Q.EUR.3P.N.A.I.B.EUR": "Millions of Euro",
+                "Q.JPY.3P.N.A.I.B.JPY": "Millions of Japanese Yen",
+            }
+            expected_unit = supported.get(key)
+            currency = key.split(".")[1]
+            if expected_unit is None or definition.unit != expected_unit:
+                raise BisError("BIS global-liquidity key or configured unit is unsupported")
+            expected_metadata = {("Q", currency, currency, 6)}
         else:
             raise BisError(f"Unsupported BIS dataflow: {_flow}")
         if metadata != expected_metadata:

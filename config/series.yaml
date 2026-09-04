@@ -684,3 +684,33 @@ GLOBAL:
       start: "2000-03-31"
       source: "Bank for International Settlements, Global liquidity indicators"
       source_url: "https://data.bis.org/topics/GLI/BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD"
+    eur_credit_nonbanks_outside_euro_area:
+      classification: measured_data
+      provider: bis
+      series_id: BIS,WS_GLI,1.0/Q.EUR.3P.N.A.I.B.EUR
+      component: eur_credit_nonbanks_outside_euro_area
+      title: "Euro Credit to Non-Bank Borrowers Outside the Euro Area"
+      description: >-
+        Quarterly BIS bank loans and debt securities denominated in euro and owed by non-bank
+        borrowers outside the euro area. This is context and does not enter Model G or H.
+      unit: "Millions of Euro"
+      frequency: "Quarterly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2000-03-31"
+      source: "Bank for International Settlements, Global liquidity indicators"
+      source_url: "https://data.bis.org/topics/GLI/BIS,WS_GLI,1.0/Q.EUR.3P.N.A.I.B.EUR"
+    jpy_credit_nonbanks_outside_japan:
+      classification: measured_data
+      provider: bis
+      series_id: BIS,WS_GLI,1.0/Q.JPY.3P.N.A.I.B.JPY
+      component: jpy_credit_nonbanks_outside_japan
+      title: "Yen Credit to Non-Bank Borrowers Outside Japan"
+      description: >-
+        Quarterly BIS bank loans and debt securities denominated in yen and owed by non-bank
+        borrowers outside Japan. This is context and does not enter Model G or H.
+      unit: "Millions of Japanese Yen"
+      frequency: "Quarterly, End of Period"
+      seasonal_adjustment: "Not Seasonally Adjusted"
+      start: "2000-03-31"
+      source: "Bank for International Settlements, Global liquidity indicators"
+      source_url: "https://data.bis.org/topics/GLI/BIS,WS_GLI,1.0/Q.JPY.3P.N.A.I.B.JPY"

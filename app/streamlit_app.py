@@ -46,6 +46,7 @@ from dashboard_support import (  # noqa: E402
     load_dashboard_data,
     load_data_quality_inventory,
     load_ecb_data,
+    load_foreign_currency_credit_context,
     load_global_availability_registry,
     load_global_bitcoin_pairs,
     load_global_bitcoin_summary,
@@ -116,6 +117,12 @@ GLOBAL_BITCOIN_SUMMARY_SNAPSHOT_PATH = (
 CROSS_BORDER_DATA_PATH = DATA_ROOT / "processed" / "global_cross_border_credit_indicators.parquet"
 CROSS_BORDER_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "global_cross_border_credit_indicators_snapshot.parquet"
+)
+FOREIGN_CURRENCY_CREDIT_PATH = (
+    DATA_ROOT / "processed" / "global_foreign_currency_credit_context.parquet"
+)
+FOREIGN_CURRENCY_CREDIT_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "global_foreign_currency_credit_context_snapshot.parquet"
 )
 PRIVATE_LIQUIDITY_PATH = DATA_ROOT / "processed" / "us_private_liquidity_indicators.parquet"
 PRIVATE_LIQUIDITY_SNAPSHOT_PATH = (
@@ -355,6 +362,12 @@ def _load_cross_border_credit(path: str, modified_ns: int) -> pd.DataFrame:
 
 
 @st.cache_data(show_spinner=False)
+def _load_foreign_currency_credit(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_foreign_currency_credit_context(Path(path))
+
+
+@st.cache_data(show_spinner=False)
 def _load_private_liquidity(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_private_liquidity(Path(path))
@@ -574,6 +587,13 @@ def _global_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
 def _cross_border_data() -> tuple[pd.DataFrame, str]:
     path, origin = resolve_dashboard_data_path(CROSS_BORDER_DATA_PATH, CROSS_BORDER_SNAPSHOT_PATH)
     return _load_cross_border_credit(str(path), path.stat().st_mtime_ns), origin
+
+
+def _foreign_currency_credit_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(
+        FOREIGN_CURRENCY_CREDIT_PATH, FOREIGN_CURRENCY_CREDIT_SNAPSHOT_PATH
+    )
+    return _load_foreign_currency_credit(str(path), path.stat().st_mtime_ns), origin
 
 
 def _global_availability_data() -> tuple[pd.DataFrame, str]:
@@ -4452,6 +4472,33 @@ def cross_border_credit_page() -> None:
     growth_chart.add_hline(y=0, line_dash="dot", line_color="gray")
     growth_chart.update_yaxes(tickformat=".0%")
     st.plotly_chart(growth_chart, width="stretch", config={"displaylogo": False})
+
+    try:
+        currency_context, currency_origin = _foreign_currency_credit_data()
+    except DashboardDataError:
+        currency_context = pd.DataFrame()
+        currency_origin = "Unavailable"
+    if not currency_context.empty:
+        labels = {
+            "usd_credit_nonbanks_outside_us": "US dollar outside US",
+            "eur_credit_nonbanks_outside_euro_area": "Euro outside euro area",
+            "jpy_credit_nonbanks_outside_japan": "Yen outside Japan",
+        }
+        context_chart = px.line(
+            currency_context.assign(currency=lambda frame: frame["component"].map(labels)),
+            x="date",
+            y="rebased_index",
+            color="currency",
+            title="Foreign-currency credit to non-banks · native stocks rebased to 100",
+            labels={"date": "Quarter end", "rebased_index": "Index", "currency": ""},
+        )
+        st.plotly_chart(context_chart, width="stretch", config={"displaylogo": False})
+        st.info(
+            "The euro and yen series are robustness context only. Native-currency levels are "
+            "rebased separately and never summed; neither series changes Model G or Model H.",
+            icon=":material/info:",
+        )
+        st.caption(f"Foreign-currency context data mode: {currency_origin}.")
 
     st.subheader("Transparent methodology")
     st.latex(r"M_t = 0.60z(g^{QoQ,ann}_t) + 0.40z(g^{YoY}_t)")

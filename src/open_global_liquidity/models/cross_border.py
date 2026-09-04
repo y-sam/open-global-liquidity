@@ -124,3 +124,26 @@ def calculate_cross_border_credit(source: pd.DataFrame, config: CrossBorderConfi
     result["availability_classification"] = "model_assumption"
     result["calibration_status"] = "not_calibrated"
     return result.reset_index(drop=True)
+
+
+def calculate_foreign_currency_credit_context(source: pd.DataFrame) -> pd.DataFrame:
+    """Compare reserve-currency credit in native units without summing unlike currencies."""
+    components = {
+        "usd_credit_nonbanks_outside_us",
+        "eur_credit_nonbanks_outside_euro_area",
+        "jpy_credit_nonbanks_outside_japan",
+    }
+    frame = source.loc[source["component"].isin(components)].copy()
+    frame["date"] = pd.to_datetime(frame["date"], errors="coerce")
+    frame["value"] = pd.to_numeric(frame["value"], errors="coerce")
+    frame = frame.dropna(subset=["date", "value"]).sort_values(["component", "date"])
+    if set(frame["component"]) != components or frame.duplicated(["component", "date"]).any():
+        raise CrossBorderModelError("Foreign-currency context requires three unique BIS series")
+    frame["growth_yoy"] = frame.groupby("component")["value"].pct_change(4, fill_method=None)
+    frame["rebased_index"] = frame.groupby("component")["value"].transform(
+        lambda values: 100 * values / values.iloc[0]
+    )
+    frame["signal_available_date"] = frame["date"] + pd.offsets.MonthEnd(4)
+    frame["model_role"] = "context_only_not_model_input"
+    frame["classification"] = "statistical_transformation"
+    return frame

@@ -78,6 +78,7 @@ from open_global_liquidity.models.collateral import (
 from open_global_liquidity.models.cross_border import (
     CrossBorderModelError,
     calculate_cross_border_credit,
+    calculate_foreign_currency_credit_context,
     load_cross_border_config,
 )
 from open_global_liquidity.models.global_central_bank import (
@@ -360,6 +361,7 @@ def run_pipeline(
     bis_output: pd.DataFrame | None = None
     bis_cross_border_output: pd.DataFrame | None = None
     cross_border_indicators: pd.DataFrame | None = None
+    foreign_currency_credit_context: pd.DataFrame | None = None
     bis_provider = BisProvider(cache_dir=project_root / "data" / "raw" / "bis")
     if bis_definitions:
         bis_output = pd.concat(
@@ -416,6 +418,12 @@ def run_pipeline(
             "Wrote %d derived cross-border credit observations to %s",
             len(cross_border_indicators),
             cross_border_indicators_path,
+        )
+        foreign_currency_credit_context = calculate_foreign_currency_credit_context(
+            bis_cross_border_output
+        )
+        foreign_currency_credit_context.to_parquet(
+            output_dir / "global_foreign_currency_credit_context.parquet", index=False
         )
 
     fx_output: pd.DataFrame | None = None
@@ -817,6 +825,10 @@ def run_pipeline(
         if cross_border_indicators is not None:
             snapshots["global_cross_border_credit_indicators_snapshot.parquet"] = (
                 cross_border_indicators
+            )
+        if foreign_currency_credit_context is not None:
+            snapshots["global_foreign_currency_credit_context_snapshot.parquet"] = (
+                foreign_currency_credit_context
             )
         if auxiliary_bitcoin_pairs is not None and auxiliary_bitcoin_summary is not None:
             snapshots["global_auxiliary_bitcoin_pairs_snapshot.parquet"] = auxiliary_bitcoin_pairs

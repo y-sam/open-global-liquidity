@@ -1382,6 +1382,22 @@ def load_cross_border_credit(path: Path) -> pd.DataFrame:
     return result.sort_values("date").reset_index(drop=True)
 
 
+def load_foreign_currency_credit_context(path: Path) -> pd.DataFrame:
+    """Load native-unit reserve-currency credit context without aggregating currencies."""
+    frame = _read_parquet(path, "foreign-currency credit context")
+    required = {"date", "component", "value", "growth_yoy", "rebased_index", "model_role"}
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError(
+            "Foreign-currency credit context is missing: " + ", ".join(missing)
+        )
+    if frame["component"].nunique() != 3 or set(frame["model_role"]) != {
+        "context_only_not_model_input"
+    }:
+        raise DashboardDataError("Foreign-currency credit context is incomplete")
+    return frame.sort_values(["component", "date"]).reset_index(drop=True)
+
+
 def load_private_liquidity(path: Path) -> pd.DataFrame:
     """Load the separate US bank-credit and MMF liquidity layer."""
     frame = _read_parquet(path, "US private liquidity indicators")
