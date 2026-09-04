@@ -235,6 +235,9 @@ The project will keep three categories separate:
 
 This milestone contains measured data plus explicitly classified model assumptions. No parameters
 have been empirically calibrated. The main weekly pipeline uses current-vintage FRED observations.
+A dated [global private-credit and collateral source review](docs/research/global_private_credit_collateral_review.md)
+records which additional datasets were integrated, deferred to avoid double counting, or rejected
+for now because public global coverage is not sufficiently harmonized.
 A separate local monthly pilot reconstructs OGLI from ALFRED information sets and never silently
 replaces the published current-vintage index.
 
