@@ -19,6 +19,8 @@ release is tagged.
   equal central-bank, offshore-dollar, and private-liquidity pillars plus prospective review rules.
 - Implemented the frozen Model H formula as a clearly labeled post-specification descriptive
   series, preserving Model G as the production global index.
+- Added auditable Model H pillar contributions and a non-aggregated four-channel liquidity signal
+  map for central banks, offshore dollars, US private liquidity, and US collateral conditions.
 
 ### Research boundary
 

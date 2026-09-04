@@ -51,6 +51,7 @@ from dashboard_support import (  # noqa: E402
     load_global_central_bank_aggregate,
     load_global_central_bank_detail,
     load_liquidity_model_data,
+    load_liquidity_signal_map,
     load_macro_context,
     load_market_comparisons,
     load_market_correlations,
@@ -97,6 +98,8 @@ GLOBAL_AVAILABILITY_SNAPSHOT_PATH = (
 )
 MODEL_H_DATA_PATH = DATA_ROOT / "processed" / "global_model_h.parquet"
 MODEL_H_SNAPSHOT_PATH = DATA_ROOT / "reference" / "global_model_h_snapshot.parquet"
+SIGNAL_MAP_PATH = DATA_ROOT / "processed" / "liquidity_signal_map.parquet"
+SIGNAL_MAP_SNAPSHOT_PATH = DATA_ROOT / "reference" / "liquidity_signal_map_snapshot.parquet"
 GLOBAL_BITCOIN_PAIRS_PATH = DATA_ROOT / "processed" / "global_central_bank_bitcoin_pairs.parquet"
 GLOBAL_BITCOIN_PAIRS_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "global_central_bank_bitcoin_pairs_snapshot.parquet"
@@ -322,6 +325,12 @@ def _load_global_availability(path: str, modified_ns: int) -> pd.DataFrame:
 def _load_model_h(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_model_h(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_signal_map(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_liquidity_signal_map(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -568,6 +577,11 @@ def _global_availability_data() -> tuple[pd.DataFrame, str]:
 def _model_h_data() -> tuple[pd.DataFrame, str]:
     path, origin = resolve_dashboard_data_path(MODEL_H_DATA_PATH, MODEL_H_SNAPSHOT_PATH)
     return _load_model_h(str(path), path.stat().st_mtime_ns), origin
+
+
+def _signal_map_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(SIGNAL_MAP_PATH, SIGNAL_MAP_SNAPSHOT_PATH)
+    return _load_signal_map(str(path), path.stat().st_mtime_ns), origin
 
 
 def _private_liquidity_data() -> tuple[pd.DataFrame, str]:
@@ -1293,6 +1307,30 @@ def landing_page() -> None:
             "China central-bank assets translated into USD. Open the Global aggregate page for "
             "the formula, composition, FX audit trail, and full history."
         )
+
+    try:
+        signal_map, signal_origin = _signal_map_data()
+    except DashboardDataError:
+        signal_map = pd.DataFrame()
+        signal_origin = "Unavailable"
+    if not signal_map.empty:
+        latest_signals = (
+            signal_map.sort_values("available_date").groupby("channel", as_index=False).tail(1)
+        )
+        st.subheader("Liquidity signal map")
+        st.caption(
+            "Independent channel readings—not a combined forecast. Different observation and "
+            "availability dates are retained."
+        )
+        with st.container(horizontal=True):
+            for row in latest_signals.itertuples(index=False):
+                with st.container(border=True):
+                    st.markdown(f"**{row.channel_label}**")
+                    st.metric("Index", f"{float(row.index_value):.1f}", str(row.regime))
+                    st.caption(
+                        f"{row.direction} · available {pd.Timestamp(row.available_date):%Y-%m-%d}"
+                    )
+        st.caption(f"Data mode: {signal_origin}.")
 
     loaded = _load_or_explain()
     if loaded is not None:

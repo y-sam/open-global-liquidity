@@ -66,5 +66,17 @@ def test_calculates_equal_weight_model_h_without_partial_rows() -> None:
     )
     result = calculate_model_h(global_model, offshore, private, spec)
     assert result["model_h_momentum_score"].eq(2.0).all()
+    assert (
+        result[
+            [
+                "contribution_global_model_g",
+                "contribution_offshore_dollar_credit",
+                "contribution_us_private_liquidity",
+            ]
+        ]
+        .sum(axis=1)
+        .eq(result["model_h_momentum_score"])
+        .all()
+    )
     assert result["result_status"].eq("post_specification_descriptive").all()
     assert result["signal_available_date"].equals(offshore["signal_available_date"])

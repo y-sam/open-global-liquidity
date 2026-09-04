@@ -83,6 +83,7 @@ jobs:
             data/reference/global_central_bank_bitcoin_pairs_snapshot.parquet \
             data/reference/global_central_bank_bitcoin_summary_snapshot.parquet \
             data/reference/global_model_h_snapshot.parquet \
+            data/reference/liquidity_signal_map_snapshot.parquet \
             data/reference/us_collateral_source_snapshot.parquet \
             data/reference/us_collateral_conditions_snapshot.parquet \
             data/reference/us_collateral_robustness_snapshot.parquet \

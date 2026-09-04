@@ -155,6 +155,10 @@ def calculate_model_h(
     result["model_h_momentum_score"] = sum(
         result[score_columns[pillar.model_id]] * pillar.weight for pillar in config.pillars
     )
+    for pillar in config.pillars:
+        result[f"contribution_{pillar.model_id}"] = (
+            result[score_columns[pillar.model_id]] * pillar.weight
+        )
     result["model_h_index"] = momentum_to_ogli(result["model_h_momentum_score"])
     result["signal_available_date"] = result[
         ["global_available_date", "offshore_available_date", "private_available_date"]

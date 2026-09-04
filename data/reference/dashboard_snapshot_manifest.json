@@ -429,7 +429,7 @@
       "sha256": "d48c04fddf12bbb8b5d103625b3b80f98cbd16e7a0a8d48c0915d71c533e15ca"
     },
     "global_model_h_snapshot.parquet": {
-      "bytes": 17196,
+      "bytes": 21471,
       "columns": [
         "date",
         "global_cb_momentum_score",
@@ -439,6 +439,9 @@
         "private_liquidity_momentum",
         "private_available_date",
         "model_h_momentum_score",
+        "contribution_global_model_g",
+        "contribution_offshore_dollar_credit",
+        "contribution_us_private_liquidity",
         "model_h_index",
         "signal_available_date",
         "model_id",
@@ -453,7 +456,7 @@
         "model_h"
       ],
       "rows": 74,
-      "sha256": "615b80f41fc45575771c5285fcc93ee73f84db1c4fbc83a4714fc7c8cdf0e1dc"
+      "sha256": "6c79c75f693ea6bec737789ff515129db352fde91f0ee6405c978eacaad82a92"
     },
     "japan_boj_series_snapshot.parquet": {
       "bytes": 11037,
@@ -482,6 +485,23 @@
         "BS01.MABJMTA"
       ],
       "sha256": "169c83e79ed5afd592551fdeed68c41aee953cc7faff8da9d22403c5d29181de"
+    },
+    "liquidity_signal_map_snapshot.parquet": {
+      "bytes": 25605,
+      "columns": [
+        "observation_date",
+        "available_date",
+        "channel",
+        "channel_label",
+        "index_value",
+        "momentum_score",
+        "regime",
+        "direction",
+        "classification",
+        "aggregation_status"
+      ],
+      "rows": 572,
+      "sha256": "858b3901c92405c17822db6f58efd8a87194baad25606881e0c769a84bf93f77"
     },
     "uk_boe_series_snapshot.parquet": {
       "bytes": 6322,
@@ -1561,10 +1581,10 @@
       "sha256": "0cb575ddb97277572c12cb6d251de1fc767aa24145d6a0d4e2dd6cbdb6bde96f"
     }
   },
-  "generated_at": "2026-09-04T16:03:27.695889+00:00",
+  "generated_at": "2026-09-04T16:06:50.196910+00:00",
   "pipeline_version": "0.4.1",
   "schema_version": 1,
-  "snapshot_count": 45,
-  "source_commit": "c907171e03ff922115964def235945190910ca96",
+  "snapshot_count": 46,
+  "source_commit": "cc1d75f7f5f9b222a8ca734c652c67f678d6dc8e",
   "working_tree_dirty": true
 }

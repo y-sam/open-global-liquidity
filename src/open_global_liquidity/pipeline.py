@@ -46,6 +46,7 @@ from open_global_liquidity.analysis.lead_lag import (
     build_liquidity_market_comparison,
     calculate_market_forward_returns,
 )
+from open_global_liquidity.analysis.signal_map import SignalMapError, build_liquidity_signal_map
 from open_global_liquidity.analysis.subperiods import calculate_subperiod_correlations
 from open_global_liquidity.config import (
     ConfigurationError,
@@ -512,6 +513,7 @@ def run_pipeline(
     auxiliary_bitcoin_pairs: pd.DataFrame | None = None
     auxiliary_bitcoin_summary: pd.DataFrame | None = None
     model_h: pd.DataFrame | None = None
+    signal_map: pd.DataFrame | None = None
     if collateral_conditions is not None:
         validation = collateral_config.bitcoin_validation
         collateral_bitcoin_pairs = build_collateral_bitcoin_pairs(
@@ -611,6 +613,21 @@ def run_pipeline(
         )
         model_h.to_parquet(output_dir / "global_model_h.parquet", index=False)
         LOGGER.info("Wrote %d descriptive Global Model H readings", len(model_h))
+
+    if (
+        global_aggregate is not None
+        and cross_border_indicators is not None
+        and private_liquidity_indicators is not None
+        and collateral_conditions is not None
+    ):
+        signal_map = build_liquidity_signal_map(
+            global_aggregate,
+            cross_border_indicators,
+            private_liquidity_indicators,
+            collateral_conditions,
+        )
+        signal_map.to_parquet(output_dir / "liquidity_signal_map.parquet", index=False)
+        LOGGER.info("Wrote %d cross-channel signal-map rows", len(signal_map))
 
     market_weekly = align_market_closes_to_weekly_wednesday(
         market_source,
@@ -812,6 +829,8 @@ def run_pipeline(
             snapshots["global_central_bank_assets_snapshot.parquet"] = global_aggregate
         if model_h is not None:
             snapshots["global_model_h_snapshot.parquet"] = model_h
+        if signal_map is not None:
+            snapshots["liquidity_signal_map_snapshot.parquet"] = signal_map
         if global_bitcoin_pairs is not None and global_bitcoin_summary is not None:
             snapshots["global_central_bank_bitcoin_pairs_snapshot.parquet"] = global_bitcoin_pairs
             snapshots["global_central_bank_bitcoin_summary_snapshot.parquet"] = (
@@ -925,6 +944,7 @@ def main() -> None:
         GrowthCalculationError,
         GlobalAggregationError,
         ModelHPreregistrationError,
+        SignalMapError,
         GlobalMarketAnalysisError,
         LiquidityModelError,
         MarketAnalysisError,

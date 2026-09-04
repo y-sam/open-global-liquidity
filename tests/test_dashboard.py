@@ -560,6 +560,9 @@ def test_loads_published_global_aggregate_snapshots() -> None:
         snapshots / "global_availability_registry_snapshot.parquet"
     )
     model_h = support.load_model_h(snapshots / "global_model_h_snapshot.parquet")
+    signal_map = support.load_liquidity_signal_map(
+        snapshots / "liquidity_signal_map_snapshot.parquet"
+    )
     private_liquidity = support.load_private_liquidity(
         snapshots / "us_private_liquidity_indicators_snapshot.parquet"
     )
@@ -584,6 +587,8 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     assert availability["point_in_time_status"].eq("lag_adjusted_current_vintage").all()
     assert model_h["model_h_index"].between(0, 100).all()
     assert model_h["result_status"].eq("post_specification_descriptive").all()
+    assert signal_map["channel"].nunique() == 4
+    assert signal_map["aggregation_status"].eq("not_aggregated").all()
     assert private_liquidity["private_liquidity_index"].dropna().between(0, 100).all()
     assert (
         private_liquidity.loc[

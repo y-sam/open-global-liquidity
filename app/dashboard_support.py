@@ -1288,6 +1288,37 @@ def load_model_h(path: Path) -> pd.DataFrame:
     return result.sort_values("date").reset_index(drop=True)
 
 
+def load_liquidity_signal_map(path: Path) -> pd.DataFrame:
+    """Load independent channel readings without treating them as one composite."""
+    frame = _read_parquet(path, "liquidity signal map")
+    required = {
+        "observation_date",
+        "available_date",
+        "channel",
+        "channel_label",
+        "index_value",
+        "momentum_score",
+        "regime",
+        "direction",
+        "classification",
+        "aggregation_status",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Liquidity signal map is missing: " + ", ".join(missing))
+    result = frame.copy()
+    for column in ("observation_date", "available_date"):
+        result[column] = pd.to_datetime(result[column], errors="coerce")
+    if (
+        result.empty
+        or result[["observation_date", "available_date"]].isna().any().any()
+        or not result["index_value"].between(0, 100).all()
+        or set(result["aggregation_status"]) != {"not_aggregated"}
+    ):
+        raise DashboardDataError("Liquidity signal map contains invalid values")
+    return result.sort_values(["available_date", "channel"]).reset_index(drop=True)
+
+
 def load_cross_border_credit(path: Path) -> pd.DataFrame:
     """Load the separate BIS offshore-dollar credit momentum layer."""
     frame = _read_parquet(path, "Cross-border credit indicators")
