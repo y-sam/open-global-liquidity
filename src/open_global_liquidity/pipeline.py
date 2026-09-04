@@ -10,6 +10,12 @@ from pathlib import Path
 import pandas as pd
 from dotenv import load_dotenv
 
+from open_global_liquidity.analysis.auxiliary_markets import (
+    AuxiliaryMarketAnalysisError,
+    build_auxiliary_bitcoin_pairs,
+    load_auxiliary_validation_config,
+    summarize_auxiliary_bitcoin_pairs,
+)
 from open_global_liquidity.analysis.collateral_markets import (
     CollateralMarketAnalysisError,
     build_collateral_bitcoin_pairs,
@@ -486,6 +492,8 @@ def run_pipeline(
     global_bitcoin_summary: pd.DataFrame | None = None
     collateral_bitcoin_pairs: pd.DataFrame | None = None
     collateral_bitcoin_summary: pd.DataFrame | None = None
+    auxiliary_bitcoin_pairs: pd.DataFrame | None = None
+    auxiliary_bitcoin_summary: pd.DataFrame | None = None
     if collateral_conditions is not None:
         validation = collateral_config.bitcoin_validation
         collateral_bitcoin_pairs = build_collateral_bitcoin_pairs(
@@ -531,6 +539,42 @@ def run_pipeline(
             "Wrote %d Global Model G/Bitcoin pairs and %d summary rows",
             len(global_bitcoin_pairs),
             len(global_bitcoin_summary),
+        )
+
+    auxiliary_config_path = project_root / "config" / "auxiliary_validation.yaml"
+    auxiliary_sources = {
+        "offshore_dollar_credit": cross_border_indicators,
+        "us_private_liquidity": private_liquidity_indicators,
+    }
+    if auxiliary_config_path.is_file() and all(
+        frame is not None for frame in auxiliary_sources.values()
+    ):
+        auxiliary_config = load_auxiliary_validation_config(auxiliary_config_path)
+        auxiliary_bitcoin_pairs = pd.concat(
+            [
+                build_auxiliary_bitcoin_pairs(
+                    auxiliary_sources[definition.model_id],  # type: ignore[arg-type]
+                    market_source,
+                    definition,
+                    auxiliary_config,
+                )
+                for definition in auxiliary_config.signals
+            ],
+            ignore_index=True,
+        )
+        auxiliary_bitcoin_summary = summarize_auxiliary_bitcoin_pairs(
+            auxiliary_bitcoin_pairs, auxiliary_config
+        )
+        auxiliary_bitcoin_pairs.to_parquet(
+            output_dir / "global_auxiliary_bitcoin_pairs.parquet", index=False
+        )
+        auxiliary_bitcoin_summary.to_parquet(
+            output_dir / "global_auxiliary_bitcoin_summary.parquet", index=False
+        )
+        LOGGER.info(
+            "Wrote %d auxiliary-liquidity/Bitcoin pairs and %d summary rows",
+            len(auxiliary_bitcoin_pairs),
+            len(auxiliary_bitcoin_summary),
         )
 
     market_weekly = align_market_closes_to_weekly_wednesday(
@@ -719,6 +763,11 @@ def run_pipeline(
             snapshots["global_cross_border_credit_indicators_snapshot.parquet"] = (
                 cross_border_indicators
             )
+        if auxiliary_bitcoin_pairs is not None and auxiliary_bitcoin_summary is not None:
+            snapshots["global_auxiliary_bitcoin_pairs_snapshot.parquet"] = auxiliary_bitcoin_pairs
+            snapshots["global_auxiliary_bitcoin_summary_snapshot.parquet"] = (
+                auxiliary_bitcoin_summary
+            )
         if fx_output is not None:
             snapshots["global_fx_series_snapshot.parquet"] = fx_output
         if global_detail is not None and global_aggregate is not None:
@@ -845,6 +894,7 @@ def main() -> None:
         TreasuryFiscalDataError,
         CollateralModelError,
         CollateralMarketAnalysisError,
+        AuxiliaryMarketAnalysisError,
         CollateralRobustnessError,
         ProvenanceError,
         UnitConversionError,

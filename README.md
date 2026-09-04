@@ -189,8 +189,18 @@ loans and leases are shown only as a share of total bank credit and are never ad
 double counting. The quarterly composite is assumed available three month-ends after quarter end
 because the Financial Accounts input is slower than weekly H.8 data. It is current-vintage,
 not calibrated, and not yet included in Global Model G. Through 2026-Q1, the measured stocks are
-`$19.38tn` of bank credit and `$8.29tn` of MMF assets; the experimental composite reads `51.4`,
-near its historical neutral point. Pre-positive MMF quarters are excluded rather than interpolated.
+approximately `$19.4tn` of bank credit and `$8.3tn` of MMF assets. Pre-positive MMF quarters are
+excluded rather than interpolated; current readings are displayed dynamically in the dashboard.
+
+The two quarterly auxiliary layers now have a validation protocol frozen on 4 September 2026,
+before its results were inspected. It compares their unbounded momentum scores with subsequent
+1-, 3-, 6-, and 12-month Bitcoin returns after each source-modeled availability date, plus zero-,
+one-, and two-month additional-delay sensitivities. The primary specification is six months, zero
+additional delay, and a date-selected non-overlapping sample. Through the current snapshot, the
+primary offshore-dollar estimate is `+0.41` across 32 observations and the private-liquidity
+estimate is `-0.51` across 31 observations. Both moving-block 95% intervals include zero, so both
+are classified **inconclusive**. These results do not calibrate either signal or justify adding it
+to Model G.
 
 ## Research boundaries
 
@@ -402,6 +412,10 @@ artifacts plus a JSON provenance manifest:
   with subsequent Bitcoin outcomes under the declared timing assumptions.
 - `data/reference/us_collateral_bitcoin_summary_snapshot.parquet` — overlapping and
   non-overlapping correlations, sample sizes, return summaries, and uncertainty intervals.
+- `data/reference/global_auxiliary_bitcoin_pairs_snapshot.parquet` — source-timed offshore-dollar
+  and private-liquidity signals paired with subsequent Bitcoin outcomes.
+- `data/reference/global_auxiliary_bitcoin_summary_snapshot.parquet` — predeclared primary and
+  robustness results with Fisher and moving-block uncertainty intervals.
 - `data/reference/us_point_in_time_comparison_snapshot.parquet` — derived monthly vintage/current
   OGLI comparisons; raw ALFRED observations remain excluded.
 - `data/reference/us_point_in_time_market_series_snapshot.parquet` — standardized public Bitcoin,
@@ -436,7 +450,7 @@ mode and source retrieval time.
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
 environment, downloads fresh FRED, ALFRED, Coin Metrics, World Bank, ECB, BOJ, BoE, and BIS
-observations, regenerates the forty-one public Parquet snapshots and provenance manifest, and
+observations, regenerates the forty-three public Parquet snapshots and provenance manifest, and
 runs formatting, linting, and offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 

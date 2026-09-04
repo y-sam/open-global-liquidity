@@ -1336,6 +1336,85 @@ def load_private_liquidity(path: Path) -> pd.DataFrame:
     return result.sort_values("date").reset_index(drop=True)
 
 
+def load_auxiliary_bitcoin_pairs(path: Path) -> pd.DataFrame:
+    """Load predeclared auxiliary-liquidity and Bitcoin observation pairs."""
+    frame = _read_parquet(path, "auxiliary-liquidity Bitcoin pairs")
+    required = {
+        "signal_date",
+        "source_available_date",
+        "signal_available_date",
+        "model_id",
+        "model_name",
+        "signal_score",
+        "signal_index",
+        "signal_regime",
+        "market_id",
+        "additional_availability_lag_months",
+        "horizon_months",
+        "market_return",
+        "is_non_overlapping",
+        "specification_role",
+        "timing_classification",
+        "classification",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Auxiliary Bitcoin pairs are missing: " + ", ".join(missing))
+    result = frame.copy()
+    for column in ("signal_date", "source_available_date", "signal_available_date"):
+        result[column] = pd.to_datetime(result[column], errors="coerce")
+    if (
+        result.empty
+        or result[["signal_date", "source_available_date", "signal_available_date"]]
+        .isna()
+        .any()
+        .any()
+        or set(result["market_id"]) != {"bitcoin"}
+        or set(result["specification_role"]) - {"primary", "robustness"}
+        or set(result["classification"]) != {"statistical_transformation"}
+    ):
+        raise DashboardDataError("Auxiliary Bitcoin pairs contain invalid observations")
+    return result.sort_values(
+        ["model_id", "additional_availability_lag_months", "horizon_months", "signal_date"]
+    ).reset_index(drop=True)
+
+
+def load_auxiliary_bitcoin_summary(path: Path) -> pd.DataFrame:
+    """Load aggregate auxiliary-liquidity and Bitcoin validation results."""
+    frame = _read_parquet(path, "auxiliary-liquidity Bitcoin summary")
+    required = {
+        "model_id",
+        "model_name",
+        "market_id",
+        "additional_availability_lag_months",
+        "horizon_months",
+        "sample_policy",
+        "specification_role",
+        "observations",
+        "correlation",
+        "bootstrap_ci_lower",
+        "bootstrap_ci_upper",
+        "mean_return",
+        "median_return",
+        "positive_share",
+        "interval_reading",
+        "classification",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Auxiliary Bitcoin summary is missing: " + ", ".join(missing))
+    if (
+        frame.empty
+        or set(frame["market_id"]) != {"bitcoin"}
+        or set(frame["sample_policy"]) != {"overlapping", "non_overlapping"}
+        or set(frame["classification"]) != {"descriptive_statistic"}
+    ):
+        raise DashboardDataError("Auxiliary Bitcoin summary contains invalid metadata")
+    return frame.sort_values(
+        ["model_id", "sample_policy", "additional_availability_lag_months", "horizon_months"]
+    ).reset_index(drop=True)
+
+
 def prepare_global_index_display(frame: pd.DataFrame) -> pd.DataFrame:
     """Adapt Global Model G columns to the shared liquidity-index presentation schema."""
     required = {

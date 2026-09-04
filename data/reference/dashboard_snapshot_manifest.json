@@ -57,6 +57,84 @@
       ],
       "sha256": "336646a509b11864972805dd4f6e350775230d217f9e71679ae7a4b3d5edf4cd"
     },
+    "global_auxiliary_bitcoin_pairs_snapshot.parquet": {
+      "bytes": 53920,
+      "columns": [
+        "signal_date",
+        "source_available_date",
+        "signal_available_date",
+        "model_id",
+        "model_name",
+        "signal_score",
+        "signal_index",
+        "signal_regime",
+        "market_id",
+        "series_id",
+        "provider",
+        "additional_availability_lag_months",
+        "horizon_months",
+        "start_observation_date",
+        "start_value",
+        "end_target_date",
+        "end_observation_date",
+        "end_value",
+        "market_return",
+        "is_non_overlapping",
+        "specification_role",
+        "timing_classification",
+        "classification"
+      ],
+      "market_ids": [
+        "bitcoin"
+      ],
+      "model_ids": [
+        "offshore_dollar_credit",
+        "us_private_liquidity"
+      ],
+      "providers": [
+        "Coin Metrics"
+      ],
+      "rows": 1508,
+      "series_ids": [
+        "btc.PriceUSD"
+      ],
+      "sha256": "c9c881cccf618b93201fdc89e695b5ad7f4b338b80bf2d4f6561be017f9b89ea"
+    },
+    "global_auxiliary_bitcoin_summary_snapshot.parquet": {
+      "bytes": 16924,
+      "columns": [
+        "model_id",
+        "model_name",
+        "market_id",
+        "additional_availability_lag_months",
+        "horizon_months",
+        "sample_policy",
+        "specification_role",
+        "observations",
+        "correlation",
+        "correlation_ci_lower",
+        "correlation_ci_upper",
+        "bootstrap_ci_lower",
+        "bootstrap_ci_upper",
+        "bootstrap_valid_resamples",
+        "bootstrap_block_length",
+        "bootstrap_seed",
+        "mean_return",
+        "median_return",
+        "positive_share",
+        "interval_reading",
+        "classification"
+      ],
+      "market_ids": [
+        "bitcoin"
+      ],
+      "model_ids": [
+        "offshore_dollar_credit",
+        "us_private_liquidity"
+      ],
+      "rows": 48,
+      "sha256": "fb92f56b0dd9e83cfd6ead8e3e755680d84c80012c07dd94d55e02c1278bc761"
+    },
     "global_bis_central_bank_series_snapshot.parquet": {
       "bytes": 21664,
       "columns": [
@@ -1422,10 +1500,10 @@
       "sha256": "3e78a928830afb9a399b6fb193ba0b73fb817bcbe1183cdeec63fbc6f6a1a663"
     }
   },
-  "generated_at": "2026-09-03T18:38:16.375025+00:00",
+  "generated_at": "2026-09-04T12:01:54.638708+00:00",
   "pipeline_version": "0.4.1",
   "schema_version": 1,
-  "snapshot_count": 41,
-  "source_commit": "0fcb44e25b698f79006b054c5d9e323fe427b0f8",
-  "working_tree_dirty": false
+  "snapshot_count": 43,
+  "source_commit": "8129c61a69927baacde4984db33384433436f869",
+  "working_tree_dirty": true
 }

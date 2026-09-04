@@ -5,6 +5,20 @@ release is tagged.
 
 ## [Unreleased]
 
+### Added
+
+- Froze and implemented a common Bitcoin validation protocol for the separate offshore-dollar and
+  US private-liquidity layers, with source-modeled availability, three additional-delay settings,
+  four forward horizons, date-based non-overlapping samples, and deterministic uncertainty.
+- Added package-calculated validation panels to both auxiliary-layer dashboard pages and two new
+  provenance-tracked public snapshots.
+
+### Research boundary
+
+- The primary six-month non-overlapping estimates are `+0.41` for offshore-dollar credit
+  (`n=32`) and `-0.51` for US private liquidity (`n=31`). Both moving-block 95% intervals include
+  zero and are therefore classified inconclusive. Neither result changes or enters Model G.
+
 ## [0.4.1] — 2026-09-03
 
 ### Fixed

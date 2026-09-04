@@ -24,8 +24,9 @@ scientific completeness. It separates what is operational from what still requir
   information is not reconstructed for every non-US source.
 - The collateral/Bitcoin non-overlapping primary sample remains small and its interval includes
   zero. It is therefore documented as inconclusive rather than promoted into the main index.
-- The offshore-dollar and private-liquidity layers still require frozen, predeclared Bitcoin
-  validation before any broader composite is justified.
+- The offshore-dollar and private-liquidity layers now have frozen, predeclared Bitcoin validation.
+  Their first primary intervals include zero, so neither qualifies for automatic inclusion in a
+  broader composite.
 - Nominal balance-sheet aggregation does not measure collateral reuse, credit quality, haircuts,
   bank capital constraints, or all shadow-bank leverage.
 

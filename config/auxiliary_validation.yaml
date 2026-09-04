@@ -1,0 +1,34 @@
+classification: model_assumption
+status: frozen_before_result_inspection
+frozen_on: "2026-09-04"
+description: >-
+  Predeclared Bitcoin validation for the separate offshore-dollar-credit and US private-liquidity
+  momentum layers. Bitcoin outcomes never enter either signal or any parameter choice.
+market_component: bitcoin
+additional_availability_lag_months: [0, 1, 2]
+forward_horizons_months: [1, 3, 6, 12]
+primary:
+  additional_availability_lag_months: 0
+  forward_horizon_months: 6
+  sample_policy: non_overlapping
+minimum_observations:
+  overlapping: 12
+  non_overlapping: 8
+confidence_level: 0.95
+bootstrap:
+  method: circular_moving_block_percentile
+  resamples: 1000
+  block_length_observations: 2
+  seed: 404
+signals:
+  offshore_dollar_credit:
+    name: "Open Offshore Dollar Credit Momentum Index"
+    score_column: momentum_score
+    index_column: offshore_dollar_credit_index
+    regime_column: regime
+  us_private_liquidity:
+    name: "Open US Private Liquidity Momentum Index"
+    score_column: private_liquidity_momentum
+    index_column: private_liquidity_index
+    regime_column: private_liquidity_regime
+calibrated_parameters: {}

@@ -29,6 +29,8 @@ from dashboard_support import (  # noqa: E402
     latest_ogli_readings,
     latest_pboc_readings,
     latest_readings,
+    load_auxiliary_bitcoin_pairs,
+    load_auxiliary_bitcoin_summary,
     load_bitcoin_contrast_summary,
     load_bitcoin_outcomes,
     load_bitcoin_regime_summary,
@@ -103,6 +105,16 @@ CROSS_BORDER_SNAPSHOT_PATH = (
 PRIVATE_LIQUIDITY_PATH = DATA_ROOT / "processed" / "us_private_liquidity_indicators.parquet"
 PRIVATE_LIQUIDITY_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "us_private_liquidity_indicators_snapshot.parquet"
+)
+AUXILIARY_BITCOIN_PAIRS_PATH = DATA_ROOT / "processed" / "global_auxiliary_bitcoin_pairs.parquet"
+AUXILIARY_BITCOIN_PAIRS_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "global_auxiliary_bitcoin_pairs_snapshot.parquet"
+)
+AUXILIARY_BITCOIN_SUMMARY_PATH = (
+    DATA_ROOT / "processed" / "global_auxiliary_bitcoin_summary.parquet"
+)
+AUXILIARY_BITCOIN_SUMMARY_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "global_auxiliary_bitcoin_summary_snapshot.parquet"
 )
 COLLATERAL_CONDITIONS_PATH = DATA_ROOT / "processed" / "us_collateral_conditions.parquet"
 COLLATERAL_CONDITIONS_SNAPSHOT_PATH = (
@@ -307,6 +319,18 @@ def _load_cross_border_credit(path: str, modified_ns: int) -> pd.DataFrame:
 def _load_private_liquidity(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_private_liquidity(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_auxiliary_bitcoin_pairs(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_auxiliary_bitcoin_pairs(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_auxiliary_bitcoin_summary(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_auxiliary_bitcoin_summary(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -518,6 +542,22 @@ def _private_liquidity_data() -> tuple[pd.DataFrame, str]:
         PRIVATE_LIQUIDITY_PATH, PRIVATE_LIQUIDITY_SNAPSHOT_PATH
     )
     return _load_private_liquidity(str(path), path.stat().st_mtime_ns), origin
+
+
+def _auxiliary_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
+    pairs_path, origin = resolve_dashboard_data_path(
+        AUXILIARY_BITCOIN_PAIRS_PATH, AUXILIARY_BITCOIN_PAIRS_SNAPSHOT_PATH
+    )
+    summary_path, summary_origin = resolve_dashboard_data_path(
+        AUXILIARY_BITCOIN_SUMMARY_PATH, AUXILIARY_BITCOIN_SUMMARY_SNAPSHOT_PATH
+    )
+    if summary_origin != origin:
+        raise DashboardDataError("Auxiliary Bitcoin pairs and summary use different data modes")
+    return (
+        _load_auxiliary_bitcoin_pairs(str(pairs_path), pairs_path.stat().st_mtime_ns),
+        _load_auxiliary_bitcoin_summary(str(summary_path), summary_path.stat().st_mtime_ns),
+        origin,
+    )
 
 
 def _collateral_data() -> tuple[pd.DataFrame, str]:
@@ -3941,6 +3981,96 @@ def global_aggregate_page() -> None:
         )
 
 
+def _render_auxiliary_bitcoin_validation(model_id: str) -> None:
+    """Render package-calculated, predeclared auxiliary-signal Bitcoin evidence."""
+    st.subheader("Predeclared Bitcoin validation")
+    try:
+        pairs, summary, origin = _auxiliary_bitcoin_data()
+    except DashboardDataError:
+        st.info(
+            "This validation will appear after the next public data refresh.",
+            icon=":material/schedule:",
+        )
+        return
+    model_summary = summary.loc[summary["model_id"] == model_id].copy()
+    primary = model_summary.loc[model_summary["specification_role"] == "primary"]
+    if primary.empty:
+        st.warning("The frozen primary specification is unavailable in this snapshot.")
+        return
+    row = primary.iloc[0]
+    correlation = row["correlation"]
+    with st.container(horizontal=True):
+        st.metric(
+            "Primary correlation",
+            "Insufficient sample" if pd.isna(correlation) else f"{float(correlation):+.2f}",
+            border=True,
+        )
+        st.metric("Non-overlapping observations", f"{int(row['observations'])}", border=True)
+        st.metric("Interval reading", str(row["interval_reading"]), border=True)
+        st.metric(
+            "Median Bitcoin return",
+            (
+                "Unavailable"
+                if pd.isna(row["median_return"])
+                else f"{float(row['median_return']):+.1%}"
+            ),
+            border=True,
+        )
+    st.caption(
+        "Primary specification: source-modeled availability date, no additional delay, six-month "
+        "Bitcoin return, non-overlapping sample. The protocol was frozen on 4 September 2026 "
+        "before inspecting these results."
+    )
+    lag = int(row["additional_availability_lag_months"])
+    horizon_rows = model_summary.loc[
+        (model_summary["additional_availability_lag_months"] == lag)
+        & (model_summary["sample_policy"] == "non_overlapping")
+    ].copy()
+    horizon_rows["Horizon"] = horizon_rows["horizon_months"].map(lambda value: f"{value}m")
+    figure = px.bar(
+        horizon_rows,
+        x="Horizon",
+        y="correlation",
+        title="Correlation sensitivity across predeclared horizons",
+        labels={"correlation": "Pearson correlation"},
+    )
+    figure.update_traces(
+        marker_color="#F59E0B",
+        text=horizon_rows["correlation"].map(
+            lambda value: "n/a" if pd.isna(value) else f"{value:+.2f}"
+        ),
+        textposition="outside",
+    )
+    figure.update_yaxes(range=[-1, 1])
+    st.plotly_chart(figure, width="stretch", config={"displaylogo": False})
+    primary_pairs = pairs.loc[
+        (pairs["model_id"] == model_id)
+        & (pairs["specification_role"] == "primary")
+        & pairs["is_non_overlapping"]
+    ]
+    if not primary_pairs.empty:
+        scatter = px.scatter(
+            primary_pairs,
+            x="signal_score",
+            y="market_return",
+            hover_data={"signal_date": "|%Y-%m-%d", "signal_regime": True},
+            title="Frozen signal versus subsequent six-month Bitcoin return",
+            labels={
+                "signal_score": "Liquidity momentum score",
+                "market_return": "Bitcoin return",
+            },
+        )
+        scatter.update_yaxes(tickformat=".0%")
+        st.plotly_chart(scatter, width="stretch", config={"displaylogo": False})
+    st.warning(
+        "These are descriptive associations, not forecasts or calibration results. Quarterly "
+        "signals create modest non-overlapping samples, Bitcoin volatility is high, and current "
+        "source vintages may differ from information available historically.",
+        icon=":material/warning:",
+    )
+    st.caption(f"Validation data mode: {origin}")
+
+
 def private_liquidity_page() -> None:
     """Present the separate US commercial-bank and money-fund liquidity layer."""
     st.title("US private liquidity")
@@ -4053,6 +4183,7 @@ def private_liquidity_page() -> None:
         "is not yet part of Global Model G or a trading signal.",
         icon=":material/warning:",
     )
+    _render_auxiliary_bitcoin_validation("us_private_liquidity")
     st.caption(f"Data mode: {origin} · Sources: Federal Reserve H.8 and Z.1 via FRED.")
 
 
@@ -4165,6 +4296,7 @@ def cross_border_credit_page() -> None:
         "signal or CrossBorder Capital's proprietary GLI.",
         icon=":material/warning:",
     )
+    _render_auxiliary_bitcoin_validation("offshore_dollar_credit")
     st.link_button(
         "Review the exact BIS series",
         "https://data.bis.org/topics/GLI/BIS,WS_GLI,1.0/Q.USD.3P.N.A.I.B.USD",

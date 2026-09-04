@@ -550,6 +550,12 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     cross_border = support.load_cross_border_credit(
         snapshots / "global_cross_border_credit_indicators_snapshot.parquet"
     )
+    auxiliary_pairs = support.load_auxiliary_bitcoin_pairs(
+        snapshots / "global_auxiliary_bitcoin_pairs_snapshot.parquet"
+    )
+    auxiliary_summary = support.load_auxiliary_bitcoin_summary(
+        snapshots / "global_auxiliary_bitcoin_summary_snapshot.parquet"
+    )
     private_liquidity = support.load_private_liquidity(
         snapshots / "us_private_liquidity_indicators_snapshot.parquet"
     )
@@ -565,6 +571,11 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     assert global_display["index_value"].notna().all()
     assert cross_border["offshore_dollar_credit_index"].dropna().between(0, 100).all()
     assert cross_border["provider"].eq("BIS").all()
+    assert set(auxiliary_pairs["model_id"]) == {
+        "offshore_dollar_credit",
+        "us_private_liquidity",
+    }
+    assert auxiliary_summary["specification_role"].eq("primary").sum() == 2
     assert private_liquidity["private_liquidity_index"].dropna().between(0, 100).all()
     assert (
         private_liquidity.loc[
@@ -668,6 +679,7 @@ def test_offshore_dollar_page_renders_published_snapshot() -> None:
     assert not app.exception
     assert app.title[0].value == "Offshore dollar credit"
     assert any(metric.label == "Credit momentum index" for metric in app.metric)
+    assert any(metric.label == "Primary correlation" for metric in app.metric)
 
 
 def test_private_liquidity_page_renders_published_snapshot() -> None:
@@ -679,3 +691,4 @@ def test_private_liquidity_page_renders_published_snapshot() -> None:
     assert not app.exception
     assert app.title[0].value == "US private liquidity"
     assert any(metric.label == "Private liquidity index" for metric in app.metric)
+    assert any(metric.label == "Primary correlation" for metric in app.metric)
