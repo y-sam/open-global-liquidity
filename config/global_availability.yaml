@@ -1,0 +1,85 @@
+classification: model_assumption
+as_of: "2026-09-04"
+description: >-
+  Audit registry for publication timing and vintage coverage of current Global Model G inputs.
+  It does not convert current-vintage observations into genuine point-in-time data.
+inputs:
+  us_central_bank_total_assets:
+    provider: BIS
+    source_family: central_bank_total_assets
+    availability_policy: quarterly_release_calendar
+    conservative_lag_months: 2
+    historical_release_calendar: partial
+    historical_value_vintages: unavailable
+    model_role: central_bank_asset
+  euro_area_central_bank_total_assets:
+    provider: BIS
+    source_family: central_bank_total_assets
+    availability_policy: quarterly_release_calendar
+    conservative_lag_months: 2
+    historical_release_calendar: partial
+    historical_value_vintages: unavailable
+    model_role: central_bank_asset
+  japan_central_bank_total_assets:
+    provider: BIS
+    source_family: central_bank_total_assets
+    availability_policy: quarterly_release_calendar
+    conservative_lag_months: 2
+    historical_release_calendar: partial
+    historical_value_vintages: unavailable
+    model_role: central_bank_asset
+  uk_central_bank_total_assets:
+    provider: BIS
+    source_family: central_bank_total_assets
+    availability_policy: quarterly_release_calendar
+    conservative_lag_months: 2
+    historical_release_calendar: partial
+    historical_value_vintages: unavailable
+    model_role: central_bank_asset
+  china_central_bank_total_assets:
+    provider: BIS
+    source_family: central_bank_total_assets
+    availability_policy: quarterly_release_calendar
+    conservative_lag_months: 2
+    historical_release_calendar: partial
+    historical_value_vintages: unavailable
+    model_role: central_bank_asset
+  usd_per_euro:
+    provider: Federal Reserve H.10 via FRED
+    source_family: bilateral_exchange_rates
+    availability_policy: following_weekly_release
+    conservative_lag_days: 7
+    historical_release_calendar: available
+    historical_value_vintages: archived_releases_not_ingested
+    model_role: fx_translation
+  yen_per_usd:
+    provider: Federal Reserve H.10 via FRED
+    source_family: bilateral_exchange_rates
+    availability_policy: following_weekly_release
+    conservative_lag_days: 7
+    historical_release_calendar: available
+    historical_value_vintages: archived_releases_not_ingested
+    model_role: fx_translation
+  usd_per_sterling:
+    provider: Federal Reserve H.10 via FRED
+    source_family: bilateral_exchange_rates
+    availability_policy: following_weekly_release
+    conservative_lag_days: 7
+    historical_release_calendar: available
+    historical_value_vintages: archived_releases_not_ingested
+    model_role: fx_translation
+  yuan_per_usd:
+    provider: Federal Reserve H.10 via FRED
+    source_family: bilateral_exchange_rates
+    availability_policy: following_weekly_release
+    conservative_lag_days: 7
+    historical_release_calendar: available
+    historical_value_vintages: archived_releases_not_ingested
+    model_role: fx_translation
+conclusion:
+  genuine_point_in_time_global_model: false
+  current_label: lag_adjusted_current_vintage
+  reason: >-
+    BIS historical value vintages are not reconstructed. Release-calendar assumptions can reduce
+    timing optimism but cannot recover the values that were actually published on each past date.
+calibrated_parameters: {}

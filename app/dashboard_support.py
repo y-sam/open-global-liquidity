@@ -1415,6 +1415,39 @@ def load_auxiliary_bitcoin_summary(path: Path) -> pd.DataFrame:
     ).reset_index(drop=True)
 
 
+def load_global_availability_registry(path: Path) -> pd.DataFrame:
+    """Load the declared availability and vintage-coverage audit for Model G inputs."""
+    frame = _read_parquet(path, "global availability registry")
+    required = {
+        "component",
+        "provider",
+        "source_family",
+        "model_role",
+        "availability_policy",
+        "conservative_lag_months",
+        "conservative_lag_days",
+        "historical_release_calendar",
+        "historical_value_vintages",
+        "point_in_time_status",
+        "classification",
+        "registry_as_of",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Global availability registry is missing: " + ", ".join(missing))
+    result = frame.copy()
+    result["registry_as_of"] = pd.to_datetime(result["registry_as_of"], errors="coerce")
+    if (
+        result.empty
+        or result["registry_as_of"].isna().any()
+        or set(result["model_role"]) != {"central_bank_asset", "fx_translation"}
+        or set(result["point_in_time_status"]) != {"lag_adjusted_current_vintage"}
+        or set(result["classification"]) != {"model_assumption"}
+    ):
+        raise DashboardDataError("Global availability registry contains invalid metadata")
+    return result.sort_values(["model_role", "component"]).reset_index(drop=True)
+
+
 def prepare_global_index_display(frame: pd.DataFrame) -> pd.DataFrame:
     """Adapt Global Model G columns to the shared liquidity-index presentation schema."""
     required = {

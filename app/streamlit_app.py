@@ -45,6 +45,7 @@ from dashboard_support import (  # noqa: E402
     load_cross_border_credit,
     load_dashboard_data,
     load_ecb_data,
+    load_global_availability_registry,
     load_global_bitcoin_pairs,
     load_global_bitcoin_summary,
     load_global_central_bank_aggregate,
@@ -87,6 +88,10 @@ GLOBAL_AGGREGATE_SNAPSHOT_DATA_PATH = (
 GLOBAL_DETAIL_DATA_PATH = DATA_ROOT / "processed" / "global_central_bank_assets_detail.parquet"
 GLOBAL_DETAIL_SNAPSHOT_DATA_PATH = (
     DATA_ROOT / "reference" / "global_central_bank_assets_detail_snapshot.parquet"
+)
+GLOBAL_AVAILABILITY_PATH = DATA_ROOT / "processed" / "global_availability_registry.parquet"
+GLOBAL_AVAILABILITY_SNAPSHOT_PATH = (
+    DATA_ROOT / "reference" / "global_availability_registry_snapshot.parquet"
 )
 GLOBAL_BITCOIN_PAIRS_PATH = DATA_ROOT / "processed" / "global_central_bank_bitcoin_pairs.parquet"
 GLOBAL_BITCOIN_PAIRS_SNAPSHOT_PATH = (
@@ -301,6 +306,12 @@ def _load_global_bitcoin_pairs(path: str, modified_ns: int) -> pd.DataFrame:
 def _load_global_bitcoin_summary(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_global_bitcoin_summary(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_global_availability(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_global_availability_registry(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -535,6 +546,13 @@ def _global_bitcoin_data() -> tuple[pd.DataFrame, pd.DataFrame, str]:
 def _cross_border_data() -> tuple[pd.DataFrame, str]:
     path, origin = resolve_dashboard_data_path(CROSS_BORDER_DATA_PATH, CROSS_BORDER_SNAPSHOT_PATH)
     return _load_cross_border_credit(str(path), path.stat().st_mtime_ns), origin
+
+
+def _global_availability_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(
+        GLOBAL_AVAILABILITY_PATH, GLOBAL_AVAILABILITY_SNAPSHOT_PATH
+    )
+    return _load_global_availability(str(path), path.stat().st_mtime_ns), origin
 
 
 def _private_liquidity_data() -> tuple[pd.DataFrame, str]:
@@ -3929,7 +3947,8 @@ def global_aggregate_page() -> None:
         "Changes reflect "
         "both native balance-sheet movements and exchange-rate translation. The balanced panel "
         "uses harmonized monthly BIS-spliced series through their latest common period. "
-        "Publication lags and historical revisions are not yet modeled.",
+        "Conservative publication delays are documented in the availability registry, but "
+        "historical value vintages are not reconstructed.",
         icon=":material/warning:",
     )
     with st.expander("Method and audit trail"):
@@ -3978,6 +3997,56 @@ def global_aggregate_page() -> None:
             ),
             width="stretch",
             hide_index=True,
+        )
+
+    st.subheader("Availability and vintage coverage")
+    try:
+        availability, availability_origin = _global_availability_data()
+    except DashboardDataError:
+        st.info("The availability registry will appear after the next public data refresh.")
+    else:
+        display = availability.assign(
+            assumed_lag=lambda frame: frame.apply(
+                lambda row: (
+                    f"{int(row['conservative_lag_months'])} months"
+                    if int(row["conservative_lag_months"]) > 0
+                    else f"{int(row['conservative_lag_days'])} days"
+                ),
+                axis=1,
+            )
+        )
+        st.dataframe(
+            display[
+                [
+                    "component",
+                    "provider",
+                    "model_role",
+                    "assumed_lag",
+                    "historical_release_calendar",
+                    "historical_value_vintages",
+                ]
+            ].rename(
+                columns={
+                    "component": "Model input",
+                    "provider": "Provider",
+                    "model_role": "Role",
+                    "assumed_lag": "Conservative lag",
+                    "historical_release_calendar": "Release calendar",
+                    "historical_value_vintages": "Historical vintages",
+                }
+            ),
+            width="stretch",
+            hide_index=True,
+        )
+        st.warning(
+            "This registry supports lag-adjusted current-vintage research. It does not make "
+            "Global Model G genuinely point-in-time because historical BIS value vintages have "
+            "not been reconstructed.",
+            icon=":material/history:",
+        )
+        st.caption(
+            f"Registry as of {availability['registry_as_of'].max():%d %b %Y} · "
+            f"Data mode: {availability_origin}"
         )
 
 

@@ -12,12 +12,17 @@ release is tagged.
   four forward horizons, date-based non-overlapping samples, and deterministic uncertainty.
 - Added package-calculated validation panels to both auxiliary-layer dashboard pages and two new
   provenance-tracked public snapshots.
+- Added a nine-input Global Model G availability registry covering the five BIS central-bank
+  series and four H.10 FX translations, with conservative lags and explicit vintage limitations.
+- Exposed the registry on the global dashboard and in a provenance-tracked public snapshot.
 
 ### Research boundary
 
 - The primary six-month non-overlapping estimates are `+0.41` for offshore-dollar credit
   (`n=32`) and `-0.51` for US private liquidity (`n=31`). Both moving-block 95% intervals include
   zero and are therefore classified inconclusive. Neither result changes or enters Model G.
+- Global Model G is now explicitly labeled `lag_adjusted_current_vintage`: its timing assumptions
+  reduce look-ahead risk but do not constitute a genuine historical point-in-time reconstruction.
 
 ## [0.4.1] — 2026-09-03
 

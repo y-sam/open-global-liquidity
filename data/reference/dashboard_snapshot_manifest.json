@@ -135,6 +135,40 @@
       "rows": 48,
       "sha256": "fb92f56b0dd9e83cfd6ead8e3e755680d84c80012c07dd94d55e02c1278bc761"
     },
+    "global_availability_registry_snapshot.parquet": {
+      "bytes": 8732,
+      "columns": [
+        "component",
+        "provider",
+        "source_family",
+        "model_role",
+        "availability_policy",
+        "conservative_lag_months",
+        "conservative_lag_days",
+        "historical_release_calendar",
+        "historical_value_vintages",
+        "point_in_time_status",
+        "classification",
+        "registry_as_of"
+      ],
+      "components": [
+        "china_central_bank_total_assets",
+        "euro_area_central_bank_total_assets",
+        "japan_central_bank_total_assets",
+        "uk_central_bank_total_assets",
+        "us_central_bank_total_assets",
+        "usd_per_euro",
+        "usd_per_sterling",
+        "yen_per_usd",
+        "yuan_per_usd"
+      ],
+      "providers": [
+        "BIS",
+        "Federal Reserve H.10 via FRED"
+      ],
+      "rows": 9,
+      "sha256": "e2fe7fa8c73ad876ad7aa1126f6f1b38db69a94e4ce5d0b8d3ef921d509b483f"
+    },
     "global_bis_central_bank_series_snapshot.parquet": {
       "bytes": 21664,
       "columns": [
@@ -1500,10 +1534,10 @@
       "sha256": "3e78a928830afb9a399b6fb193ba0b73fb817bcbe1183cdeec63fbc6f6a1a663"
     }
   },
-  "generated_at": "2026-09-04T12:01:54.638708+00:00",
+  "generated_at": "2026-09-04T12:08:34.253441+00:00",
   "pipeline_version": "0.4.1",
   "schema_version": 1,
-  "snapshot_count": 43,
-  "source_commit": "8129c61a69927baacde4984db33384433436f869",
+  "snapshot_count": 44,
+  "source_commit": "f0c87f08ada76856f6ea38a77bd38ea092ab00cd",
   "working_tree_dirty": true
 }

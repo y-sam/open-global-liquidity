@@ -556,6 +556,9 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     auxiliary_summary = support.load_auxiliary_bitcoin_summary(
         snapshots / "global_auxiliary_bitcoin_summary_snapshot.parquet"
     )
+    availability = support.load_global_availability_registry(
+        snapshots / "global_availability_registry_snapshot.parquet"
+    )
     private_liquidity = support.load_private_liquidity(
         snapshots / "us_private_liquidity_indicators_snapshot.parquet"
     )
@@ -576,6 +579,8 @@ def test_loads_published_global_aggregate_snapshots() -> None:
         "us_private_liquidity",
     }
     assert auxiliary_summary["specification_role"].eq("primary").sum() == 2
+    assert len(availability) == 9
+    assert availability["point_in_time_status"].eq("lag_adjusted_current_vintage").all()
     assert private_liquidity["private_liquidity_index"].dropna().between(0, 100).all()
     assert (
         private_liquidity.loc[

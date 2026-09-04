@@ -202,6 +202,13 @@ estimate is `-0.51` across 31 observations. Both moving-block 95% intervals incl
 are classified **inconclusive**. These results do not calibrate either signal or justify adding it
 to Model G.
 
+Global Model G has a separate nine-input availability audit covering its five BIS central-bank
+asset series and four Federal Reserve H.10 exchange rates. BIS quarterly observations receive a
+conservative two-month lag and H.10 inputs a seven-day lag. Because historical BIS value vintages
+and archived H.10 releases are not reconstructed, the model is explicitly classified
+**lag-adjusted current-vintage**, not genuine point-in-time. The timing choices are model
+assumptions; no parameters are calibrated to Bitcoin or another market.
+
 ## Research boundaries
 
 The project will keep three categories separate:
@@ -416,6 +423,8 @@ artifacts plus a JSON provenance manifest:
   and private-liquidity signals paired with subsequent Bitcoin outcomes.
 - `data/reference/global_auxiliary_bitcoin_summary_snapshot.parquet` — predeclared primary and
   robustness results with Fisher and moving-block uncertainty intervals.
+- `data/reference/global_availability_registry_snapshot.parquet` — per-input release-lag,
+  historical-calendar, and vintage-coverage audit for Global Model G.
 - `data/reference/us_point_in_time_comparison_snapshot.parquet` — derived monthly vintage/current
   OGLI comparisons; raw ALFRED observations remain excluded.
 - `data/reference/us_point_in_time_market_series_snapshot.parquet` — standardized public Bitcoin,
@@ -450,7 +459,7 @@ mode and source retrieval time.
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
 environment, downloads fresh FRED, ALFRED, Coin Metrics, World Bank, ECB, BOJ, BoE, and BIS
-observations, regenerates the forty-three public Parquet snapshots and provenance manifest, and
+observations, regenerates the forty-four public Parquet snapshots and provenance manifest, and
 runs formatting, linting, and offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 

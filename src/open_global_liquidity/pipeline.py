@@ -64,6 +64,10 @@ from open_global_liquidity.data.treasury import (
     TreasuryFiscalDataError,
     TreasuryFiscalDataProvider,
 )
+from open_global_liquidity.models.availability import (
+    AvailabilityRegistryError,
+    load_global_availability_registry,
+)
 from open_global_liquidity.models.collateral import (
     CollateralModelError,
     calculate_collateral_conditions,
@@ -185,6 +189,14 @@ def run_pipeline(
     output_path = output_dir / "us_fred_series.parquet"
     output.to_parquet(output_path, index=False)
     LOGGER.info("Wrote %d standardized observations to %s", len(output), output_path)
+
+    availability_registry: pd.DataFrame | None = None
+    availability_registry_path = project_root / "config" / "global_availability.yaml"
+    if availability_registry_path.is_file():
+        availability_registry = load_global_availability_registry(availability_registry_path)
+        availability_registry.to_parquet(
+            output_dir / "global_availability_registry.parquet", index=False
+        )
 
     private_liquidity_source: pd.DataFrame | None = None
     private_liquidity_indicators: pd.DataFrame | None = None
@@ -746,6 +758,8 @@ def run_pipeline(
             "us_liquidity_market_regimes_snapshot.parquet": regime_statistics,
             "us_liquidity_market_subperiods_snapshot.parquet": subperiod_correlations,
         }
+        if availability_registry is not None:
+            snapshots["global_availability_registry_snapshot.parquet"] = availability_registry
         if ecb_output is not None:
             snapshots["euro_area_ecb_series_snapshot.parquet"] = ecb_output
         if boj_output is not None:
@@ -895,6 +909,7 @@ def main() -> None:
         CollateralModelError,
         CollateralMarketAnalysisError,
         AuxiliaryMarketAnalysisError,
+        AvailabilityRegistryError,
         CollateralRobustnessError,
         ProvenanceError,
         UnitConversionError,
