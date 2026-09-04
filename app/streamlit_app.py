@@ -44,6 +44,7 @@ from dashboard_support import (  # noqa: E402
     load_collateral_robustness,
     load_cross_border_credit,
     load_dashboard_data,
+    load_data_quality_inventory,
     load_ecb_data,
     load_global_availability_registry,
     load_global_bitcoin_pairs,
@@ -100,6 +101,8 @@ MODEL_H_DATA_PATH = DATA_ROOT / "processed" / "global_model_h.parquet"
 MODEL_H_SNAPSHOT_PATH = DATA_ROOT / "reference" / "global_model_h_snapshot.parquet"
 SIGNAL_MAP_PATH = DATA_ROOT / "processed" / "liquidity_signal_map.parquet"
 SIGNAL_MAP_SNAPSHOT_PATH = DATA_ROOT / "reference" / "liquidity_signal_map_snapshot.parquet"
+DATA_QUALITY_PATH = DATA_ROOT / "processed" / "data_quality_inventory.parquet"
+DATA_QUALITY_SNAPSHOT_PATH = DATA_ROOT / "reference" / "data_quality_inventory_snapshot.parquet"
 GLOBAL_BITCOIN_PAIRS_PATH = DATA_ROOT / "processed" / "global_central_bank_bitcoin_pairs.parquet"
 GLOBAL_BITCOIN_PAIRS_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "global_central_bank_bitcoin_pairs_snapshot.parquet"
@@ -331,6 +334,12 @@ def _load_model_h(path: str, modified_ns: int) -> pd.DataFrame:
 def _load_signal_map(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_liquidity_signal_map(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_data_quality(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_data_quality_inventory(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -582,6 +591,11 @@ def _model_h_data() -> tuple[pd.DataFrame, str]:
 def _signal_map_data() -> tuple[pd.DataFrame, str]:
     path, origin = resolve_dashboard_data_path(SIGNAL_MAP_PATH, SIGNAL_MAP_SNAPSHOT_PATH)
     return _load_signal_map(str(path), path.stat().st_mtime_ns), origin
+
+
+def _data_quality_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(DATA_QUALITY_PATH, DATA_QUALITY_SNAPSHOT_PATH)
+    return _load_data_quality(str(path), path.stat().st_mtime_ns), origin
 
 
 def _private_liquidity_data() -> tuple[pd.DataFrame, str]:
@@ -4903,6 +4917,50 @@ def collateral_conditions_page() -> None:
     )
 
 
+def data_quality_page() -> None:
+    """Expose public snapshot completeness and timing metadata without a false quality score."""
+    st.title("Data quality and availability")
+    st.caption(
+        "Per-file coverage, missingness, duplicates, retrieval metadata, and Model G vintage "
+        "limitations. Frequencies differ, so the app does not publish an arbitrary aggregate score."
+    )
+    try:
+        inventory, origin = _data_quality_data()
+    except DashboardDataError as exc:
+        st.error(str(exc))
+        return
+    provenance = _snapshot_provenance()
+    with st.container(horizontal=True):
+        st.metric("Inventoried snapshots", str(len(inventory)), border=True)
+        st.metric("Rows represented", f"{int(inventory['rows'].sum()):,}", border=True)
+        st.metric(
+            "Exact duplicate rows", f"{int(inventory['duplicate_rows'].sum()):,}", border=True
+        )
+        st.metric(
+            "Hashed by manifest",
+            str(provenance["snapshot_count"]) if provenance else "Unavailable",
+            border=True,
+        )
+    st.dataframe(
+        inventory,
+        column_config={
+            "earliest_observation": st.column_config.DateColumn(format="YYYY-MM-DD"),
+            "latest_observation": st.column_config.DateColumn(format="YYYY-MM-DD"),
+            "latest_retrieval": st.column_config.DatetimeColumn(format="YYYY-MM-DD HH:mm"),
+        },
+        hide_index=True,
+        width="stretch",
+    )
+    st.warning(
+        "Null cells are not automatically errors: growth windows, unmatched forward returns, and "
+        "summary tables legitimately contain nulls. Review each dataset in context. Global Model G "
+        "is lag-adjusted current-vintage because historical BIS value vintages are not "
+        "reconstructed.",
+        icon=":material/fact_check:",
+    )
+    st.caption(f"Data mode: {origin}.")
+
+
 def research_guide_page() -> None:
     st.title("Research guide")
     st.markdown(
@@ -5235,6 +5293,12 @@ data_page = st.Page(
     icon=":material/monitoring:",
     url_path="dashboard",
 )
+quality_page = st.Page(
+    data_quality_page,
+    title="Data quality",
+    icon=":material/fact_check:",
+    url_path="data-quality",
+)
 euro_area_data_page = st.Page(
     euro_area_page,
     title="Euro area data",
@@ -5328,6 +5392,7 @@ navigation = st.navigation(
         markets_index_page,
         collateral_data_page,
         data_page,
+        quality_page,
         central_bank_data_page,
         global_aggregate_data_page,
         cross_border_data_page,

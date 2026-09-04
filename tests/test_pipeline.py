@@ -341,7 +341,7 @@ def test_pipeline_writes_source_weekly_and_model_parquet(monkeypatch, tmp_path: 
     pd.testing.assert_frame_equal(correlation_snapshot, correlations)
     pd.testing.assert_frame_equal(comparison_snapshot, comparisons)
     pd.testing.assert_frame_equal(subperiod_snapshot, subperiods)
-    assert manifest["snapshot_count"] == 14
+    assert manifest["snapshot_count"] == 15
     assert set(manifest["files"]) == {path.name for path in snapshot_dir.glob("*.parquet")}
     assert manifest["files"]["us_liquidity_market_subperiods_snapshot.parquet"]["rows"] == 18
     assert snapshot_dir.joinpath("us_market_series_snapshot.parquet").is_file()

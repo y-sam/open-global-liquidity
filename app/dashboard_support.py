@@ -1319,6 +1319,29 @@ def load_liquidity_signal_map(path: Path) -> pd.DataFrame:
     return result.sort_values(["available_date", "channel"]).reset_index(drop=True)
 
 
+def load_data_quality_inventory(path: Path) -> pd.DataFrame:
+    """Load the per-snapshot quality and metadata inventory."""
+    frame = _read_parquet(path, "data-quality inventory")
+    required = {
+        "filename",
+        "rows",
+        "columns",
+        "earliest_observation",
+        "latest_observation",
+        "latest_retrieval",
+        "null_cells",
+        "duplicate_rows",
+        "metadata_status",
+        "classification",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Data-quality inventory is missing: " + ", ".join(missing))
+    if frame.empty or set(frame["classification"]) != {"data_quality_inventory"}:
+        raise DashboardDataError("Data-quality inventory contains invalid metadata")
+    return frame.sort_values("filename").reset_index(drop=True)
+
+
 def load_cross_border_credit(path: Path) -> pd.DataFrame:
     """Load the separate BIS offshore-dollar credit momentum layer."""
     frame = _read_parquet(path, "Cross-border credit indicators")

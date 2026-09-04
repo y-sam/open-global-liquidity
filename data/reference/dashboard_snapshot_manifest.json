@@ -29,6 +29,23 @@
       ],
       "sha256": "ad1f65739b94f9573e22dfd9fbfa2c078aa8de3f07d96e61f370c20356f32ab6"
     },
+    "data_quality_inventory_snapshot.parquet": {
+      "bytes": 8636,
+      "columns": [
+        "filename",
+        "rows",
+        "columns",
+        "earliest_observation",
+        "latest_observation",
+        "latest_retrieval",
+        "null_cells",
+        "duplicate_rows",
+        "metadata_status",
+        "classification"
+      ],
+      "rows": 46,
+      "sha256": "b166a63f54d61dc776b9a835ba04cb0e1e42a431760c67d3638783598ed7927f"
+    },
     "euro_area_ecb_series_snapshot.parquet": {
       "bytes": 11990,
       "columns": [
@@ -1581,10 +1598,10 @@
       "sha256": "0cb575ddb97277572c12cb6d251de1fc767aa24145d6a0d4e2dd6cbdb6bde96f"
     }
   },
-  "generated_at": "2026-09-04T16:06:50.196910+00:00",
+  "generated_at": "2026-09-04T16:11:28.055494+00:00",
   "pipeline_version": "0.4.1",
   "schema_version": 1,
-  "snapshot_count": 46,
-  "source_commit": "cc1d75f7f5f9b222a8ca734c652c67f678d6dc8e",
+  "snapshot_count": 47,
+  "source_commit": "02e98d6ff84398c4cc0d5861411b83a3036ee5dc",
   "working_tree_dirty": true
 }

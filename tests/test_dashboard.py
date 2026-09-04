@@ -563,6 +563,9 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     signal_map = support.load_liquidity_signal_map(
         snapshots / "liquidity_signal_map_snapshot.parquet"
     )
+    quality = support.load_data_quality_inventory(
+        snapshots / "data_quality_inventory_snapshot.parquet"
+    )
     private_liquidity = support.load_private_liquidity(
         snapshots / "us_private_liquidity_indicators_snapshot.parquet"
     )
@@ -589,6 +592,8 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     assert model_h["result_status"].eq("post_specification_descriptive").all()
     assert signal_map["channel"].nunique() == 4
     assert signal_map["aggregation_status"].eq("not_aggregated").all()
+    assert quality["filename"].nunique() >= 46
+    assert quality["duplicate_rows"].ge(0).all()
     assert private_liquidity["private_liquidity_index"].dropna().between(0, 100).all()
     assert (
         private_liquidity.loc[

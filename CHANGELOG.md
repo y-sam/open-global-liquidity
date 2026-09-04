@@ -23,6 +23,8 @@ release is tagged.
   map for central banks, offshore dollars, US private liquidity, and US collateral conditions.
 - Added `ogli-article`, a deterministic dated workspace generator producing a Markdown research
   note plus signal, contribution, and metadata exports from provenance-tracked snapshots.
+- Added a formal data-quality dashboard and generated inventory covering per-snapshot row/column
+  counts, date coverage, retrieval metadata, null cells, duplicates, and metadata limitations.
 
 ### Research boundary
 

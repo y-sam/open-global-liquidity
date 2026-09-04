@@ -71,6 +71,7 @@ jobs:
         run: |
           git add \
             data/reference/china_bis_series_snapshot.parquet \
+            data/reference/data_quality_inventory_snapshot.parquet \
             data/reference/global_bis_central_bank_series_snapshot.parquet \
             data/reference/global_bis_cross_border_credit_snapshot.parquet \
             data/reference/global_auxiliary_bitcoin_pairs_snapshot.parquet \

@@ -31,6 +31,7 @@ from open_global_liquidity.analysis.correlations import (
     add_rolling_correlations,
     calculate_lagged_correlations,
 )
+from open_global_liquidity.analysis.data_quality import build_data_quality_inventory
 from open_global_liquidity.analysis.diagnostics import (
     DIAGNOSTIC_GROUP_COLUMNS,
     calculate_regime_return_statistics,
@@ -858,6 +859,9 @@ def run_pipeline(
                 filename.replace(".parquet", "_snapshot.parquet"): frame
                 for filename, frame in context_outputs.items()
             }
+        )
+        snapshots["data_quality_inventory_snapshot.parquet"] = build_data_quality_inventory(
+            snapshots
         )
         for filename, snapshot_frame in snapshots.items():
             snapshot_path = snapshot_dir / filename
