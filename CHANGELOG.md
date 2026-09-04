@@ -21,6 +21,8 @@ release is tagged.
   series, preserving Model G as the production global index.
 - Added auditable Model H pillar contributions and a non-aggregated four-channel liquidity signal
   map for central banks, offshore dollars, US private liquidity, and US collateral conditions.
+- Added `ogli-article`, a deterministic dated workspace generator producing a Markdown research
+  note plus signal, contribution, and metadata exports from provenance-tracked snapshots.
 
 ### Research boundary
 

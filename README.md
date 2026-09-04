@@ -281,6 +281,19 @@ uv run python -m open_global_liquidity.pipeline --force-refresh
 uv run python -m open_global_liquidity.pipeline --start 2020-01-01 --publish-dashboard-snapshot
 ```
 
+### Generate a research-note workspace
+
+Create a dated Markdown draft and supporting CSV/JSON evidence from published snapshots:
+
+```zsh
+uv run ogli-article --as-of 2026-09-04
+```
+
+Output goes to `reports/generated/YYYY-MM-DD/` and is intentionally ignored by Git. It contains
+independently dated signal readings, recent Model H contributions, machine-readable metadata,
+research caveats, and prompts for interpretation. The generator does not invent causal explanations
+or investment recommendations.
+
 The provider fails clearly when `FRED_API_KEY` is absent, FRED returns an error, the response schema
 is invalid, or no observations are returned. A successful run writes:
 

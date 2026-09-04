@@ -32,6 +32,7 @@ dev = [
 ogli-pipeline = "open_global_liquidity.pipeline:main"
 ogli-vintage = "open_global_liquidity.vintage_pipeline:main"
 ogli-point-in-time = "open_global_liquidity.point_in_time_pipeline:main"
+ogli-article = "open_global_liquidity.reporting.article:main"
 
 [build-system]
 requires = ["uv_build>=0.12.5,<0.13.0"]

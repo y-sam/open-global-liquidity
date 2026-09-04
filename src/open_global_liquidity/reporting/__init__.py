@@ -1,0 +1,1 @@
+"""Deterministic research-publication helpers."""

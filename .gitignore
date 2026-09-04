@@ -37,3 +37,7 @@ data/vintages/*
 
 # Notebook artifacts
 .ipynb_checkpoints/
+
+# Generated article workspaces
+reports/generated/*
+!reports/generated/.gitkeep
