@@ -209,6 +209,14 @@ and archived H.10 releases are not reconstructed, the model is explicitly classi
 **lag-adjusted current-vintage**, not genuine point-in-time. The timing choices are model
 assumptions; no parameters are calibrated to Bitcoin or another market.
 
+An experimental **Global Model H** design is preregistered in
+`config/model_h_preregistration.yaml`, but no Model H index is calculated or displayed. The design
+uses equal weights for Global Model G momentum, offshore-dollar credit momentum, and US private
+liquidity momentum at quarterly frequency. Those weights are economic assumptions, not fitted to
+the already-observed Bitcoin results. Historical results produced after the freeze must be labeled
+post-specification descriptive; promotion requires a prospective review and cannot be based on
+correlation alone. The US collateral score remains excluded and separate.
+
 ## Research boundaries
 
 The project will keep three categories separate:

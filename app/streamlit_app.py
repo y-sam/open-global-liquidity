@@ -56,6 +56,7 @@ from dashboard_support import (  # noqa: E402
     load_market_correlations,
     load_market_regime_statistics,
     load_market_subperiod_statistics,
+    load_model_h_display_spec,
     load_ogli_data,
     load_pboc_data,
     load_point_in_time_comparison,
@@ -4880,6 +4881,29 @@ def research_guide_page() -> None:
             "their effects are already reflected in reserve balances, so another adjustment could "
             "double count those drains."
         )
+
+    st.subheader("Preregistered broader Model H")
+    model_h = load_model_h_display_spec(PROJECT_ROOT / "config" / "model_h_preregistration.yaml")
+    with st.container(border=True):
+        st.markdown(f"#### {model_h['name']}")
+        st.badge("Design frozen · not calculated", color="orange")
+        st.write(
+            "A quarterly challenger combining three equally weighted economic pillars. It does "
+            "not replace Global Model G and has no published index reading yet."
+        )
+        st.dataframe(
+            model_h["pillars"],
+            column_config={"Assumed weight": st.column_config.NumberColumn(format="percent")},
+            hide_index=True,
+            width="stretch",
+        )
+        st.code(str(model_h["score_formula"]), language=None)
+        st.caption(
+            f"Frozen {model_h['frozen_on']:%Y-%m-%d}; prospective evaluation begins "
+            f"{model_h['prospective_start']:%Y-%m-%d}. Historical results produced later must be "
+            "labeled post-specification descriptive."
+        )
+        st.warning(str(model_h["research_boundary"]), icon=":material/science:")
 
     st.subheader("Glossary")
     glossary = {

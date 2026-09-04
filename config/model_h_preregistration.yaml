@@ -1,0 +1,49 @@
+classification: model_assumption
+name: "Global Model H — broader liquidity challenger"
+status: preregistered_not_calculated
+frozen_on: "2026-09-04"
+description: >-
+  A preregistered experimental challenger to Global Model G. It combines three economically
+  distinct public-data pillars and is not Michael Howell or CrossBorder Capital's proprietary GLI.
+research_boundary: >-
+  The auxiliary Bitcoin validation results were known before this specification was frozen.
+  Equal pillar weights were selected for economic transparency, not fitted to those results.
+  Model G remains the production central-bank index until Model H passes prospective review.
+canonical_frequency: quarter_end
+alignment_policy: latest_complete_quarter_available_to_all_pillars
+missing_data_policy: no_interpolation_and_no_partial_composite
+normalization:
+  method: existing_expanding_non_look_ahead_momentum_scores
+  minimum_history_observations: 20
+aggregation:
+  method: arithmetic_mean
+  score_formula: "(global_model_g_momentum + offshore_dollar_momentum + us_private_liquidity_momentum) / 3"
+  index_formula: "100 * normal_cdf(model_h_momentum_score)"
+pillars:
+  global_model_g:
+    weight: 0.3333333333333333
+    role: global_central_bank_balance_sheet_momentum
+  offshore_dollar_credit:
+    weight: 0.3333333333333333
+    role: cross_border_us_dollar_credit_momentum
+  us_private_liquidity:
+    weight: 0.3333333333333334
+    role: private_bank_and_money_market_fund_momentum
+excluded_inputs:
+  collateral_conditions:
+    reason: >-
+      The current score is US-only, has a short sample, and its Bitcoin validation is
+      inconclusive. It remains a separate robustness signal.
+evaluation:
+  primary_market: bitcoin
+  forward_horizons_months: [1, 3, 6, 12]
+  primary_horizon_months: 6
+  primary_sample_policy: non_overlapping
+  source_availability_required: true
+  historical_results_label: post_specification_descriptive
+  prospective_start: "2026-09-05"
+  promotion_rule: >-
+    Do not replace Model G based on correlation alone. Promotion requires stable data operations,
+    documented revisions, at least 20 prospective quarterly observations, and evidence that the
+    broader composite adds information across predeclared horizons without changing its weights.
+calibrated_parameters: {}

@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 import pandas as pd
+import yaml
 
 SOURCE_COLUMNS = [
     "date",
@@ -1446,6 +1447,39 @@ def load_global_availability_registry(path: Path) -> pd.DataFrame:
     ):
         raise DashboardDataError("Global availability registry contains invalid metadata")
     return result.sort_values(["model_role", "component"]).reset_index(drop=True)
+
+
+def load_model_h_display_spec(path: Path) -> dict[str, object]:
+    """Load the display-only subset of the validated Model H preregistration."""
+    try:
+        raw = yaml.safe_load(path.read_text(encoding="utf-8"))
+        pillars = raw["pillars"]
+        evaluation = raw["evaluation"]
+    except (OSError, KeyError, TypeError, yaml.YAMLError) as exc:
+        raise DashboardDataError(f"Could not load the Model H preregistration: {exc}") from exc
+    if (
+        raw.get("status") != "preregistered_not_calculated"
+        or raw.get("calibrated_parameters") != {}
+        or not isinstance(pillars, dict)
+    ):
+        raise DashboardDataError("Model H preregistration contains invalid metadata")
+    return {
+        "name": str(raw["name"]),
+        "frozen_on": pd.Timestamp(raw["frozen_on"]),
+        "prospective_start": pd.Timestamp(evaluation["prospective_start"]),
+        "score_formula": str(raw["aggregation"]["score_formula"]),
+        "research_boundary": str(raw["research_boundary"]),
+        "pillars": pd.DataFrame(
+            [
+                {
+                    "Pillar": model_id,
+                    "Economic role": item["role"],
+                    "Assumed weight": float(item["weight"]),
+                }
+                for model_id, item in pillars.items()
+            ]
+        ),
+    }
 
 
 def prepare_global_index_display(frame: pd.DataFrame) -> pd.DataFrame:

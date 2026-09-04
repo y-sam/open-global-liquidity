@@ -15,6 +15,8 @@ release is tagged.
 - Added a nine-input Global Model G availability registry covering the five BIS central-bank
   series and four H.10 FX translations, with conservative lags and explicit vintage limitations.
 - Exposed the registry on the global dashboard and in a provenance-tracked public snapshot.
+- Preregistered, but deliberately did not calculate, a quarterly Global Model H challenger with
+  equal central-bank, offshore-dollar, and private-liquidity pillars plus prospective review rules.
 
 ### Research boundary
 
@@ -23,6 +25,8 @@ release is tagged.
   zero and are therefore classified inconclusive. Neither result changes or enters Model G.
 - Global Model G is now explicitly labeled `lag_adjusted_current_vintage`: its timing assumptions
   reduce look-ahead risk but do not constitute a genuine historical point-in-time reconstruction.
+- Model H weights are economic assumptions rather than a response to the now-known auxiliary
+  validation results. Model G remains unchanged, and collateral conditions remain separate.
 
 ## [0.4.1] — 2026-09-03
 
