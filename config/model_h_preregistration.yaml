@@ -1,6 +1,6 @@
 classification: model_assumption
 name: "Global Model H — broader liquidity challenger"
-status: preregistered_not_calculated
+status: preregistered_calculated_descriptive
 frozen_on: "2026-09-04"
 description: >-
   A preregistered experimental challenger to Global Model G. It combines three economically
@@ -47,3 +47,7 @@ evaluation:
     documented revisions, at least 20 prospective quarterly observations, and evidence that the
     broader composite adds information across predeclared horizons without changing its weights.
 calibrated_parameters: {}
+implementation:
+  implemented_on: "2026-09-04"
+  historical_output_label: post_specification_descriptive
+  production_model_replaced: false

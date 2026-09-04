@@ -559,6 +559,7 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     availability = support.load_global_availability_registry(
         snapshots / "global_availability_registry_snapshot.parquet"
     )
+    model_h = support.load_model_h(snapshots / "global_model_h_snapshot.parquet")
     private_liquidity = support.load_private_liquidity(
         snapshots / "us_private_liquidity_indicators_snapshot.parquet"
     )
@@ -581,6 +582,8 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     assert auxiliary_summary["specification_role"].eq("primary").sum() == 2
     assert len(availability) == 9
     assert availability["point_in_time_status"].eq("lag_adjusted_current_vintage").all()
+    assert model_h["model_h_index"].between(0, 100).all()
+    assert model_h["result_status"].eq("post_specification_descriptive").all()
     assert private_liquidity["private_liquidity_index"].dropna().between(0, 100).all()
     assert (
         private_liquidity.loc[

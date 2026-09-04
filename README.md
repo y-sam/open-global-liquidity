@@ -210,7 +210,8 @@ and archived H.10 releases are not reconstructed, the model is explicitly classi
 assumptions; no parameters are calibrated to Bitcoin or another market.
 
 An experimental **Global Model H** design is preregistered in
-`config/model_h_preregistration.yaml`, but no Model H index is calculated or displayed. The design
+`config/model_h_preregistration.yaml`. A historical index is calculated and displayed only as a
+post-specification descriptive series. The design
 uses equal weights for Global Model G momentum, offshore-dollar credit momentum, and US private
 liquidity momentum at quarterly frequency. Those weights are economic assumptions, not fitted to
 the already-observed Bitcoin results. Historical results produced after the freeze must be labeled
@@ -433,6 +434,8 @@ artifacts plus a JSON provenance manifest:
   robustness results with Fisher and moving-block uncertainty intervals.
 - `data/reference/global_availability_registry_snapshot.parquet` — per-input release-lag,
   historical-calendar, and vintage-coverage audit for Global Model G.
+- `data/reference/global_model_h_snapshot.parquet` — frozen three-pillar Model H descriptive
+  history, component scores, and conservative availability dates.
 - `data/reference/us_point_in_time_comparison_snapshot.parquet` — derived monthly vintage/current
   OGLI comparisons; raw ALFRED observations remain excluded.
 - `data/reference/us_point_in_time_market_series_snapshot.parquet` — standardized public Bitcoin,
@@ -467,7 +470,7 @@ mode and source retrieval time.
 The `Refresh public dashboard data` GitHub Actions workflow runs every Friday at 12:00 UTC and can
 also be started manually from the repository's **Actions** tab. It installs the locked Python 3.12
 environment, downloads fresh FRED, ALFRED, Coin Metrics, World Bank, ECB, BOJ, BoE, and BIS
-observations, regenerates the forty-four public Parquet snapshots and provenance manifest, and
+observations, regenerates the forty-five public Parquet snapshots and provenance manifest, and
 runs formatting, linting, and offline tests. Only successful runs can commit changed
 snapshot files to `main`; a new commit then prompts Streamlit Community Cloud to redeploy.
 

@@ -17,6 +17,8 @@ release is tagged.
 - Exposed the registry on the global dashboard and in a provenance-tracked public snapshot.
 - Preregistered, but deliberately did not calculate, a quarterly Global Model H challenger with
   equal central-bank, offshore-dollar, and private-liquidity pillars plus prospective review rules.
+- Implemented the frozen Model H formula as a clearly labeled post-specification descriptive
+  series, preserving Model G as the production global index.
 
 ### Research boundary
 

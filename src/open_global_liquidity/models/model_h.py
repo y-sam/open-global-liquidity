@@ -1,4 +1,4 @@
-"""Validated preregistration for the unimplemented broader Global Model H."""
+"""Frozen specification and descriptive calculation for broader Global Model H."""
 
 from __future__ import annotations
 
@@ -7,6 +7,8 @@ from pathlib import Path
 
 import pandas as pd
 import yaml
+
+from open_global_liquidity.models.ogli import momentum_to_ogli
 
 
 class ModelHPreregistrationError(ValueError):
@@ -24,7 +26,7 @@ class ModelHPillar:
 
 @dataclass(frozen=True)
 class ModelHPreregistration:
-    """Frozen design contract; this object deliberately contains no calculate method."""
+    """Frozen design contract for the descriptive Model H calculation."""
 
     name: str
     status: str
@@ -50,7 +52,7 @@ def load_model_h_preregistration(path: Path) -> ModelHPreregistration:
 
     if (
         raw.get("classification") != "model_assumption"
-        or raw.get("status") != "preregistered_not_calculated"
+        or raw.get("status") != "preregistered_calculated_descriptive"
         or raw.get("calibrated_parameters") != {}
         or raw.get("canonical_frequency") != "quarter_end"
         or not isinstance(pillar_items, dict)
@@ -84,3 +86,82 @@ def load_model_h_preregistration(path: Path) -> ModelHPreregistration:
         promotion_rule=str(evaluation["promotion_rule"]),
         research_boundary=str(raw["research_boundary"]),
     )
+
+
+def calculate_model_h(
+    global_model: pd.DataFrame,
+    offshore_dollar: pd.DataFrame,
+    private_liquidity: pd.DataFrame,
+    config: ModelHPreregistration,
+) -> pd.DataFrame:
+    """Calculate the frozen equal-weight quarterly challenger without fitting market outcomes.
+
+    Global Model G is sampled at calendar quarter-end. The two slower pillars already have
+    quarterly observation and assumed availability dates. A Model H reading becomes available
+    only when all three inputs are available; no missing pillar is interpolated or reweighted.
+    """
+    required = {
+        "global": {"date", "global_cb_momentum_score"},
+        "offshore": {"date", "momentum_score", "signal_available_date"},
+        "private": {"date", "private_liquidity_momentum", "signal_available_date"},
+    }
+    for name, (frame, columns) in zip(
+        required,
+        (
+            (global_model, required["global"]),
+            (offshore_dollar, required["offshore"]),
+            (private_liquidity, required["private"]),
+        ),
+        strict=True,
+    ):
+        missing = columns - set(frame.columns)
+        if missing:
+            raise ModelHPreregistrationError(
+                f"{name} input is missing: {', '.join(sorted(missing))}"
+            )
+
+    g = global_model.copy()
+    g["date"] = pd.to_datetime(g["date"])
+    g = g.loc[g["date"].dt.month.isin([3, 6, 9, 12]), ["date", "global_cb_momentum_score"]]
+    g["global_available_date"] = g["date"] + pd.offsets.MonthEnd(2)
+    o = (
+        offshore_dollar[["date", "momentum_score", "signal_available_date"]]
+        .copy()
+        .rename(
+            columns={
+                "momentum_score": "offshore_dollar_momentum",
+                "signal_available_date": "offshore_available_date",
+            }
+        )
+    )
+    p = (
+        private_liquidity[["date", "private_liquidity_momentum", "signal_available_date"]]
+        .copy()
+        .rename(columns={"signal_available_date": "private_available_date"})
+    )
+    for frame in (o, p):
+        frame["date"] = pd.to_datetime(frame["date"])
+    result = g.merge(o, on="date", how="inner", validate="one_to_one").merge(
+        p, on="date", how="inner", validate="one_to_one"
+    )
+    score_columns = {
+        "global_model_g": "global_cb_momentum_score",
+        "offshore_dollar_credit": "offshore_dollar_momentum",
+        "us_private_liquidity": "private_liquidity_momentum",
+    }
+    result = result.dropna(subset=list(score_columns.values())).reset_index(drop=True)
+    if len(result) < 20:
+        raise ModelHPreregistrationError("Model H requires at least 20 complete quarterly readings")
+    result["model_h_momentum_score"] = sum(
+        result[score_columns[pillar.model_id]] * pillar.weight for pillar in config.pillars
+    )
+    result["model_h_index"] = momentum_to_ogli(result["model_h_momentum_score"])
+    result["signal_available_date"] = result[
+        ["global_available_date", "offshore_available_date", "private_available_date"]
+    ].max(axis=1)
+    result["model_id"] = "model_h"
+    result["model_name"] = config.name
+    result["result_status"] = "post_specification_descriptive"
+    result["calibration_status"] = "not_calibrated"
+    result["production_model"] = False
+    return result

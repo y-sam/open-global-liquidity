@@ -56,6 +56,7 @@ from dashboard_support import (  # noqa: E402
     load_market_correlations,
     load_market_regime_statistics,
     load_market_subperiod_statistics,
+    load_model_h,
     load_model_h_display_spec,
     load_ogli_data,
     load_pboc_data,
@@ -94,6 +95,8 @@ GLOBAL_AVAILABILITY_PATH = DATA_ROOT / "processed" / "global_availability_regist
 GLOBAL_AVAILABILITY_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "global_availability_registry_snapshot.parquet"
 )
+MODEL_H_DATA_PATH = DATA_ROOT / "processed" / "global_model_h.parquet"
+MODEL_H_SNAPSHOT_PATH = DATA_ROOT / "reference" / "global_model_h_snapshot.parquet"
 GLOBAL_BITCOIN_PAIRS_PATH = DATA_ROOT / "processed" / "global_central_bank_bitcoin_pairs.parquet"
 GLOBAL_BITCOIN_PAIRS_SNAPSHOT_PATH = (
     DATA_ROOT / "reference" / "global_central_bank_bitcoin_pairs_snapshot.parquet"
@@ -313,6 +316,12 @@ def _load_global_bitcoin_summary(path: str, modified_ns: int) -> pd.DataFrame:
 def _load_global_availability(path: str, modified_ns: int) -> pd.DataFrame:
     del modified_ns
     return load_global_availability_registry(Path(path))
+
+
+@st.cache_data(show_spinner=False)
+def _load_model_h(path: str, modified_ns: int) -> pd.DataFrame:
+    del modified_ns
+    return load_model_h(Path(path))
 
 
 @st.cache_data(show_spinner=False)
@@ -554,6 +563,11 @@ def _global_availability_data() -> tuple[pd.DataFrame, str]:
         GLOBAL_AVAILABILITY_PATH, GLOBAL_AVAILABILITY_SNAPSHOT_PATH
     )
     return _load_global_availability(str(path), path.stat().st_mtime_ns), origin
+
+
+def _model_h_data() -> tuple[pd.DataFrame, str]:
+    path, origin = resolve_dashboard_data_path(MODEL_H_DATA_PATH, MODEL_H_SNAPSHOT_PATH)
+    return _load_model_h(str(path), path.stat().st_mtime_ns), origin
 
 
 def _private_liquidity_data() -> tuple[pd.DataFrame, str]:
@@ -3909,6 +3923,44 @@ def global_aggregate_page() -> None:
 
     _render_global_model_g_bitcoin(key_prefix="global_aggregate")
 
+    st.subheader("Global Model H — broader liquidity challenger")
+    try:
+        model_h, model_h_origin = _model_h_data()
+    except DashboardDataError:
+        st.info("Model H descriptive history will appear after the next public data refresh.")
+    else:
+        latest_h = model_h.iloc[-1]
+        with st.container(horizontal=True):
+            st.metric("Latest Model H", f"{float(latest_h['model_h_index']):.1f}", border=True)
+            st.metric(
+                "Momentum score",
+                f"{float(latest_h['model_h_momentum_score']):+.2f}",
+                border=True,
+            )
+            st.metric(
+                "Available after",
+                f"{pd.Timestamp(latest_h['signal_available_date']):%b %Y}",
+                border=True,
+            )
+        h_chart = px.line(
+            model_h,
+            x="date",
+            y="model_h_index",
+            labels={"date": "Quarter end", "model_h_index": "0-100 index"},
+            title="Model H descriptive history · three equal-weight liquidity pillars",
+        )
+        h_chart.add_hline(y=50, line_dash="dot", line_color="gray")
+        h_chart.update_yaxes(range=[0, 100])
+        h_chart.update_traces(line={"width": 2.7, "color": "#0D9488"})
+        st.plotly_chart(h_chart, width="stretch", config={"displaylogo": False})
+        st.warning(
+            "This history was calculated after the Model H design was frozen and is therefore "
+            "post-specification descriptive—not prospective validation. Model G remains the "
+            "production global index. No Bitcoin outcomes were used in this calculation.",
+            icon=":material/science:",
+        )
+        st.caption(f"Data mode: {model_h_origin}.")
+
     figure = px.line(
         aggregate,
         x="date",
@@ -4886,10 +4938,10 @@ def research_guide_page() -> None:
     model_h = load_model_h_display_spec(PROJECT_ROOT / "config" / "model_h_preregistration.yaml")
     with st.container(border=True):
         st.markdown(f"#### {model_h['name']}")
-        st.badge("Design frozen · not calculated", color="orange")
+        st.badge("Design frozen · descriptive history available", color="orange")
         st.write(
             "A quarterly challenger combining three equally weighted economic pillars. It does "
-            "not replace Global Model G and has no published index reading yet."
+            "not replace Global Model G; its historical readings are explicitly descriptive."
         )
         st.dataframe(
             model_h["pillars"],

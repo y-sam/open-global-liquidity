@@ -428,6 +428,33 @@
       ],
       "sha256": "d48c04fddf12bbb8b5d103625b3b80f98cbd16e7a0a8d48c0915d71c533e15ca"
     },
+    "global_model_h_snapshot.parquet": {
+      "bytes": 17196,
+      "columns": [
+        "date",
+        "global_cb_momentum_score",
+        "global_available_date",
+        "offshore_dollar_momentum",
+        "offshore_available_date",
+        "private_liquidity_momentum",
+        "private_available_date",
+        "model_h_momentum_score",
+        "model_h_index",
+        "signal_available_date",
+        "model_id",
+        "model_name",
+        "result_status",
+        "calibration_status",
+        "production_model"
+      ],
+      "earliest_observation": "2007-12-31",
+      "latest_observation": "2026-03-31",
+      "model_ids": [
+        "model_h"
+      ],
+      "rows": 74,
+      "sha256": "615b80f41fc45575771c5285fcc93ee73f84db1c4fbc83a4714fc7c8cdf0e1dc"
+    },
     "japan_boj_series_snapshot.parquet": {
       "bytes": 11037,
       "columns": [
@@ -1534,10 +1561,10 @@
       "sha256": "0cb575ddb97277572c12cb6d251de1fc767aa24145d6a0d4e2dd6cbdb6bde96f"
     }
   },
-  "generated_at": "2026-09-04T15:48:33.542599+00:00",
+  "generated_at": "2026-09-04T16:03:27.695889+00:00",
   "pipeline_version": "0.4.1",
   "schema_version": 1,
-  "snapshot_count": 44,
-  "source_commit": "863248d22cb2796209e81605682270b862f06077",
-  "working_tree_dirty": false
+  "snapshot_count": 45,
+  "source_commit": "c907171e03ff922115964def235945190910ca96",
+  "working_tree_dirty": true
 }

@@ -1253,6 +1253,41 @@ def load_global_central_bank_aggregate(path: Path) -> pd.DataFrame:
     return result.sort_values("date").reset_index(drop=True)
 
 
+def load_model_h(path: Path) -> pd.DataFrame:
+    """Load package-calculated, post-specification descriptive Model H readings."""
+    frame = _read_parquet(path, "Global Model H")
+    required = {
+        "date",
+        "global_cb_momentum_score",
+        "offshore_dollar_momentum",
+        "private_liquidity_momentum",
+        "model_h_momentum_score",
+        "model_h_index",
+        "signal_available_date",
+        "result_status",
+        "calibration_status",
+        "production_model",
+    }
+    missing = sorted(required - set(frame.columns))
+    if missing:
+        raise DashboardDataError("Global Model H is missing: " + ", ".join(missing))
+    result = frame.copy()
+    result["date"] = pd.to_datetime(result["date"], errors="coerce")
+    result["signal_available_date"] = pd.to_datetime(
+        result["signal_available_date"], errors="coerce"
+    )
+    if (
+        result.empty
+        or result[["date", "signal_available_date"]].isna().any().any()
+        or not result["model_h_index"].between(0, 100).all()
+        or set(result["result_status"]) != {"post_specification_descriptive"}
+        or set(result["calibration_status"]) != {"not_calibrated"}
+        or result["production_model"].any()
+    ):
+        raise DashboardDataError("Global Model H contains invalid research metadata")
+    return result.sort_values("date").reset_index(drop=True)
+
+
 def load_cross_border_credit(path: Path) -> pd.DataFrame:
     """Load the separate BIS offshore-dollar credit momentum layer."""
     frame = _read_parquet(path, "Cross-border credit indicators")
@@ -1458,7 +1493,7 @@ def load_model_h_display_spec(path: Path) -> dict[str, object]:
     except (OSError, KeyError, TypeError, yaml.YAMLError) as exc:
         raise DashboardDataError(f"Could not load the Model H preregistration: {exc}") from exc
     if (
-        raw.get("status") != "preregistered_not_calculated"
+        raw.get("status") != "preregistered_calculated_descriptive"
         or raw.get("calibrated_parameters") != {}
         or not isinstance(pillars, dict)
     ):

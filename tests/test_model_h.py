@@ -1,9 +1,11 @@
 from pathlib import Path
 
+import pandas as pd
 import pytest
 
 from open_global_liquidity.models.model_h import (
     ModelHPreregistrationError,
+    calculate_model_h,
     load_model_h_preregistration,
 )
 
@@ -12,7 +14,7 @@ def test_loads_frozen_model_h_preregistration() -> None:
     path = Path(__file__).resolve().parents[1] / "config" / "model_h_preregistration.yaml"
     spec = load_model_h_preregistration(path)
 
-    assert spec.status == "preregistered_not_calculated"
+    assert spec.status == "preregistered_calculated_descriptive"
     assert spec.canonical_frequency == "quarter_end"
     assert spec.frozen_on.date().isoformat() == "2026-09-04"
     assert spec.prospective_start > spec.frozen_on
@@ -41,3 +43,28 @@ calibrated_parameters: {bitcoin_weight: 0.5}
 
     with pytest.raises(ModelHPreregistrationError):
         load_model_h_preregistration(path)
+
+
+def test_calculates_equal_weight_model_h_without_partial_rows() -> None:
+    path = Path(__file__).resolve().parents[1] / "config" / "model_h_preregistration.yaml"
+    spec = load_model_h_preregistration(path)
+    dates = pd.date_range("2018-03-31", periods=24, freq="QE")
+    global_model = pd.DataFrame({"date": dates, "global_cb_momentum_score": [1.0] * 24})
+    offshore = pd.DataFrame(
+        {
+            "date": dates,
+            "momentum_score": [2.0] * 24,
+            "signal_available_date": dates + pd.offsets.MonthEnd(4),
+        }
+    )
+    private = pd.DataFrame(
+        {
+            "date": dates,
+            "private_liquidity_momentum": [3.0] * 24,
+            "signal_available_date": dates + pd.offsets.MonthEnd(3),
+        }
+    )
+    result = calculate_model_h(global_model, offshore, private, spec)
+    assert result["model_h_momentum_score"].eq(2.0).all()
+    assert result["result_status"].eq("post_specification_descriptive").all()
+    assert result["signal_available_date"].equals(offshore["signal_available_date"])
