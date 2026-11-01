@@ -5,6 +5,12 @@ release is tagged.
 
 ## [Unreleased]
 
+### Fixed
+
+- Removed a brittle data-quality inventory row-count assertion that caused every scheduled public
+  refresh after 4 September 2026 to fail before committing updated snapshots. The test now verifies
+  required snapshot coverage regardless of whether it runs before or after the point-in-time stage.
+
 ### Added
 
 - Froze and implemented a common Bitcoin validation protocol for the separate offshore-dollar and

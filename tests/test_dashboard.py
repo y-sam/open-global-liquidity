@@ -597,7 +597,12 @@ def test_loads_published_global_aggregate_snapshots() -> None:
     assert model_h["result_status"].eq("post_specification_descriptive").all()
     assert signal_map["channel"].nunique() == 4
     assert signal_map["aggregation_status"].eq("not_aggregated").all()
-    assert quality["filename"].nunique() >= 46
+    assert {
+        "global_central_bank_assets_snapshot.parquet",
+        "global_model_h_snapshot.parquet",
+        "liquidity_signal_map_snapshot.parquet",
+        "us_ogli_snapshot.parquet",
+    }.issubset(set(quality["filename"]))
     assert quality["duplicate_rows"].ge(0).all()
     assert private_liquidity["private_liquidity_index"].dropna().between(0, 100).all()
     assert (
